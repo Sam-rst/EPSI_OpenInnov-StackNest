@@ -1,117 +1,93 @@
-# 🥚 StackNest
+# StackNest - Étape 2 (UI + API proxy + webhook n8n)
 
-> **Build Fast. Deploy Smart.**
+Cette version connecte l'interface StackNest à une API locale Node.js/Express qui relaie le déploiement vers un webhook n8n.
 
-![Project Status](https://img.shields.io/badge/Status-Development-orange)
-![Version](https://img.shields.io/badge/Version-0.1.0-blue)
-![License](https://img.shields.io/badge/License-Proprietary-red)
+## Prérequis
 
-## 📖 À propos
+- Docker
+- Docker Compose (commande `docker compose`)
 
-[cite_start]**StackNest** est une **Plateforme d'Ingénierie Interne (Internal Developer Platform - IDP)** conçue pour combler le fossé entre les développeurs et les équipes Ops[cite: 22].
+## Structure du projet
 
-[cite_start]Actuellement, les développeurs perdent du temps à créer des tickets pour obtenir des ressources (VM, Bases de données), créant frustration et "Shadow IT"[cite: 25]. [cite_start]**StackNest** résout ce problème en offrant un **guichet unique (Store)** permettant de provisionner des ressources IT de manière autonome, sécurisée et standardisée[cite: 22].
+- `ui/index.html` : interface StackNest (inchangée)
+- `ui/styles.css` : charte graphique StackNest
+- `ui/app.js` : appel réel `POST /api/deploy` (même origine)
+- `ui/nginx.conf` : serveur statique + proxy `/api/` vers `api:3001`
+- `api/server.js` : API Express (`GET /health`, `POST /deploy`)
+- `api/package.json` : dépendances API
+- `api/Dockerfile` : image API
+- `docker-compose.yml` : orchestration UI + API
+- `.env.example` : variables d'environnement à copier
 
-### 🚀 Notre Mission
-* **Autonomie :** Libérer les développeurs des tickets d'attente.
-* **Contrôle :** Standardiser l'infrastructure via l'IaC (Terraform/Ansible).
-* **Innovation :** Intégrer l'IA pour simplifier les demandes complexes (ChatOps).
+## Configuration
 
----
+1. Copier le fichier d'exemple:
 
-## ✨ Fonctionnalités Clés
+```bash
+cp .env.example .env
+```
 
-* [cite_start]🛒 **Service Catalog (Store) :** Une interface web intuitive pour commander des ressources (S3, EC2, PGSQL) en quelques clics[cite: 40].
-* [cite_start]🤖 **AI ChatOps :** Un assistant intelligent capable de traduire des demandes naturelles (ex: *"Je veux un env de dev pour une app Node"*) en configuration Terraform valide[cite: 40].
-* [cite_start]⚙️ **Automation Engine :** Exécution automatisée et isolée des scripts Terraform et Ansible[cite: 40].
-* [cite_start]🔐 **Sécurité & Conformité :** Gestion des secrets via **Vault**, authentification forte (OAuth2/OIDC) et RBAC strict[cite: 41, 45].
-* [cite_start]📊 **Dashboard & FinOps :** Vue d'ensemble des déploiements et estimation des coûts cloud[cite: 40].
+2. Renseigner `.env` à la racine du projet (même niveau que `docker-compose.yml`).
+3. Ne pas commiter `.env` (il contient des secrets potentiels).
 
----
+Variables :
 
-## 🛠 Stack Technique
+- `N8N_WEBHOOK_URL` (obligatoire)
+- `N8N_TOKEN` (optionnel, transmis en header `x-deploy-token`)
+- `PORT` (optionnel, défaut `3001`)
+- `DEBUG_ENV` (optionnel: `1` pour activer `GET /debug/env`)
 
-[cite_start]Le projet repose sur une architecture moderne et conteneurisée[cite: 44, 54]:
+## Lancement
 
-| Composant | Technologie | Description |
-| :--- | :--- | :--- |
-| **Frontend** | React.js / Next.js | Interface réactive et Widget Chat |
-| **Backend** | Python (FastAPI) / Go | API, Logique métier et Connecteur IA |
-| **Database** | PostgreSQL | Stockage utilisateurs, logs et catalogue |
-| **IaC** | Terraform & Ansible | Moteur de déploiement et configuration |
-| **IA / LLM** | OpenAI (GPT-4o) / Ollama | Interprétation des prompts utilisateurs |
-| **Sécurité** | Hashicorp Vault | Gestion centralisée des secrets |
-| **Infra** | Docker Compose | Conteneurisation pour le dév et la démo |
+Depuis la racine du projet:
 
----
+```bash
+docker compose up --build
+```
 
-## ⚡ Installation & Démarrage
+Application disponible sur:
 
-### Prérequis
-* Docker & Docker Compose installés sur votre machine.
-* Clés API (AWS/Azure) pour les tests de déploiement réel.
+- http://localhost:8080
 
-### Lancement Rapide
+Commandes Windows utiles (PowerShell / Docker Desktop):
 
-1.  **Cloner le dépôt :**
-    ```bash
-    git clone [https://github.com/votre-orga/stacknest.git](https://github.com/votre-orga/stacknest.git)
-    cd stacknest
-    ```
+```bash
+docker compose down
+docker compose up -d --build
+docker compose exec api sh -lc "env | grep -E '^N8N_'"
+```
 
-2.  **Configurer l'environnement :**
-    Dupliquez le fichier `.env.example` en `.env` et renseignez vos secrets (Clés API, Token LLM).
-    ```bash
-    cp .env.example .env
-    ```
+## Endpoints disponibles
 
-3.  **Lancer la stack (Mode Dev) :**
-    ```bash
-    docker-compose up --build
-    ```
+- `GET /api/health` -> `{ "ok": true }`
+- `POST /api/deploy` -> relaie `{ template, count }` vers n8n et renvoie la réponse JSON
 
-4.  **Accéder à l'application :**
-    * Frontend : `http://localhost:3000`
-    * API Docs (Swagger) : `http://localhost:8000/docs`
+Vérification de base:
 
----
+- http://localhost:8080/api/health doit répondre `{ "ok": true }`
 
-## 🗺️ Roadmap
+## Exemples de test curl
 
-[cite_start]Le développement suit un cycle d'innovation sur 5 mois[cite: 57]:
+Via nginx (recommandé):
 
-- [ ] **Phase 1 (Janvier) :** Conception, UX/UI, Socle Docker & BDD.
-- [ ] **Phase 2 (Fev - Mars) :** MVP du Store, Moteur Terraform, Auth & Vault.
-- [ ] **Phase 3 (Avril) :** Intégration du Chatbot IA & Sécurité avancée.
-- [ ] **Phase 4 (Mai) :** Dashboard, Tests finaux et Livraison.
+```bash
+curl -X POST http://localhost:8080/api/deploy \
+  -H "Content-Type: application/json" \
+  -d '{"template":"ubuntu","count":1}'
+```
 
----
+Si vous publiez temporairement le port API dans `docker-compose.yml` (ex: `3001:3001`):
 
-## 👥 L'Équipe (Projet 2427-01)
+```bash
+curl -X POST http://localhost:3001/deploy \
+  -H "Content-Type: application/json" \
+  -d '{"template":"ubuntu","count":1}'
+```
 
-**Développement (M1 DEV)**
-* Samuel RESSIOT
-* Yassine ZOUITNI
+## Logo
 
-**Cybersécurité & Compliance (M1 CYBER)**
-* Antony LOZANO
-* Rémi REZE
-* Thomas BREMARD
+Le logo doit être placé ici:
 
-**Business & Produit (B1)**
-* Julien VOLMERANGE
-* Mahé PERNOT
+- `ui/assets/stacknest-logo.png`
 
----
-
-## 🎨 Charte Graphique
-
-* [cite_start]**Police :** Inter / Roboto (UI), JetBrains Mono (Code)[cite: 48].
-* **Couleurs Principales :**
-    * 🔵 Bleu Nuit : `#032233`
-    * 🔵 Cyan : `#0d9297`
-    * 🟠 Jaune (Accent) : `#fea21f`
-
----
-
-[cite_start]*Projet réalisé dans le cadre du Cycle d'Innovation 2025-2026.* [cite: 5]
+Si absent, l'interface affiche le fallback texte `StackNest`.
