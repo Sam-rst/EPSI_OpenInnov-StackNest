@@ -18,8 +18,30 @@ Generate Jira tickets that respect the team's Definition of Ready. Every ticket 
 
 1. **Understand the scope** — read the spec document at `docs/superpowers/specs/2026-04-14-stacknest-architecture-design.md` to understand the project architecture, tech stack, and existing ticket list
 2. **Clarify if needed** — ask the user ONE question at a time if the scope is ambiguous
-3. **Generate the ticket** — follow the DOR template exactly
-4. **Present for review** — show the ticket to the user before any Jira action
+3. **Estimate complexity** — apply the complexity matrix (see below) to calculate Story Points
+4. **Generate the ticket** — follow the DOR template exactly
+5. **Present for review** — show the ticket to the user before any Jira action
+
+## Complexity matrix for Story Points
+
+Before assigning Story Points (Fibonacci: 1, 2, 3, 5, 8, 13, 21), evaluate each criterion and assign a score from 1 to 8:
+
+| Critere | 1 – Simple | 3 – Moyen | 5 – Complexe | 8 – Tres complexe |
+|---|---|---|---|---|
+| Effort technique | Modification triviale / copier-coller | Developpement standard connu | Refactoring ou logique non triviale | Refonte d'architecture |
+| Inconnues / risque | Tout est clair et specifie | Quelques points a clarifier | Dependances ou comportement flous | Territoire inconnu, R&D necessaire |
+| Dependances | Aucune dependance externe | 1 module ou service interne | Plusieurs modules ou equipes | Dependances externes critiques ou tierces |
+| Impact metier | Fonctionnalite isolee | Un seul domaine fonctionnel | Plusieurs domaines impactes | Transverse a tout le produit |
+| Tests necessaires | Unitaire simple ou aucun | Tests d'integration standards | Scenarios multiples / edge cases | End-to-end + non-regression lourde |
+| UX / Design | Aucune interface a produire | UI existante a adapter | Nouvelle interface a concevoir | Parcours complexe multi-etats |
+
+**Rules:**
+1. Evaluate each criterion and briefly justify the score
+2. Calculate the average of the 6 scores
+3. Round to the nearest Fibonacci number
+4. If any single criterion exceeds 8 (absolute blocker), propose to split the ticket before estimating
+
+**Always show the filled matrix table in the ticket output, before the final Story Points value.**
 
 ## DOR Template (6 mandatory sections)
 

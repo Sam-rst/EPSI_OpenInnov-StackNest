@@ -695,23 +695,77 @@ Merge sur develop/main → CI verte → CD (self-hosted runner) :
 
 ### Infra / CI-CD
 
-| # | Ticket | Scope | Assignation |
-|---|---|---|---|
-| 41 | Docker Compose de dev + override | `docker-compose.yml` + `docker-compose.dev.yml` : volumes montes, hot reload (uvicorn --reload, Vite HMR), ports debug | Dev |
-| 42 | Pipeline CI GitHub Actions | Workflow : lint (ruff + eslint) → tests (pytest + vitest) → build → coverage gate | Dev |
-| 43 | Pipeline CD self-hosted runner | Job CD sur label `self-hosted,stacknest`, docker compose pull + up | Dev |
-| 44 | Installation runner sur serveur | Mise en place du self-hosted runner Docker sur la VM Proxmox d'Antony | Cyber (Antony) |
-| 45 | Configuration Nginx reverse proxy | Nginx sur le serveur : SSL, routing `/api/`, headers securite | Cyber |
-| 46 | Gestion des secrets | Variables d'env chiffrees, GitHub secrets par environnement (develop, staging, prod) | Cyber |
-| 47 | Audit securite infra | Scan des images Docker, review des ports exposes, permissions, reseau | Cyber |
+| # | Ticket | Scope | SP | Assignation |
+|---|---|---|---|---|
+| 41 | Docker Compose de dev + override | `docker-compose.yml` + `docker-compose.dev.yml` : volumes montes, hot reload (uvicorn --reload, Vite HMR), ports debug | 2 | Dev |
+| 42 | Pipeline CI GitHub Actions | Workflow : lint (ruff + eslint) → tests (pytest + vitest) → build → coverage gate | 3 | Dev |
+| 43 | Pipeline CD self-hosted runner | Job CD sur label `self-hosted,stacknest`, docker compose pull + up | 3 | Dev |
+| 44 | Installation runner sur serveur | Mise en place du self-hosted runner Docker sur la VM Proxmox d'Antony | 2 | Cyber (Antony) |
+| 45 | Configuration Nginx reverse proxy | Nginx sur le serveur : SSL, routing `/api/`, headers securite | — | Cyber |
+| 46 | Gestion des secrets | Variables d'env chiffrees, GitHub secrets par environnement (develop, staging, prod) | 2 | Cyber |
+| 47 | Audit securite infra | Scan des images Docker, review des ports exposes, permissions, reseau | — | Cyber |
+| 48 | Scaffolding backend FastAPI | pyproject.toml, uv, archi verticale (core/ + features vides), ruff, mypy, pytest, Dockerfile, endpoint GET /health | 2 | Dev |
+| 49 | Scaffolding frontend React | Vite, TypeScript, Tailwind (charte graphique), ESLint, Prettier, Vitest, Playwright, archi verticale (core/ + features vides) | 2 | Dev |
 
 ### Repartition par profil
 
 | Profil | Tickets | Total |
 |---|---|---|
-| Dev (Samuel + Yassine) | 1-6, 4b, 9-25, 23b, 27-32, 34-36, 41-43 | ~36 |
+| Dev (Samuel + Yassine) | 1-6, 4b, 9-25, 23b, 27-32, 34-36, 41-43, 48-49 | ~38 |
 | Cyber (Antony, Remi, Thomas) | 7, 8, 9b, 15, 26, 33, 44-47 | ~10 |
 | B1 (Julien, Mahe) | 37-40 (+5, 6 si montee en competences OK) | 4-6 |
+
+### Planning des versions (sprints d'une semaine, dimanche a dimanche)
+
+| Version | Contenu | SP | Sprint |
+|---|---|---|---|
+| **v0.1.0** | Setup projet (infra, frameworks, archi, docs, regles) | 11 | 14-19 avril |
+| **v0.2.0** | Auth complete (back + front + modele User) | 16 | 19-26 avril |
+| **v0.3.0** | Store complet (modele templates + CRUD + front) | 16 | 26 avril - 3 mai |
+| **v0.4.0** | Terraform worker (modele deployments + worker + generation) | 16 | 3-10 mai |
+| **v0.5.0** | SSE + frontend deploiement + rollback | 14 | 10-17 mai |
+| **v0.6.0** | Historique + suppression + gestion ressources | 10 | 17-24 mai |
+| **v0.7.0** | Chat IA backend (modele chat + connecteur + validation) | 16 | 24-31 mai |
+| **v0.8.0** | Chat frontend + dashboard basique | 12 | 31 mai - 7 juin |
+| | **Preparation oral + video demo + bugfixes** | — | 7-16 juin (oral le 16) |
+| **v0.9.0** | Post-jury (dashboard complet, MFA, audits, docs B1) | — | Sept 2026+ |
+
+**Detail par version :**
+
+**v0.1.0 — Setup projet (11 SP) — 14-19 avril**
+Tickets : #41 (2), #42 (3), #44 (2), #48 (2), #49 (2)
+Livrable : repo structure, Docker Compose fonctionnel, CI qui tourne, hot reload, GET /health, version.json
+
+**v0.2.0 — Auth (16 SP) — 19-26 avril**
+Tickets : #1 (2), #2 (2), #3 (3), #4 (3), #4b (1), #5 (3), #6 (2)
+Livrable : inscription, login, JWT, RBAC, pages login/register, route guard
+
+**v0.3.0 — Store (16 SP) — 26 avril - 3 mai**
+Tickets : #9 (3), #15 (2), #10 (2), #11 (1), #12 (1), #13 (3), #14 (3), #46 (2) [total: 17, ajuster si besoin]
+Livrable : catalogue navigable avec auth, templates avec versions LTS/EOL
+
+**v0.4.0 — Terraform worker (16 SP) — 3-10 mai**
+Tickets : #16 (3), #17 (3), #18 (5), #19 (5)
+Livrable : backend provisionne des containers Docker via Terraform
+
+**v0.5.0 — SSE + frontend deploiement (14 SP) — 10-17 mai**
+Tickets : #20 (3), #21 (5), #43 (3), #24 (5) [total: 16, ajuster si besoin]
+Livrable : **MVP demonstrable** — deploiement depuis l'UI avec suivi temps reel
+
+**v0.6.0 — Historique + gestion (10 SP) — 17-24 mai**
+Tickets : #22 (1), #23 (3), #23b (3), #25 (3)
+Livrable : gestion complete des deploiements (voir, supprimer, regenerer mdp)
+
+**v0.7.0 — Chat IA backend (16 SP) — 24-31 mai**
+Tickets : #31 (2), #27 (3), #28 (3), #29 (5), #30 (3)
+Livrable : chatbot fonctionnel cote API avec validation anti-hallucination
+
+**v0.8.0 — Chat frontend + dashboard (12 SP) — 31 mai - 7 juin**
+Tickets : #32 (5), #34 (1), #35 (3), #36 (3)
+Livrable : **feature-complete pour la demo jury**
+
+**v0.9.0 — Post-jury — Sept 2026+**
+Tickets : #7, #8, #9b, #26, #33, #37-40, #45, #47
 
 ---
 
@@ -773,13 +827,19 @@ Periode de test : 14 jours Pro gratuit. Cles de licence generees a l'inscription
 
 ### Roadmap
 
-| Phase | Periode | Contenu | Livrable |
+Sprints d'une semaine (dimanche a dimanche). Oral le 16 juin 2026, feature freeze le 7 juin.
+
+| Phase | Periode | Versions | Contenu |
 |---|---|---|---|
-| Phase 1 | Avril 2026 | Setup CI/CD, Docker Compose, structure projet, spec | Repo configure, spec validee |
-| Phase 2 | Avril-Mai 2026 | Store + Auth + Terraform runner | v0.1.0 + v0.2.0 |
-| Phase 3 | Mai-Juin 2026 | Chatbot IA + Dashboard basique | v0.3.0 — demo jury juin |
-| Phase 4 | Sept-Dec 2026 | MFA, Proxmox, site vitrine, finitions | v0.4.0 |
-| Phase 5 | Jan-Juin 2027 | Beta testing, feedback, commercialisation | v1.0.0 |
+| Phase 1 | 14-19 avril 2026 | v0.1.0 | Setup projet complet |
+| Phase 2 | 19 avril - 3 mai | v0.2.0, v0.3.0 | Auth + Store |
+| Phase 3 | 3-24 mai | v0.4.0, v0.5.0, v0.6.0 | Terraform runner + deploiement |
+| Phase 4 | 24 mai - 7 juin | v0.7.0, v0.8.0 | Chat IA + Dashboard |
+| Prep oral | 7-16 juin | — | Video demo, slides, entrainement |
+| Phase 5 | Sept 2026+ | v0.9.0+ | MFA, Proxmox, site vitrine, audits, docs B1 |
+| Phase 6 | Jan-Juin 2027 | v1.0.0 | Beta testing, commercialisation |
+
+**Jalons :** MVP demonstrable a la v0.5.0 (mi-mai). Feature-complete a la v0.8.0 (7 juin). Oral le 16 juin.
 
 ### Reponses aux questions techniques du prof
 

@@ -190,17 +190,23 @@ Garde-fous supplementaires :
 
 ## 8. Roadmap — remplacer la section existante
 
-| Phase | Periode | Contenu | Livrable |
+Sprints d'une semaine (dimanche a dimanche). Oral le 16 juin 2026, feature freeze le 7 juin.
+
+| Phase | Periode | Versions | Contenu |
 |---|---|---|---|
-| Phase 1 | Avril 2026 | Setup CI/CD, Docker Compose, structure projet, spec technique | Repo configure, spec validee |
-| Phase 2 | Avril-Mai 2026 | Store + Auth + Terraform runner | v0.1.0 (Store+Auth) + v0.2.0 (Terraform) |
-| Phase 3 | Mai-Juin 2026 | Chatbot IA + Dashboard basique | v0.3.0 — **demo jury juin** |
-| Phase 4 | Sept-Dec 2026 | MFA, Proxmox provider, site vitrine, finitions | v0.4.0 |
-| Phase 5 | Jan-Juin 2027 | Beta testing, feedback utilisateurs, commercialisation, mise en production | v1.0.0 |
+| Phase 1 | 14-19 avril 2026 | v0.1.0 | Setup projet complet (infra, frameworks, archi, docs, regles) |
+| Phase 2 | 19 avril - 3 mai | v0.2.0, v0.3.0 | Auth complete + Store complet |
+| Phase 3 | 3-24 mai | v0.4.0, v0.5.0, v0.6.0 | Terraform runner + deploiement + historique |
+| Phase 4 | 24 mai - 7 juin | v0.7.0, v0.8.0 | Chat IA + Dashboard basique |
+| Prep oral | 7-16 juin | — | Video demo, slides, entrainement |
+| Phase 5 | Sept-Dec 2026 | v0.9.0+ | MFA, Proxmox, site vitrine, audits, docs B1 |
+| Phase 6 | Jan-Juin 2027 | v1.0.0 | Beta testing, feedback, commercialisation |
 
 **Jalons cles :**
-- **Juin 2026** : presentation MVP devant jury (v0.3.0 avec chatbot)
-- **Decembre 2026** : applicatif complet + site vitrine (v0.4.0)
+- **Mi-mai 2026** : MVP demonstrable (v0.5.0 — Store + Auth + Terraform + UI deploiement)
+- **7 juin 2026** : feature-complete (v0.8.0 — chatbot + dashboard)
+- **16 juin 2026** : oral jury
+- **Decembre 2026** : applicatif complet + site vitrine (v0.9.0)
 - **Juin 2027** : commercialisation, release publique (v1.0.0)
 
 ---
