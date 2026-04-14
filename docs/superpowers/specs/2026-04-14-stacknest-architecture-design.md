@@ -706,6 +706,7 @@ Merge sur develop/main → CI verte → CD (self-hosted runner) :
 | 47 | Audit securite infra | Scan des images Docker, review des ports exposes, permissions, reseau | — | Cyber |
 | 48 | Scaffolding backend FastAPI | pyproject.toml, uv, archi verticale (core/ + features vides), ruff, mypy, pytest, Dockerfile, endpoint GET /health | 2 | Dev |
 | 49 | Scaffolding frontend React | Vite, TypeScript, Tailwind (charte graphique), ESLint, Prettier, Vitest, Playwright, archi verticale (core/ + features vides) | 2 | Dev |
+| 50 | Configuration des 3 environnements | docker-compose.{dev,preview,prod}.yml, script start/stop, pipeline CD par branche, Nginx par env | 3 | Dev |
 
 ### Repartition par profil
 
@@ -719,11 +720,11 @@ Merge sur develop/main → CI verte → CD (self-hosted runner) :
 
 | Version | Contenu | SP | Sprint |
 |---|---|---|---|
-| **v0.1.0** | Setup projet (infra, frameworks, archi, docs, regles) | 11 | 14-19 avril |
-| **v0.2.0** | Auth complete (back + front + modele User) | 16 | 19-26 avril |
-| **v0.3.0** | Store complet (modele templates + CRUD + front) | 16 | 26 avril - 3 mai |
-| **v0.4.0** | Terraform worker (modele deployments + worker + generation) | 16 | 3-10 mai |
-| **v0.5.0** | SSE + frontend deploiement + rollback | 14 | 10-17 mai |
+| **v0.1.0** | Setup projet (infra, frameworks, archi, envs, docs, regles) | 14 | 14-19 avril |
+| **v0.2.0** | Store complet (modele templates + CRUD + front) | 16 | 19-26 avril |
+| **v0.3.0** | Terraform worker (modele deployments + worker + generation) | 16 | 26 avril - 3 mai |
+| **v0.4.0** | SSE + frontend deploiement + rollback | 14 | 3-10 mai |
+| **v0.5.0** | Auth complete (back + front + modele User) | 16 | 10-17 mai |
 | **v0.6.0** | Historique + suppression + gestion ressources | 10 | 17-24 mai |
 | **v0.7.0** | Chat IA backend (modele chat + connecteur + validation) | 16 | 24-31 mai |
 | **v0.8.0** | Chat frontend + dashboard basique | 12 | 31 mai - 7 juin |
@@ -732,25 +733,26 @@ Merge sur develop/main → CI verte → CD (self-hosted runner) :
 
 **Detail par version :**
 
-**v0.1.0 — Setup projet (11 SP) — 14-19 avril**
-Tickets : #41 (2), #42 (3), #44 (2), #48 (2), #49 (2)
-Livrable : repo structure, Docker Compose fonctionnel, CI qui tourne, hot reload, GET /health, version.json
+**v0.1.0 — Setup projet (14 SP) — 14-19 avril**
+Tickets : #41 (2), #42 (3), #44 (2), #48 (2), #49 (2), #50 (3)
+Livrable : repo structure, Docker Compose fonctionnel, 3 envs (develop/preview/prod) avec start/stop, CI qui tourne, hot reload, GET /health, version.json
+Environnements : develop tourne en permanence sur le serveur d'Antony, preview/prod a la demande (start/stop). Tout accessible via VPN equipe.
 
-**v0.2.0 — Auth (16 SP) — 19-26 avril**
-Tickets : #1 (2), #2 (2), #3 (3), #4 (3), #4b (1), #5 (3), #6 (2)
-Livrable : inscription, login, JWT, RBAC, pages login/register, route guard
-
-**v0.3.0 — Store (16 SP) — 26 avril - 3 mai**
+**v0.2.0 — Store (16 SP) — 19-26 avril**
 Tickets : #9 (3), #15 (2), #10 (2), #11 (1), #12 (1), #13 (3), #14 (3), #46 (2) [total: 17, ajuster si besoin]
-Livrable : catalogue navigable avec auth, templates avec versions LTS/EOL
+Livrable : catalogue navigable, templates avec versions LTS/EOL
 
-**v0.4.0 — Terraform worker (16 SP) — 3-10 mai**
+**v0.3.0 — Terraform worker (16 SP) — 26 avril - 3 mai**
 Tickets : #16 (3), #17 (3), #18 (5), #19 (5)
 Livrable : backend provisionne des containers Docker via Terraform
 
-**v0.5.0 — SSE + frontend deploiement (14 SP) — 10-17 mai**
+**v0.4.0 — SSE + frontend deploiement (14 SP) — 3-10 mai**
 Tickets : #20 (3), #21 (5), #43 (3), #24 (5) [total: 16, ajuster si besoin]
 Livrable : **MVP demonstrable** — deploiement depuis l'UI avec suivi temps reel
+
+**v0.5.0 — Auth (16 SP) — 10-17 mai**
+Tickets : #1 (2), #2 (2), #3 (3), #4 (3), #4b (1), #5 (3), #6 (2)
+Livrable : inscription, login, JWT, RBAC, pages login/register, route guard. Toutes les routes existantes sont protegees.
 
 **v0.6.0 — Historique + gestion (10 SP) — 17-24 mai**
 Tickets : #22 (1), #23 (3), #23b (3), #25 (3)
@@ -831,15 +833,17 @@ Sprints d'une semaine (dimanche a dimanche). Oral le 16 juin 2026, feature freez
 
 | Phase | Periode | Versions | Contenu |
 |---|---|---|---|
-| Phase 1 | 14-19 avril 2026 | v0.1.0 | Setup projet complet |
-| Phase 2 | 19 avril - 3 mai | v0.2.0, v0.3.0 | Auth + Store |
-| Phase 3 | 3-24 mai | v0.4.0, v0.5.0, v0.6.0 | Terraform runner + deploiement |
+| Phase 1 | 14-19 avril 2026 | v0.1.0 | Setup projet complet + 3 environnements |
+| Phase 2 | 19 avril - 10 mai | v0.2.0, v0.3.0, v0.4.0 | Store + Terraform + deploiement (MVP) |
+| Phase 3 | 10-24 mai | v0.5.0, v0.6.0 | Auth + historique/gestion |
 | Phase 4 | 24 mai - 7 juin | v0.7.0, v0.8.0 | Chat IA + Dashboard |
 | Prep oral | 7-16 juin | — | Video demo, slides, entrainement |
 | Phase 5 | Sept 2026+ | v0.9.0+ | MFA, Proxmox, site vitrine, audits, docs B1 |
 | Phase 6 | Jan-Juin 2027 | v1.0.0 | Beta testing, commercialisation |
 
-**Jalons :** MVP demonstrable a la v0.5.0 (mi-mai). Feature-complete a la v0.8.0 (7 juin). Oral le 16 juin.
+**Jalons :** MVP demonstrable a la v0.4.0 (10 mai). Feature-complete a la v0.8.0 (7 juin). Oral le 16 juin.
+
+**Environnements :** develop tourne en permanence sur le serveur d'Antony (acces VPN equipe). Preview et prod lances a la demande (start/stop) pour les livraisons de version. Un seul env non-develop actif a la fois (contrainte ressources serveur).
 
 ### Reponses aux questions techniques du prof
 
