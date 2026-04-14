@@ -767,7 +767,32 @@ Tickets : #32 (5), #34 (1), #35 (3), #36 (3)
 Livrable : **feature-complete pour la demo jury**
 
 **v0.9.0 — Post-jury — Sept 2026+**
-Tickets : #7, #8, #9b, #26, #33, #37-40, #45, #47
+Tickets : #7, #37-40
+
+### Planning equipe cyber (sprint decale N-1)
+
+Les cyber testent toujours la version N-1 (stable, mergee sur develop) pendant que les devs bossent sur la version N. Les vulnerabilites trouvees generent des tickets bugfix integres au sprint courant ou suivant.
+
+| Sprint dev | Les devs livrent | Les cyber font |
+|---|---|---|
+| v0.1.0 (14-19 avril) | Setup projet | #44 Installation runner |
+| v0.2.0 (19-26 avril) | Store | #46 Gestion secrets + review setup v0.1.0 |
+| v0.3.0 (26 avril - 3 mai) | Terraform worker | Audit Store (v0.2.0) — endpoints catalogue, injections, permissions |
+| v0.4.0 (3-10 mai) | SSE + front deploiement | #26 Audit Terraform (v0.3.0) — isolation worker, Docker socket, states |
+| v0.5.0 (10-17 mai) | Auth | #47 Audit infra + deploiement (v0.4.0) — scan images, SSE, ports |
+| v0.6.0 (17-24 mai) | Historique + gestion | #8 Audit auth (v0.5.0) — brute force, JWT, timing attack |
+| v0.7.0 (24-31 mai) | Chat IA backend | Audit historique/gestion (v0.6.0) + #45 Config Nginx SSL |
+| v0.8.0 (31 mai - 7 juin) | Chat front + dashboard | #33 Audit prompts IA (v0.7.0) — injections, data leak + #9b Maintenance versions |
+| Prep oral (7-16 juin) | Slides + video | Audit final v0.8.0 + **#51 Redaction rapport de pentest complet** |
+
+**Ticket #51 — Rapport de pentest securite** (Cyber, livrable prep oral)
+Structure du rapport :
+1. Perimetre — ce qui a ete teste (API, auth, Terraform, infra, IA)
+2. Methodologie — OWASP Top 10, scan automatise (trivy, OWASP ZAP), tests manuels
+3. Vulnerabilites trouvees — classees par criticite (Critical/High/Medium/Low/Info)
+4. Preuves — screenshots, requetes, logs
+5. Recommandations — fix propose pour chaque vuln
+6. Statut — corrige / en cours / accepte
 
 ---
 
