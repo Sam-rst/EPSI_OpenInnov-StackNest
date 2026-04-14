@@ -4,42 +4,124 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-StackNest is a deployment UI that proxies requests to n8n webhooks. It consists of two Docker services: a Node.js/Express API backend and a vanilla HTML/CSS/JS frontend served by Nginx.
+StackNest is an Internal Developer Platform (IDP) that enables technical teams to provision IT resources (VMs, databases, environments) autonomously via a web UI or an AI chatbot, using Terraform and Docker.
 
 The entire UI is in **French** — all labels, text, and user-facing strings must remain in French.
+Commits must be in **French** and reference the Jira ticket (EOS-XX).
 
-## Commands
+## Team
 
-```bash
-# Build and run (from repo root)
-docker compose up --build
+- **Dev** : Samuel Ressiot (tech lead), Yassine Zouitni (M1 DEV)
+- **Cyber** : Antony Lozano, Remi Reze, Thomas Bremard (M1 CYBER)
+- **Design/QA** : Julien Volmerange, Mahe Pernot (B1)
 
-# Run detached
-docker compose up -d --build
+## Tech Stack
 
-# Stop
-docker compose down
-
-# Check API health
-curl http://localhost:8080/api/health
-```
-
-The app is accessible at http://localhost:8080. There are no test suites, linters, or build steps configured.
-
-## Environment
-
-Copy `.env.example` to `.env` before running. Required variable: `N8N_WEBHOOK_URL`. Optional: `N8N_TOKEN`, `PORT` (default 3001), `DEBUG_ENV` (0/1).
+- **Backend** : FastAPI (Python 3.13), uv, Clean Architecture vertical slicing
+- **Frontend** : React + Vite + TypeScript (SPA), Tailwind CSS
+- **Database** : PostgreSQL 16, SQLAlchemy async + Alembic
+- **IaC** : Terraform (Docker provider MVP, Proxmox stretch)
+- **Queue/Realtime** : Redis (job queue + pub/sub SSE)
+- **LLM** : Pluggable — Ollama (default) / OpenAI (fallback)
+- **Infra** : Docker Compose, VM Proxmox (serveur Antony), VPN access
+- **CI** : GitHub Actions (cloud runner)
+- **CD** : Self-hosted GitHub Actions runner on Antony's server
 
 ## Architecture
 
-**api/** — Single-file Express server (`server.js`). Validates incoming `{ template, count }` payloads and proxies them to the n8n webhook URL. Uses AbortController with a 15s timeout. No build step, no framework beyond Express.
+### Docker Compose Services
 
-**ui/** — Static files (index.html, app.js, styles.css) served by Nginx. Nginx also reverse-proxies `/api/` requests to the Express backend (stripping the prefix). No bundler, no npm — just plain browser JS.
+| Service | Role |
+|---|---|
+| **ui** (Nginx) | SPA React, reverse-proxy `/api/` vers API |
+| **api** (FastAPI) | Logique metier, auth, catalogue, orchestration |
+| **worker** (Python + Terraform) | Execute les plans Terraform, isole du web |
+| **db** (PostgreSQL 16) | Users, catalogue, deploiements, conversations |
+| **redis** (Redis 7) | Queue jobs API→Worker + pub/sub SSE |
+| **ollama** (optionnel) | LLM local |
 
-**docker-compose.yml** — Two services: `api` (Node 20 Alpine, port 3001 internal) and `ui` (Nginx Alpine, port 8080 exposed). The UI service depends on API health check before starting.
+### Backend — Clean Architecture + Vertical Slicing
 
-## API Contract
+```
+api/app/
+├── core/                    # Config, BDD, Redis, securite, deps partagees
+├── auth/                    # domain/ application/ infrastructure/ presentation/
+├── catalog/                 # domain/ application/ infrastructure/ presentation/
+├── deployment/              # domain/ application/ infrastructure/ presentation/ worker/
+├── chat/                    # domain/ application/ infrastructure/ presentation/
+├── dashboard/               # domain/ application/ infrastructure/ presentation/
+├── main.py                  # Entrypoint API
+└── worker_main.py           # Entrypoint Worker
+```
 
-- `GET /api/health` → `{ "ok": true }`
-- `POST /api/deploy` → proxies to n8n webhook. Body: `{ "template": string, "count": integer >= 1 }`. Returns n8n response or error (400/500/502).
-- `GET /debug/env` → env debug info (only when `DEBUG_ENV=1`)
+Each feature has its own domain/application/infrastructure/presentation layers. Features depend only on `core/` and communicate via domain interfaces.
+
+### Frontend — Clean Architecture + Vertical Slicing
+
+```
+ui/src/
+├── core/                    # Config, client API, auth context, layout, router
+├── auth/                    # components/ pages/ services/ hooks/ types/
+├── catalog/
+├── deployment/
+├── chat/
+├── dashboard/
+└── main.tsx
+```
+
+## Skills
+
+- **`/ba`** — Generate Jira tickets with full DOR (Definition of Ready). Use for creating stories, tasks, or bugs. Every ticket must have 6 sections: Contexte, Criteres d'acceptation (min 3, Given/When/Then), Parcours utilisateur, Perimetre, Impact technique, Risques et dependances, Scenarios de test.
+
+## Methodology
+
+### TDD strict (Red → Green → Blue)
+
+1. **RED** : write failing tests (unit + integration + E2E)
+2. **GREEN** : minimum implementation to pass
+3. **BLUE** : refactor (Software Craftsmanship)
+
+### Software Craftsmanship (Blue phase)
+
+- Explicit naming (no abbreviations)
+- Functions <= 20 lines, single responsibility
+- Early return, named constants, structured logs
+- Custom typed exceptions
+- Try/catch on all side-effect code (network, DB, timers)
+
+### Validation order
+
+Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
+
+### Test coverage
+
+- **80% global minimum**, **90% on business logic**
+- 3 levels: unit (services), integration (handlers + mocks), E2E (real server)
+
+## Gitflow
+
+- **main** : production
+- **preview/staging** : pre-production
+- **develop** : development
+- **feature/EOS-XX-description**, **bugfix/EOS-XX-description** : work branches
+- Never commit directly on main/develop/staging
+- Never add `Co-Authored-By`
+- Always push after merge
+- Clean working tree before any new change
+
+## Versioning (SemVer)
+
+- 0.x.y in development, 1.0.0 at first public launch
+- PATCH before MINOR (bugfixes before features)
+- Version centralized in `version.json`, synced in package.json/pyproject.toml
+
+## Key Documents
+
+- **Spec technique** : `docs/superpowers/specs/2026-04-14-stacknest-architecture-design.md`
+- **Setup runner CD** : `docs/setup-github-runner.md`
+- **Jira** : https://samrst-studies.atlassian.net/jira/software/projects/EOS/boards/34
+
+## Design System
+
+- **Fonts** : Inter/Roboto (UI), JetBrains Mono (code)
+- **Colors** : Bleu nuit `#032233`, Cyan `#0d9297`, Jaune `#fea21f`, Error `#c42b1c`, Success `#22c55e`
