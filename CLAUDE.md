@@ -71,7 +71,7 @@ ui/src/
 
 ## Skills
 
-- **`/ba`** — Generate Jira tickets with full DOR (Definition of Ready). Use for creating stories, tasks, or bugs. Every ticket must have 6 sections: Contexte, Criteres d'acceptation (min 3, Given/When/Then), Parcours utilisateur, Perimetre, Impact technique, Risques et dependances, Scenarios de test.
+- **`/ba`** — Orchestrate the full lifecycle of a Jira ticket from idea to "Prêt". ALWAYS invoke this skill before creating any ticket (feature, bug, task). The BA drives a 13-step process: create skeleton → brainstorm (with `superpowers:brainstorming`) → optional design (with `frontend-design` or `figma`) → write full DOR → link dependencies → estimate with complexity matrix → user validates. Never write a DOR without brainstorming first. Every ticket must have 6 sections: Contexte, Criteres d'acceptation (min 3, Given/When/Then), Parcours utilisateur, Perimetre, Impact technique, Risques et dependances, Scenarios de test.
 
 ## Methodology
 
