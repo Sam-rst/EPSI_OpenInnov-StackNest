@@ -1,11 +1,21 @@
 # Environment
 .env
+.env.*
+!.env.example
 
 # Dependencies
 node_modules/
+__pycache__/
+*.pyc
+.venv/
 
 # Logs
 *.log
+
+# Build
+dist/
+build/
+*.egg-info/
 
 # IDE
 .idea/
@@ -17,4 +27,21 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# Coverage
+htmlcov/
+.coverage
+coverage/
+lcov.info
+
+# Docker
+*.tar
+
+# Claude Code
 .claude/settings.local.json
