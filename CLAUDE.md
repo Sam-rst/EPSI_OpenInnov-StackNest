@@ -26,8 +26,29 @@ Commits must be in **French** and reference the Jira ticket (EOS-XX).
 - **Infra** : Docker Compose, VM Proxmox (serveur Antony), VPN access
 - **CI** : GitHub Actions (cloud runner)
 - **CD** : Self-hosted GitHub Actions runner on Antony's server
+- **Monitoring** : Sentry (back + front), structlog JSON (logs)
+- **Pre-commit** : Husky + lint-staged
 
 ## Architecture
+
+### Monorepo modulaire
+
+```
+stacknest/
+├── apps/
+│   ├── api/          # FastAPI backend
+│   ├── ui/           # React + Vite frontend
+│   └── worker/       # Worker Terraform
+├── infra/
+│   ├── docker/       # docker-compose.{yml,dev,test,preview,prod}.yml
+│   ├── terraform/    # environments/ + modules/
+│   └── scripts/      # env.sh (start/stop envs)
+├── .github/workflows/ # ci.yml, cd.yml, security.yml, performance.yml
+├── configs/          # semgrep, spectral, checkov, k6
+├── docs/
+├── package.json      # Root — husky, lint-staged
+└── version.json      # SemVer centralisee
+```
 
 ### Docker Compose Services
 
@@ -43,7 +64,7 @@ Commits must be in **French** and reference the Jira ticket (EOS-XX).
 ### Backend — Clean Architecture + Vertical Slicing
 
 ```
-api/app/
+apps/api/app/
 ├── core/                    # Config, BDD, Redis, securite, deps partagees
 ├── auth/                    # domain/ application/ infrastructure/ presentation/
 ├── catalog/                 # domain/ application/ infrastructure/ presentation/
@@ -56,18 +77,22 @@ api/app/
 
 Each feature has its own domain/application/infrastructure/presentation layers. Features depend only on `core/` and communicate via domain interfaces.
 
+**1 fichier = 1 classe.** Domain: entities/, value_objects/, enums/, interfaces/, exceptions/, factories/. Infrastructure: models/, repositories/, mappers/. Presentation: schemas/.
+
 ### Frontend — Clean Architecture + Vertical Slicing
 
 ```
-ui/src/
+apps/ui/src/
 ├── core/                    # Config, client API, auth context, layout, router
-├── auth/                    # components/ pages/ services/ hooks/ types/
+├── auth/                    # types/ mappers/ services/ hooks/ components/ pages/
 ├── catalog/
 ├── deployment/
 ├── chat/
 ├── dashboard/
 └── main.tsx
 ```
+
+**1 fichier = 1 composant.** Types: dto/ + models/ + enums/ + guards/. Separation DTO (miroir API) / Model (UI enrichi) avec mappers. Compound components quand > 100 lignes.
 
 ## Skills
 
@@ -85,9 +110,12 @@ ui/src/
 
 - Explicit naming (no abbreviations)
 - Functions <= 20 lines, single responsibility
-- Early return, named constants, structured logs
-- Custom typed exceptions
-- Try/catch on all side-effect code (network, DB, timers)
+- Early return, named constants (Enums, not magic strings), structured logs (structlog JSON)
+- Custom typed exceptions (DomainException with code + message)
+- Try/catch on infrastructure only (network, DB, timers). Handler global DomainException → HTTP.
+- Value Objects (frozen dataclass) for types with business validation
+- Guard clauses in entities (__post_init__)
+- Factories for complex entity creation
 
 ### Validation order
 
@@ -96,24 +124,34 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 ### Test coverage
 
 - **80% global minimum**, **90% on business logic**
-- 3 levels: unit (services), integration (handlers + mocks), E2E (real server)
+- 3 levels: unit (.unit.), integration (.integ.), E2E (.e2e.)
+- Backend: pytest + testcontainers. Frontend: vitest + MSW + Playwright.
 
-## Gitflow
+## Trunk-Based Development (TBD)
 
-- **main** : production
-- **preview/staging** : pre-production
-- **develop** : development
-- **feature/EOS-XX-description**, **bugfix/EOS-XX-description** : work branches
-- Never commit directly on main/develop/staging
+- **main** (trunk) : always deployable, everything goes through PRs
+- **feature/STN-XX-description** : short-lived (<2 days), created from main
+- **hotfix/STN-XX-description** : critical prod fix, merge to main + tag patch
 - Never add `Co-Authored-By`
-- Always push after merge
-- Clean working tree before any new change
+- Pre-commit: Husky + lint-staged (auto lint/format)
+- CI is automatic (push/PR). **CD is ALWAYS manual** (workflow_dispatch).
 
-## Versioning (SemVer)
+### Environments (1 active at a time)
 
-- 0.x.y in development, 1.0.0 at first public launch
-- PATCH before MINOR (bugfixes before features)
-- Version centralized in `version.json`, synced in package.json/pyproject.toml
+| Env | Usage | Deploy trigger |
+|---|---|---|
+| **dev** | Development | Manual — main (latest commit) |
+| **test** | Pentest security | Manual — tag rc (frozen version) |
+| **preview** | QA / acceptance | Manual — tag rc (after pentest) |
+| **prod** | Production / jury demo | Manual — tag release |
+
+### Versioning (SemVer)
+
+- `v0.X.0-rc.N` : release candidate (test → preview)
+- `v0.X.0` : release (prod)
+- `v0.X.1` : hotfix
+- Version centralized in `version.json`
+- `GET /version` endpoint returns version + commit + env + deploy date
 
 ## Key Documents
 

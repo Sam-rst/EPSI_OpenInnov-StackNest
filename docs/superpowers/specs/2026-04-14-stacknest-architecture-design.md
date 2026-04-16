@@ -44,7 +44,7 @@ StackNest est une Internal Developer Platform (IDP) fonctionnant comme un guiche
 
 | Sujet | Decision | Justification |
 |---|---|---|
-| Structure repo | Monorepo avec CODEOWNERS | Simplicite pour 7 personnes, ownership clair par dossier/profil |
+| Structure repo | Monorepo modulaire (apps/ + infra/ + configs/) | Separation claire code applicatif / infra / config |
 | Backend | FastAPI (Python 3.13) | Async natif (SSE, LLM streaming), Pydantic, clean archi naturelle, accessible pour cyber |
 | Frontend | React + Vite + TypeScript (SPA) | Pas besoin de SSR/SEO, plus simple que Next.js, rapide pour le MVP |
 | BDD | PostgreSQL 16 | Standard, robuste, support JSON pour les configs Terraform |
@@ -61,7 +61,13 @@ StackNest est une Internal Developer Platform (IDP) fonctionnant comme un guiche
 | Conteneurisation | Docker Compose | Obligatoire pour la demo aux jures |
 | Terraform states | Filesystem (volume Docker par deploiement) | Simple, suffisant avec un seul worker MVP |
 | Admin seeding | Script CLI `create-admin` (pas de seeder auto) | Pas de credentials par defaut dans les env vars |
-| Docker Compose dev | `docker-compose.yml` + `docker-compose.dev.yml` (override) | Hot reload, ports debug, volumes montes |
+| Docker Compose | 4 envs : dev, test, preview, prod (1 seul actif a la fois) | Contrainte ressources serveur |
+| Gitflow | Trunk-Based Development (TBD) | Branches courtes (<2j), merge quotidien, deploy manuel |
+| Logs | structlog JSON | Logs structures parsables par monitoring |
+| Monitoring | Sentry (back + front) | Exceptions en temps reel, gratuit open source |
+| Pre-commit | Husky + lint-staged | Lint/format automatique avant chaque commit |
+| Architecture backend | Clean Archi 1 fichier = 1 classe, value objects, enums, factories | Software Craftsmanship |
+| Architecture frontend | 1 fichier = 1 composant, DTO/Model/Mapper, compound components | Separation stricte API/UI |
 
 ### Justification FastAPI vs Django (preparation oral)
 
@@ -78,48 +84,69 @@ StackNest est une Internal Developer Platform (IDP) fonctionnant comme un guiche
 
 ---
 
-## 3. Architecture Docker Compose
+## 3. Architecture monorepo modulaire
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Docker Compose                     │
-│                                                      │
-│  ┌─────────┐   ┌─────────┐   ┌──────────────────┐  │
-│  │   UI    │   │   API   │   │ Worker Terraform  │  │
-│  │ (Nginx) │──>│(FastAPI)│──>│   (isole)         │  │
-│  │  :8080  │   │  :8000  │   │                   │  │
-│  └─────────┘   └────┬────┘   └──────────────────┘  │
-│                     │ │                              │
-│              ┌──────┘ └──────┐                       │
-│              v               v                       │
-│  ┌──────────────┐   ┌────────────┐                  │
-│  │  PostgreSQL  │   │   Ollama   │                  │
-│  │    :5432     │   │  :11434    │                  │
-│  └──────────────┘   └────────────┘                  │
-│                                                      │
-│  ┌──────────────┐                                    │
-│  │    Redis     │  (queue jobs + pub/sub SSE)       │
-│  │    :6379     │                                    │
-│  └──────────────┘                                    │
-└─────────────────────────────────────────────────────┘
+stacknest/
+├── apps/
+│   ├── api/                    # FastAPI (backend)
+│   ├── ui/                     # React + Vite (frontend)
+│   └── worker/                 # Worker Terraform (partage code avec api)
+├── infra/
+│   ├── docker/
+│   │   ├── docker-compose.yml          # Base commune
+│   │   ├── docker-compose.dev.yml      # Hot reload, volumes
+│   │   ├── docker-compose.test.yml     # Pentest (BDD isolee, logs verbose)
+│   │   ├── docker-compose.preview.yml  # QA (config proche prod)
+│   │   └── docker-compose.prod.yml     # Prod (restart policies)
+│   ├── terraform/
+│   │   ├── environments/ (dev/, preview/, prod/)
+│   │   └── modules/ (docker-container/, proxmox-vm/)
+│   └── scripts/
+│       └── env.sh              # Start/stop environnements (1 seul actif)
+├── .github/workflows/
+│   ├── ci.yml                  # Lint + tests + securite + build (auto sur push/PR)
+│   ├── cd.yml                  # Deploy manuel (workflow_dispatch, choix env + version)
+│   ├── security.yml            # Scan hebdo (cron dimanche)
+│   └── performance.yml         # k6 load/stress (manuel)
+├── configs/                    # Configs CI/qualite partagees
+├── docs/
+├── package.json                # Root — husky, lint-staged, scripts monorepo
+├── version.json                # SemVer centralisee
+├── CLAUDE.md
+└── README.md
 ```
+
+### Services Docker Compose
 
 | Service | Image | Role |
 |---|---|---|
-| **ui** | Node Alpine (build Vite) + Nginx | SPA React, reverse-proxy `/api/` vers l'API |
+| **ui** | Node Alpine (build Vite) + Nginx | SPA React, reverse-proxy /api/ vers l'API |
 | **api** | python:3.13-slim + uv | FastAPI — logique metier, auth, catalogue, orchestration |
 | **worker** | python:3.13-slim + uv + Terraform CLI | Execute les plans Terraform, isole du web, communique via Redis |
 | **db** | PostgreSQL 16 Alpine | Users, catalogue, deploiements, conversations |
 | **redis** | Redis 7 Alpine | File de jobs (API→Worker) + pub/sub pour SSE temps reel |
 | **ollama** | Ollama (optionnel) | LLM local, appele par l'API uniquement |
 
+### 4 environnements (1 seul actif a la fois)
+
+| Env | Usage | Trigger deploy | Qui teste |
+|---|---|---|---|
+| **dev** | Developpement continu | Manuel (bouton GitHub Actions, main) | Devs + equipe |
+| **test** | Pentest securite | Manuel (tag rc, version figee) | Cyber |
+| **preview** | QA / recette fonctionnelle | Manuel (tag rc, apres pentest) | Tech lead + B1 |
+| **prod** | Production / demo jury | Manuel (tag release) | Tout le monde |
+
+Bandeau couleur dans l'UI pour identifier l'env : dev (bleu), test (rouge), preview (orange), prod (aucun).
+Endpoint `GET /version` retourne version + commit + environnement + date deploy.
+
 ### Separation API / Worker
 
-Un seul package Python, deux entrypoints :
+Un seul package Python dans apps/api/, deux entrypoints :
 - `app/main.py` → entrypoint API (FastAPI + uvicorn)
 - `app/worker_main.py` → entrypoint Worker (consumer Redis + Terraform)
 
-Partage ~70% du code (models, schemas, services metier). Seuls les points d'entree et la couche specifique (routes HTTP vs execution Terraform) different.
+Partage ~70% du code. Le worker est un service Docker separe qui pointe vers le meme code.
 
 ---
 
@@ -228,104 +255,191 @@ Si toujours invalide → fallback : selection manuelle du Store
 
 ---
 
-## 5. Architecture backend — Vertical Slicing + Clean Architecture
+## 5. Architecture backend — Clean Archi + Vertical Slicing + Craft
 
 ```
-api/
-├── pyproject.toml
-├── uv.lock
-├── app/
-│   ├── core/                    <- config, BDD, Redis, securite, dependances partagees
-│   │
-│   ├── auth/                    <- feature auth
-│   │   ├── domain/              <- entites (User, Role), interfaces
-│   │   ├── application/         <- use cases (register, login, verify_token)
-│   │   ├── infrastructure/      <- repo PostgreSQL, hasher bcrypt
-│   │   └── presentation/        <- routes /auth/*
-│   │
-│   ├── catalog/                 <- feature catalogue
-│   │   ├── domain/
-│   │   ├── application/
-│   │   ├── infrastructure/
-│   │   └── presentation/
-│   │
-│   ├── deployment/              <- feature deploiement
-│   │   ├── domain/
-│   │   ├── application/
-│   │   ├── infrastructure/      <- Terraform executor, Redis queue
-│   │   ├── presentation/        <- routes + SSE stream
-│   │   └── worker/              <- consumer Terraform (entrypoint worker)
-│   │
-│   ├── chat/                    <- feature chatbot IA
-│   │   ├── domain/
-│   │   ├── application/
-│   │   ├── infrastructure/      <- connecteur Ollama/OpenAI
-│   │   └── presentation/
-│   │
-│   ├── dashboard/               <- feature dashboard
-│   │   ├── domain/
-│   │   ├── application/
-│   │   ├── infrastructure/
-│   │   └── presentation/
-│   │
-│   ├── main.py                  <- entrypoint API
-│   └── worker_main.py           <- entrypoint Worker
+apps/api/app/
+├── core/                           <- config, BDD, Redis, securite, logging, sentry, middleware
+│   ├── config.py                   <- settings Pydantic
+│   ├── database.py                 <- SQLAlchemy async engine
+│   ├── redis.py                    <- Redis client
+│   ├── logging.py                  <- structlog JSON
+│   ├── sentry.py                   <- Sentry SDK init
+│   ├── exception_handlers.py       <- handler global DomainException → HTTP
+│   └── middleware/
+│       └── logging.py              <- RequestLogging middleware
+│
+├── catalog/                        <- feature catalogue (exemple)
+│   ├── domain/
+│   │   ├── entities/
+│   │   │   ├── template.py         <- dataclass + guard clauses (__post_init__)
+│   │   │   ├── template_version.py
+│   │   │   └── template_param.py
+│   │   ├── value_objects/
+│   │   │   ├── port.py             <- dataclass(frozen=True), validation 1-65535
+│   │   │   └── database_name.py
+│   │   ├── enums/
+│   │   │   └── template_category.py <- str Enum
+│   │   ├── interfaces/
+│   │   │   └── template_repository.py <- ABC (port)
+│   │   ├── exceptions/
+│   │   │   ├── template_not_found.py
+│   │   │   └── template_already_exists.py
+│   │   ├── factories/
+│   │   │   └── template_factory.py  <- creation avec UUID, defaults, validations
+│   │   └── events/                  <- (structure prete, post-MVP)
+│   ├── application/
+│   │   ├── create_template.py       <- 1 fichier = 1 use case = 1 execute()
+│   │   ├── get_template.py
+│   │   ├── list_templates.py
+│   │   ├── update_template.py
+│   │   └── delete_template.py
+│   ├── infrastructure/
+│   │   ├── models/
+│   │   │   ├── template_model.py    <- SQLAlchemy model
+│   │   │   └── template_version_model.py
+│   │   ├── repositories/
+│   │   │   └── template_repository.py <- implements interface, try/catch SQLAlchemy
+│   │   └── mappers/
+│   │       ├── template_mapper.py   <- entity ↔ model
+│   │       └── template_version_mapper.py
+│   └── presentation/
+│       ├── router.py                <- routes FastAPI
+│       ├── schemas/
+│       │   ├── create_template_request.py <- Pydantic
+│       │   ├── update_template_request.py
+│       │   └── template_response.py
+│       └── dependencies.py          <- Depends() injection
+│
+├── auth/ catalog/ deployment/ chat/ dashboard/ <- meme structure
+├── main.py                          <- entrypoint API
+└── worker_main.py                   <- entrypoint Worker
 ```
 
-**Regles :**
-- Chaque feature ne depend que de `core/` et de ses propres couches
-- Communication inter-features via les interfaces du domain, jamais par l'infra directement
+**Principes Craft :**
+- 1 fichier = 1 classe dans toutes les couches
+- Value Objects (frozen dataclass) pour les types avec validation metier
+- Enums (str Enum) pour les listes fermees (pas de magic strings)
+- Guard clauses dans les entites (__post_init__) — le domain se protege lui-meme
+- Factories pour la creation d'entites complexes (UUID, defaults)
+- Logs structures JSON via structlog (INFO actions, WARN cas ignores, ERROR exceptions)
+- Monitoring Sentry (exceptions en temps reel)
+- Handler global DomainException → HTTP (aucun try/catch dans les use cases/routers)
+- Infrastructure catch les erreurs techniques → domain exceptions
+
+**Regles de dependance :**
+- Presentation → Application → Domain ← Infrastructure
+- Le Domain ne depend de RIEN
+- Communication inter-features via les interfaces du domain
 - Ajouter une feature = ajouter un dossier
-- Supprimer une feature = supprimer un dossier
 
 ---
 
-## 6. Architecture frontend — React + Vite + TypeScript
+## 6. Architecture frontend — Clean Archi + Vertical Slicing + Craft
 
 ```
-ui/
-├── package.json
-├── vite.config.ts
-├── src/
-│   ├── core/                    <- config, client API, auth context, layout, router
-│   │
-│   ├── auth/                    <- feature auth
-│   │   ├── components/          <- LoginForm, RegisterForm
-│   │   ├── pages/               <- LoginPage, RegisterPage
-│   │   ├── services/            <- authApi.ts
-│   │   ├── hooks/               <- useAuth()
-│   │   └── types/               <- DTOs
-│   │
-│   ├── catalog/                 <- feature catalogue
-│   │   ├── components/          <- TemplateCard, TemplateList, ParamForm
-│   │   ├── pages/               <- CatalogPage, TemplateDetailPage
-│   │   ├── services/
-│   │   ├── hooks/
-│   │   └── types/
-│   │
-│   ├── deployment/              <- feature deploiement
-│   │   ├── components/          <- DeploymentStatus, ResourceProgress, SSEListener
-│   │   ├── pages/               <- DeploymentPage, DeploymentDetailPage
-│   │   ├── services/
-│   │   ├── hooks/               <- useDeploymentStream() (SSE)
-│   │   └── types/
-│   │
-│   ├── chat/                    <- feature chatbot
-│   │   ├── components/          <- ChatWindow, MessageBubble, IntentPreview
-│   │   ├── pages/               <- ChatPage
-│   │   ├── services/
-│   │   ├── hooks/
-│   │   └── types/
-│   │
-│   ├── dashboard/               <- feature dashboard
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   ├── hooks/
-│   │   └── types/
-│   │
-│   └── main.tsx                 <- entrypoint
+apps/ui/src/
+├── core/                               <- config, client API, layout, router, sentry, stores
+│   ├── api/
+│   │   └── axios-instance.ts           <- intercepteur global (401, erreurs)
+│   ├── components/
+│   │   ├── ErrorBoundary.tsx           <- Error Boundary generique
+│   │   └── EnvironmentBanner.tsx       <- Bandeau couleur dev/test/preview
+│   ├── stores/
+│   │   └── ui.store.ts                 <- Zustand (sidebar, theme — state client global)
+│   ├── sentry.ts
+│   ├── router.tsx
+│   └── layout.tsx
+│
+├── catalog/                            <- feature catalogue (exemple)
+│   ├── types/
+│   │   ├── dto/
+│   │   │   ├── template.dto.ts         <- miroir API (snake_case, string)
+│   │   │   └── template-version.dto.ts
+│   │   ├── models/
+│   │   │   ├── template.model.ts       <- UI enrichi (camelCase, Date, computed)
+│   │   │   └── template-version.model.ts
+│   │   ├── enums/
+│   │   │   └── template-category.enum.ts  <- as const + type derive
+│   │   ├── guards/
+│   │   │   └── template.guard.ts       <- type guard runtime pour DTOs
+│   │   └── index.ts                    <- re-export
+│   ├── mappers/
+│   │   ├── template.mapper.ts          <- fromDTO()/toDTO()
+│   │   └── template-version.mapper.ts
+│   ├── services/
+│   │   └── catalog.api.ts              <- appels HTTP (axios), retourne DTOs
+│   ├── hooks/
+│   │   ├── use-templates.ts            <- React Query + select: mapper.fromDTO
+│   │   ├── use-template.ts
+│   │   └── use-create-template.ts      <- mutation: mapper.toDTO
+│   ├── components/
+│   │   ├── template-card/              <- compound component
+│   │   │   ├── TemplateCard.tsx
+│   │   │   ├── TemplateCardHeader.tsx
+│   │   │   ├── TemplateCardBody.tsx
+│   │   │   ├── TemplateCardFooter.tsx
+│   │   │   └── index.ts
+│   │   ├── template-list/
+│   │   │   ├── TemplateList.tsx
+│   │   │   ├── TemplateListSkeleton.tsx  <- etat loading
+│   │   │   ├── TemplateListEmpty.tsx     <- etat vide
+│   │   │   ├── TemplateListError.tsx     <- etat erreur
+│   │   │   └── index.ts
+│   │   └── version-badge/
+│   │       └── VersionBadge.tsx
+│   └── pages/                          <- containers (hooks + components)
+│       ├── CatalogPage.tsx
+│       └── TemplateDetailPage.tsx
+│
+├── auth/ deployment/ chat/ dashboard/  <- meme structure
+└── main.tsx
 ```
+
+**Principes Craft frontend :**
+- 1 fichier = 1 composant/type/hook
+- Separation stricte DTO (miroir API, snake_case) / Model (UI enrichi, camelCase, computed)
+- Mappers pour la conversion DTO ↔ Model
+- Les components ne voient JAMAIS les DTOs, uniquement les Models
+- Enums `as const` + type derive (pas `enum` TypeScript)
+- Type guards pour valider les DTOs au runtime
+- Error Boundary par feature (un crash ne tue pas l'app)
+- Composants d'etat (Skeleton/Empty/Error) pour chaque requete
+- Compound components (sous-dossiers) quand > 100 lignes
+- Container/Presentational : pages = containers (hooks), components = presentational (props)
+- Zustand uniquement pour le state client global, React Query pour le state serveur
+
+**Flux de donnees :**
+- Lecture : API → Service → DTO → Mapper → Model → Hook → Component
+- Ecriture : Form → Model → Mapper → DTO → Service → API
+
+### Tests (backend + frontend)
+
+Convention de nommage : `fichier.unit.test.ts`, `fichier.integ.test.ts`, `fichier.e2e.spec.ts`
+
+```
+apps/api/tests/
+├── conftest.py                          <- fixtures globales
+├── factories/                           <- Factory Boy
+├── unit/                                <- ~60% (mock repo, pas de BDD)
+│   └── catalog/domain/ application/ infrastructure/
+├── integration/                         <- ~30% (testcontainers PG + Redis)
+│   └── catalog/ (repo + endpoints)
+└── e2e/                                 <- ~10% (tous services reels)
+    └── test_catalog_flow.e2e.py
+
+apps/ui/tests/
+├── setup.ts                             <- config globale Vitest
+├── mocks/                               <- MSW handlers + fixtures
+├── unit/                                <- ~60% (composants, hooks, mappers, guards)
+│   └── catalog/mappers/ hooks/ components/ guards/
+├── integration/                         <- ~30% (pages + MSW)
+│   └── catalog/CatalogPage.integ.test.tsx
+└── e2e/                                 <- ~10% (Playwright, vrai navigateur)
+    └── catalog.e2e.spec.ts
+```
+
+Couverture cible : 80% global minimum, 90% sur la logique metier.
 
 ---
 
@@ -550,39 +664,67 @@ L'image Docker se construit a partir du nom du template + le tag de la version :
 
 ## 10. CI/CD
 
-### Pipeline CI (GitHub Actions — runner cloud)
+### Pipeline CI (GitHub Actions — auto sur push/PR)
 
-```
-Push/PR → Lint (ruff + eslint) → Tests (>= 80% coverage) → Build → [SonarCloud si Could]
-```
+6 stages parallelises :
+1. **Qualite** : ruff + mypy (back), ESLint + Prettier (front), vulture + knip (dead code)
+2. **Tests** : pytest + vitest + coverage gate (80% global, 90% metier)
+3. **Build** : docker compose build + healthcheck + SBOM (Syft)
+4. **Securite** : Semgrep (SAST), Gitleaks (secrets), pip-audit + npm audit, Trivy (containers), Checkov (policy)
+5. **Contrats** : Schemathesis + Spectral + oasdiff (conditionnel — skip si pas d'endpoints)
+6. **Accessibilite** : axe-core via Playwright (conditionnel — skip si pas de pages)
 
-### Pipeline CD (Self-hosted runner sur serveur Antony)
+Scan securite hebdomadaire : `security.yml` (cron dimanche nuit)
+Performance : `performance.yml` (k6 load/stress, declenchement manuel)
 
-```
-Merge sur develop/main → CI verte → CD (self-hosted runner) :
-    docker compose pull && docker compose up -d
-```
+### Pipeline CD (100% manuelle — workflow_dispatch)
 
-- Runner en container Docker sur le serveur d'Antony
-- Zero port entrant (long-polling HTTPS sortant vers GitHub)
-- Documentation d'installation : `docs/setup-github-runner.md`
+**Le deploy n'est JAMAIS automatique.** Le tech lead decide quand et ou deployer via un bouton GitHub Actions.
 
-### Gitflow
+| Env | Trigger | Version deployee |
+|---|---|---|
+| dev | workflow_dispatch (choix: dev) | main (dernier commit) |
+| test | workflow_dispatch (choix: test) | tag rc (ex: v0.3.0-rc.1) |
+| preview | workflow_dispatch (choix: preview) | tag rc (apres pentest) |
+| prod | workflow_dispatch (choix: prod) | tag release (ex: v0.3.0) |
 
-- **main** : production — deploy apres CI verte
-- **preview/staging** : pre-production — deploy apres CI verte
-- **develop** : developpement — CI only
-- **feature/EOS-XX-description** : branches de travail
-- **bugfix/EOS-XX-description** : corrections
-- Commits en francais, reference ticket Jira (EOS-XX)
-- Jamais de commit direct sur main/develop/staging
+Self-hosted runner en container Docker sur le serveur d'Antony.
+Zero port entrant. Documentation : `docs/setup-github-runner.md`
+
+### Trunk-Based Development (TBD)
+
+| Branche | Duree de vie | Regle |
+|---|---|---|
+| **main** (trunk) | Permanente | Toujours deployable. Tout passe par PR. |
+| **feature/STN-XX-description** | 1-2 jours max | Creee depuis main, mergee via PR apres CI verte. |
+| **hotfix/STN-XX-description** | Quelques heures | Bug critique prod, merge main + tag patch. |
+
+- Plus de branche develop, staging, preview — main est le trunk
+- Commits en francais, reference ticket Jira (STN-XX)
 - Jamais de Co-Authored-By
+- Pre-commit : Husky + lint-staged (lint/format automatique)
 
-### Versioning SemVer
+### Versioning SemVer + Tags
 
-- 0.x.y en developpement, 1.0.0 au premier lancement public
-- PATCH avant MINOR (bugfixes avant features)
-- Version centralisee dans `version.json` synchee dans les package.json/pyproject.toml
+- `v0.X.0-rc.N` : release candidate (deploy test puis preview)
+- `v0.X.0` : release (deploy prod)
+- `v0.X.1` : hotfix (deploy prod)
+- Version centralisee dans `version.json`
+- Endpoint `GET /version` retourne version + commit + env + date deploy
+
+### Flow d'une release
+
+```
+1. Devs mergent sur main → CI auto (lint, tests, build)
+   → Rien ne se deploie automatiquement
+2. Tech lead deploie sur DEV : workflow_dispatch → env: dev
+3. Fin de sprint, tag v0.X.0-rc.1 : workflow_dispatch → env: test
+   → Cyber pentestent sur TEST (version figee)
+4. Pentest OK → workflow_dispatch → env: preview
+   → QA fonctionnelle
+5. QA OK → tag v0.X.0 → workflow_dispatch → env: prod
+6. Retour au defaut → workflow_dispatch → env: dev
+```
 
 ---
 
