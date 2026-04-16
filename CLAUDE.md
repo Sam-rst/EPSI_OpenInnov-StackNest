@@ -37,7 +37,7 @@ Commits must be in **French** and reference the Jira ticket (EOS-XX).
 stacknest/
 ├── apps/
 │   ├── api/          # FastAPI backend
-│   ├── ui/           # React + Vite frontend
+│   ├── web/          # React + Vite (web app)
 │   └── worker/       # Worker Terraform
 ├── infra/
 │   ├── docker/       # docker-compose.{yml,dev,test,preview,prod}.yml
@@ -82,7 +82,7 @@ Each feature has its own domain/application/infrastructure/presentation layers. 
 ### Frontend — Clean Architecture + Vertical Slicing
 
 ```
-apps/ui/src/
+apps/web/src/
 ├── core/                    # Config, client API, auth context, layout, router
 ├── auth/                    # types/ mappers/ services/ hooks/ components/ pages/
 ├── catalog/

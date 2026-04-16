@@ -201,9 +201,9 @@ When creating files during GREEN/BLUE phases, follow the project architecture:
 
 **Backend:** `apps/api/app/{feature}/domain/entities/`, `value_objects/`, `enums/`, `interfaces/`, `exceptions/`, `factories/`, `application/`, `infrastructure/models/`, `repositories/`, `mappers/`, `presentation/schemas/`
 
-**Frontend:** `apps/ui/src/{feature}/types/dto/`, `types/models/`, `types/enums/`, `types/guards/`, `mappers/`, `services/`, `hooks/`, `components/`, `pages/`
+**Frontend:** `apps/web/src/{feature}/types/dto/`, `types/models/`, `types/enums/`, `types/guards/`, `mappers/`, `services/`, `hooks/`, `components/`, `pages/`
 
-**Tests:** `apps/api/tests/unit/`, `integration/`, `e2e/` with `.unit.`, `.integ.`, `.e2e.` naming convention. Same for `apps/ui/tests/`.
+**Tests:** `apps/api/tests/unit/`, `integration/`, `e2e/` with `.unit.`, `.integ.`, `.e2e.` naming convention. Same for `apps/web/tests/`.
 
 ## Example: Full TDD Cycle
 

@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: Guide frontend feature implementation for StackNest (React + Vite + TypeScript). Use when implementing any frontend feature, page, component, or hook. Triggers on "implement frontend", "create page", "add component", "new hook", "frontend for STN-XX", or when working in apps/ui/. This skill ensures DTO/Model/Mapper separation, compound components, Error Boundaries, and Tailwind charte graphique.
+description: Guide frontend feature implementation for StackNest (React + Vite + TypeScript). Use when implementing any frontend feature, page, component, or hook. Triggers on "implement frontend", "create page", "add component", "new hook", "frontend for STN-XX", or when working in apps/web/. This skill ensures DTO/Model/Mapper separation, compound components, Error Boundaries, and Tailwind charte graphique.
 ---
 
 # Frontend — Feature Implementation Guide
@@ -11,7 +11,7 @@ Guide the implementation of a frontend feature following the project's Clean Arc
 
 - Implementing a new frontend feature
 - Adding a page, component, hook, or service
-- Working in `apps/ui/`
+- Working in `apps/web/`
 - Called after `/tdd` sets up the test structure
 
 ## Process

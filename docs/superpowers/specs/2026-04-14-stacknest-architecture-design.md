@@ -338,7 +338,7 @@ apps/api/app/
 ## 6. Architecture frontend — Clean Archi + Vertical Slicing + Craft
 
 ```
-apps/ui/src/
+apps/web/src/
 ├── core/                               <- config, client API, layout, router, sentry, stores
 │   ├── api/
 │   │   └── axios-instance.ts           <- intercepteur global (401, erreurs)
@@ -428,7 +428,7 @@ apps/api/tests/
 └── e2e/                                 <- ~10% (tous services reels)
     └── test_catalog_flow.e2e.py
 
-apps/ui/tests/
+apps/web/tests/
 ├── setup.ts                             <- config globale Vitest
 ├── mocks/                               <- MSW handlers + fixtures
 ├── unit/                                <- ~60% (composants, hooks, mappers, guards)

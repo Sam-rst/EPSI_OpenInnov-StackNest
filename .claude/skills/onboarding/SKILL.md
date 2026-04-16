@@ -82,7 +82,7 @@ Explain based on role:
 "StackNest lets users deploy Docker containers (databases, runtimes) through a web UI or a chatbot. The architecture is:
 
 - **apps/api/** — FastAPI backend, Clean Architecture with vertical slicing. Each feature (auth, catalog, deployment, chat) has its own domain/application/infrastructure/presentation layers. 1 file = 1 class.
-- **apps/ui/** — React + Vite + TypeScript frontend. Same vertical slicing. DTO/Model/Mapper pattern — the API sends DTOs (snake_case), we map them to Models (camelCase, enriched) via mappers. Components only see Models, never DTOs.
+- **apps/web/** — React + Vite + TypeScript frontend. Same vertical slicing. DTO/Model/Mapper pattern — the API sends DTOs (snake_case), we map them to Models (camelCase, enriched) via mappers. Components only see Models, never DTOs.
 - **infra/** — Docker Compose, Terraform modules, deployment scripts.
 
 We use strict TDD: Red (write test) → Green (simplest impl) → Blue (refactor Craft). Each phase has its own commit."
@@ -93,14 +93,14 @@ We use strict TDD: Red (write test) → Green (simplest impl) → Blue (refactor
 
 ### For B1
 
-"You'll work on the user documentation (guides in-app) and potentially the login/register pages. The frontend uses React with TypeScript and Tailwind CSS. Don't worry about the backend — focus on components in `apps/ui/src/`. Read `apps/ui/docs/guide-developpeur.md` for how to create a new component."
+"You'll work on the user documentation (guides in-app) and potentially the login/register pages. The frontend uses React with TypeScript and Tailwind CSS. Don't worry about the backend — focus on components in `apps/web/src/`. Read `apps/web/docs/guide-developpeur.md` for how to create a new component."
 
 ## Step 4 — First task
 
 ### For devs
 
 1. Read `apps/api/docs/guide-developpeur.md`
-2. Read `apps/ui/docs/guide-developpeur.md`
+2. Read `apps/web/docs/guide-developpeur.md`
 3. Look at an existing ticket on Jira (DOR structure)
 4. Pick their first ticket from the sprint backlog
 5. Create a feature branch: `git checkout -b feature/STN-XX-description main`
@@ -115,7 +115,7 @@ We use strict TDD: Red (write test) → Green (simplest impl) → Blue (refactor
 
 ### For B1
 
-1. Read `apps/ui/README.md`
+1. Read `apps/web/README.md`
 2. Run the app locally with Docker Compose
 3. Look at an existing component to understand the structure
 4. Pick their ticket (documentation or login/register)
