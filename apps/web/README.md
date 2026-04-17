@@ -1,73 +1,87 @@
-# React + TypeScript + Vite
+# StackNest — Web (frontend React + Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SPA React + TypeScript + Vite pour l'IDP StackNest. L'UI est en français.
 
-Currently, two official plugins are available:
+## Prérequis
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20+ (https://nodejs.org)
+- npm 10+
 
-## React Compiler
+## Installation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd apps/web
+npm install
+cp .env.example .env
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Variables d'environnement
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Variable           | Description                           | Valeurs                             |
+| ------------------ | ------------------------------------- | ----------------------------------- |
+| `VITE_API_URL`     | URL du backend FastAPI                | `http://localhost:8000` en dev      |
+| `VITE_ENVIRONMENT` | Environnement affiché dans le bandeau | `dev` / `test` / `preview` / `prod` |
+| `VITE_SENTRY_DSN`  | DSN Sentry (optionnel)                | Vide = monitoring désactivé         |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Commandes
+
+```bash
+npm run dev            # Vite dev server (http://localhost:5173) + HMR
+npm run build          # Build production dans dist/
+npm run preview        # Sert le build
+npm run lint           # ESLint — 0 erreur attendu
+npm run lint:fix       # ESLint avec autofix
+npm run format         # Prettier — formate tout
+npm run format:check   # Prettier — vérifie le format
+npm run typecheck      # tsc --noEmit
+npm run test           # Vitest (unit + integration)
+npm run test:watch     # Vitest en mode watch
+npm run test:coverage  # Couverture v8
+npm run e2e            # Playwright (tests end-to-end)
 ```
+
+## Structure
+
+```
+src/
+├── core/                           # Config, API, router, layout, components partagés
+│   ├── api/axios-instance.ts       # Factory axios avec intercepteurs
+│   ├── components/
+│   │   ├── EnvironmentBanner.tsx   # Bandeau env (dev/test/preview)
+│   │   ├── ErrorBoundary.tsx       # Boundary racine
+│   │   ├── HomePage.tsx
+│   │   └── Layout.tsx
+│   ├── stores/ui.store.ts          # Store zustand UI (sidebar, etc.)
+│   ├── router.tsx                  # createBrowserRouter
+│   └── sentry.ts                   # initSentry conditionnel
+├── auth/                           # Feature auth (vide, archi complète)
+├── catalog/
+├── chat/
+├── dashboard/
+├── deployment/
+├── App.tsx                         # ErrorBoundary > Banner > RouterProvider
+└── main.tsx                        # Entrée, initSentry + createRoot
+```
+
+Chaque feature suit la **Clean Architecture vertical slicing** avec les sous-dossiers `types/{dto,models,enums,guards}`, `mappers/`, `services/`, `hooks/`, `components/`, `pages/`.
+
+## Conventions
+
+- **1 fichier = 1 composant / 1 type / 1 hook**
+- **Séparation DTO (snake_case miroir API) / Model (camelCase UI)** via mappers
+- **TDD strict** Red → Green → Blue (voir [`docs/guide-developpeur.md`](docs/guide-developpeur.md))
+- **Conventions de tests** : `*.unit.test.ts(x)`, `*.integ.test.ts(x)`, `tests/e2e/*.spec.ts`
+- **Commits en français** référençant `STN-XX`
+
+## Docker
+
+```bash
+docker build -t stacknest-web .
+docker run -p 8080:80 stacknest-web
+```
+
+L'image multi-stage build avec Node 20 puis sert la SPA via Nginx (avec reverse-proxy `/api/` vers le backend).
+
+## Docs
+
+- [Guide développeur](docs/guide-developpeur.md) — architecture, DTO/Mapper/Model, compound components, créer une feature
