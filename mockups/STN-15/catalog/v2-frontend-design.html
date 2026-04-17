@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="fr" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StackNest // catalog.index — blueprint</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&family=JetBrains+Mono:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+              mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+            },
+            colors: {
+              ink:    { 950:'#03101b', 900:'#061524', 800:'#0a1c2d', 700:'#0f2236', 600:'#14293f', 500:'#1a3450', 400:'#2a4763', 300:'#3d5c77', 200:'#6c85a0' },
+              brand:  { 300:'#5ec0c4', 500:'#0d9297', 600:'#0a7a7e' },
+              accent: { 400:'#ffb84a', 500:'#fea21f', 600:'#d98610' },
+              danger: { 500:'#c42b1c' },
+              ok:     { 500:'#22c55e' },
+            },
+            letterSpacing: { tightest: '-0.05em' },
+          },
+        },
+      };
+    </script>
+    <style>
+      html, body { background: #03101b; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+      :focus-visible { outline: 2px solid #0d9297; outline-offset: 2px; border-radius: 4px; }
+
+      /* Grille blueprint en fond */
+      .bp-grid {
+        background-image:
+          linear-gradient(rgba(13,146,151,.055) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(13,146,151,.055) 1px, transparent 1px);
+        background-size: 48px 48px;
+      }
+      /* Halo cyan discret derrière le hero */
+      .halo {
+        background: radial-gradient(closest-side at 25% 40%, rgba(13,146,151,.18), transparent 60%),
+                    radial-gradient(closest-side at 80% 70%, rgba(254,162,31,.07), transparent 60%);
+      }
+      /* Ligne de scan qui passe très lentement */
+      @keyframes scan { 0%{transform:translateY(-100%);} 100%{transform:translateY(100vh);} }
+      .scanline { animation: scan 14s linear infinite; }
+
+      /* Corner ticks */
+      .corner { position: absolute; width: 10px; height: 10px; border-color: rgba(94,192,196,.55); }
+      .corner.tl { top:-1px; left:-1px; border-top: 1px solid; border-left: 1px solid; }
+      .corner.tr { top:-1px; right:-1px; border-top: 1px solid; border-right: 1px solid; }
+      .corner.bl { bottom:-1px; left:-1px; border-bottom: 1px solid; border-left: 1px solid; }
+      .corner.br { bottom:-1px; right:-1px; border-bottom: 1px solid; border-right: 1px solid; }
+
+      /* Noise overlay subtil */
+      .grain::before {
+        content:''; position:fixed; inset:0; pointer-events:none; z-index:1;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.06 0 0 0 0 0.57 0 0 0 0 0.59 0 0 0 0.04 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        opacity:.6; mix-blend-mode: overlay;
+      }
+
+      /* Heartbeat dot */
+      @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.4;transform:scale(.85);} }
+      .heartbeat { animation: pulse 1.6s ease-in-out infinite; }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+        .scanline, .heartbeat { animation: none !important; }
+      }
+
+      /* Display kerning agressif pour titres géants */
+      .display { letter-spacing: -0.045em; font-weight: 900; }
+    </style>
+  </head>
+  <body class="min-h-full antialiased grain">
+    <div id="root"></div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.3.1",
+          "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+          "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1",
+          "framer-motion": "https://esm.sh/framer-motion@11.15.0?deps=react@18.3.1,react-dom@18.3.1"
+        }
+      }
+    </script>
+    <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+
+    <script type="text/babel" data-type="module" data-presets="react">
+      import React, { useEffect, useMemo, useState, useRef } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { motion, AnimatePresence, LayoutGroup, useInView } from 'framer-motion';
+
+      // ─────────────────────────────────────────────────────────────
+      // DATA
+      // ─────────────────────────────────────────────────────────────
+      const CATS = [
+        { id: 'all',     label: 'all',            k: 'TOUT'           },
+        { id: 'db',      label: 'database',       k: 'BASES'          },
+        { id: 'cache',   label: 'cache/queue',    k: 'CACHE · QUEUE'  },
+        { id: 'runtime', label: 'runtime',        k: 'RUNTIMES'       },
+        { id: 'obs',     label: 'observability',  k: 'OBSERVABILITÉ'  },
+        { id: 'proxy',   label: 'edge/proxy',     k: 'EDGE · PROXY'   },
+      ];
+
+      const TEMPLATES = [
+        { id:'pg',    idx:'01', cat:'db',      name:'PostgreSQL',  ver:'16.3',  size:'438 MB', port:5432, mem:'512 MB', cpu:'1 vCPU', tags:['SQL','OLTP','JSONB'],   popular:true,  desc:'Base relationnelle open-source, transactions ACID, extensions JSONB.' },
+        { id:'mysql', idx:'02', cat:'db',      name:'MySQL',       ver:'8.4',   size:'524 MB', port:3306, mem:'512 MB', cpu:'1 vCPU', tags:['SQL','InnoDB'],        popular:false, desc:'Base relationnelle mature, réplication native, éco-système large.' },
+        { id:'mongo', idx:'03', cat:'db',      name:'MongoDB',     ver:'7.0',   size:'712 MB', port:27017,mem:'1 GB',   cpu:'2 vCPU', tags:['NoSQL','Document'],    popular:false, desc:'Base documents flexible, agrégations riches, sharding horizontal.' },
+        { id:'redis', idx:'04', cat:'cache',   name:'Redis',       ver:'7.4',   size:'48 MB',  port:6379, mem:'256 MB', cpu:'0.5 vCPU', tags:['Cache','Pub/Sub'],    popular:true,  desc:'Store clé/valeur en mémoire, pub/sub temps réel, streams.' },
+        { id:'rmq',   idx:'05', cat:'cache',   name:'RabbitMQ',    ver:'3.13',  size:'172 MB', port:5672, mem:'512 MB', cpu:'1 vCPU', tags:['AMQP','Broker'],       popular:false, desc:'Broker de messages AMQP, routage flexible, haute fiabilité.' },
+        { id:'py',    idx:'06', cat:'runtime', name:'Python',      ver:'3.13',  size:'124 MB', port:null, mem:'512 MB', cpu:'1 vCPU', tags:['uv','FastAPI'],        popular:true,  badge:'NEW', desc:'Runtime Python 3.13 avec uv pré-installé, parfait FastAPI / ML.' },
+        { id:'node',  idx:'07', cat:'runtime', name:'Node.js',     ver:'22 LTS',size:'146 MB', port:null, mem:'512 MB', cpu:'1 vCPU', tags:['pnpm','TS'],           popular:false, desc:'Runtime JS/TS LTS récent, pnpm et corepack activés par défaut.' },
+        { id:'graf',  idx:'08', cat:'obs',     name:'Grafana',     ver:'11.2',  size:'332 MB', port:3000, mem:'512 MB', cpu:'1 vCPU', tags:['Dashboards'],          popular:false, desc:'Observabilité visuelle, dashboards temps réel, alerting.' },
+        { id:'prom',  idx:'09', cat:'obs',     name:'Prometheus',  ver:'2.54',  size:'218 MB', port:9090, mem:'1 GB',   cpu:'1 vCPU', tags:['Metrics','TSDB'],      popular:false, desc:'Collecte de métriques time-series, PromQL, service discovery.' },
+        { id:'ngx',   idx:'10', cat:'proxy',   name:'Nginx',       ver:'1.27',  size:'54 MB',  port:80,   mem:'128 MB', cpu:'0.5 vCPU', tags:['HTTP','TLS'],        popular:false, desc:'Reverse-proxy HTTP/2, TLS Let\u2019s Encrypt, load balancing.' },
+        { id:'traf',  idx:'11', cat:'proxy',   name:'Traefik',     ver:'v3.1',  size:'86 MB',  port:80,   mem:'128 MB', cpu:'0.5 vCPU', tags:['Edge','Docker'],     popular:false, desc:'Edge router auto-discover Docker, ACME intégré, middleware.' },
+        { id:'kc',    idx:'12', cat:'runtime', name:'Keycloak',    ver:'25.0',  size:'592 MB', port:8080, mem:'2 GB',   cpu:'2 vCPU', tags:['IAM','OIDC'],          popular:false, desc:'Serveur d\u2019identité OIDC/SAML, fédération, SSO enterprise.' },
+      ];
+
+      // ─────────────────────────────────────────────────────────────
+      // PRIMITIVES
+      // ─────────────────────────────────────────────────────────────
+      const MonoLabel = ({ children, className='' }) =>
+        <span className={'font-mono text-[10px] uppercase tracking-[0.2em] text-ink-200 ' + className}>{children}</span>;
+
+      function Heartbeat({ color='bg-brand-500' }) {
+        return (
+          <span className="relative inline-flex h-2 w-2 items-center justify-center">
+            <span className={'absolute inline-flex h-full w-full rounded-full ' + color + ' opacity-70 heartbeat'} />
+            <span className={'relative inline-flex h-1.5 w-1.5 rounded-full ' + color} />
+          </span>
+        );
+      }
+
+      function CornerFrame() {
+        return <>
+          <span className="corner tl" /><span className="corner tr" />
+          <span className="corner bl" /><span className="corner br" />
+        </>;
+      }
+
+      // Count-up component
+      function CountUp({ to, duration=1.2, format=(n)=>n }) {
+        const [n, setN] = useState(0);
+        const ref = useRef(null);
+        const inView = useInView(ref, { once: true });
+        useEffect(() => {
+          if (!inView) return;
+          let raf, start;
+          const step = (ts) => {
+            if (!start) start = ts;
+            const t = Math.min(1, (ts - start) / (duration * 1000));
+            const eased = 1 - Math.pow(1 - t, 3);
+            setN(Math.round(to * eased));
+            if (t < 1) raf = requestAnimationFrame(step);
+          };
+          raf = requestAnimationFrame(step);
+          return () => cancelAnimationFrame(raf);
+        }, [inView, to, duration]);
+        return <span ref={ref}>{format(n)}</span>;
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // TOP BAR
+      // ─────────────────────────────────────────────────────────────
+      function TopBar() {
+        return (
+          <header className="relative z-20 border-b border-ink-500/50 bg-ink-950/70 backdrop-blur">
+            <div className="mx-auto max-w-[1400px] px-8 h-12 flex items-center justify-between gap-6 font-mono text-[11px] text-ink-200">
+              {/* logo + path */}
+              <div className="flex items-center gap-5">
+                <div className="flex items-center gap-2">
+                  <div className="h-5 w-5 bg-brand-500 grid place-items-center">
+                    <span className="text-ink-950 font-bold text-[10px]">S</span>
+                  </div>
+                  <span className="text-white font-semibold tracking-widest">STACKNEST</span>
+                </div>
+                <nav className="flex items-center gap-4">
+                  <a href="#" className="hover:text-white">~/dashboard</a>
+                  <a href="#" className="text-white border-b border-brand-500 pb-0.5">~/catalog</a>
+                  <a href="#" className="hover:text-white">~/deployments</a>
+                  <a href="#" className="hover:text-white">~/chat</a>
+                </nav>
+              </div>
+              {/* status */}
+              <div className="flex items-center gap-5">
+                <span className="flex items-center gap-1.5"><Heartbeat color="bg-brand-500" /> env · dev</span>
+                <span className="flex items-center gap-1.5"><Heartbeat color="bg-ok-500" /> worker · up</span>
+                <span className="text-ink-300">build <span className="text-white">d883a29</span></span>
+                <span className="text-ink-300">v0.1.0-rc.1</span>
+              </div>
+            </div>
+            {/* ligne de scan */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-30">
+              <div className="scanline h-px w-full bg-gradient-to-r from-transparent via-brand-500 to-transparent" />
+            </div>
+          </header>
+        );
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // HERO
+      // ─────────────────────────────────────────────────────────────
+      function Hero({ count }) {
+        return (
+          <section className="relative overflow-hidden border-b border-ink-500/50">
+            <div className="absolute inset-0 bp-grid" />
+            <div className="absolute inset-0 halo" />
+
+            <div className="relative mx-auto max-w-[1400px] px-8 py-16 md:py-24 grid md:grid-cols-12 gap-10 items-end">
+              {/* bloc gauche */}
+              <div className="md:col-span-8">
+                <MonoLabel className="text-brand-300">§ 01 · catalog.index</MonoLabel>
+
+                <motion.h1
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="display mt-4 text-[clamp(3rem,8vw,7.5rem)] leading-[0.85] text-white"
+                >
+                  <span className="block">templates</span>
+                  <span className="block">
+                    <span className="text-brand-500">à déployer</span>
+                    <span className="text-accent-500">.</span>
+                  </span>
+                </motion.h1>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.5 }}
+                  className="mt-8 max-w-xl text-ink-200 text-[15px] leading-relaxed"
+                >
+                  Déclenchez un <span className="font-mono text-white">terraform apply</span> en un clic. Le worker provisionne l&rsquo;environnement, expose les ports, et vous reçoit avec un manifest propre.
+                </motion.p>
+              </div>
+
+              {/* bloc stats droite */}
+              <div className="md:col-span-4 md:pl-8 md:border-l md:border-dashed md:border-ink-500/60 space-y-6">
+                <Stat k="templates disponibles" v={count} color="text-brand-300" />
+                <Stat k="déploiements · 24 h" v={47} color="text-accent-500" />
+                <Stat k="succès · 7 j" v={98} suffix="%" color="text-ok-500" />
+              </div>
+            </div>
+          </section>
+        );
+      }
+
+      function Stat({ k, v, suffix='', color }) {
+        return (
+          <div>
+            <div className={'font-mono tabular-nums text-5xl font-bold ' + color}>
+              <CountUp to={v} />{suffix}
+            </div>
+            <MonoLabel className="mt-1 block">/ {k}</MonoLabel>
+          </div>
+        );
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // FILTER BAR
+      // ─────────────────────────────────────────────────────────────
+      function FilterBar({ q, setQ, cat, setCat, count }) {
+        return (
+          <section className="relative border-b border-ink-500/50 bg-ink-900/40 backdrop-blur-sm sticky top-0 z-10">
+            <div className="mx-auto max-w-[1400px] px-8 py-4 flex flex-col md:flex-row md:items-center gap-4">
+              <div className="flex items-center gap-3 shrink-0">
+                <MonoLabel className="text-brand-300">§ 02</MonoLabel>
+                <span className="text-white text-sm font-semibold tracking-wide">filtrer</span>
+              </div>
+
+              {/* search */}
+              <label className="flex-1 relative max-w-xl">
+                <span className="sr-only">Rechercher</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-ink-300">/</span>
+                <input
+                  value={q} onChange={(e)=>setQ(e.target.value)}
+                  placeholder="rechercher : postgres, redis, fastapi…"
+                  className="w-full bg-ink-800/80 border border-ink-500 rounded-sm pl-7 pr-3 py-2 text-sm font-mono text-white placeholder:text-ink-300 focus:border-brand-500 focus:outline-none"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-ink-300 border border-ink-500 px-1.5 py-0.5 rounded-sm">⌘K</span>
+              </label>
+
+              {/* tabs catégories */}
+              <LayoutGroup id="cat-tabs">
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  {CATS.map(c => {
+                    const active = c.id === cat;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => setCat(c.id)}
+                        className={'relative px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider whitespace-nowrap ' +
+                          (active ? 'text-ink-950' : 'text-ink-200 hover:text-white')}
+                      >
+                        {active && (
+                          <motion.span
+                            layoutId="cat-pill-v2"
+                            className="absolute inset-0 bg-accent-500"
+                            transition={{ type:'spring', stiffness:380, damping:28 }}
+                          />
+                        )}
+                        <span className="relative z-10">{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </LayoutGroup>
+
+              <div className="shrink-0 font-mono text-[11px] text-ink-200">
+                <span className="text-white font-bold">{String(count).padStart(2,'0')}</span>
+                <span className="text-ink-300"> / {TEMPLATES.length} résultats</span>
+              </div>
+            </div>
+          </section>
+        );
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // TEMPLATE CARD — spec sheet style
+      // ─────────────────────────────────────────────────────────────
+      const catLabel = (id) => CATS.find(c=>c.id===id)?.label || id;
+
+      function TemplateCard({ t, onDeploy, i }) {
+        const [hover, setHover] = useState(false);
+        return (
+          <motion.article
+            layout
+            onHoverStart={()=>setHover(true)} onHoverEnd={()=>setHover(false)}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i,10) * 0.04 } }}
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.18 } }}
+            whileHover={{ y: -3 }}
+            transition={{ type:'spring', stiffness:280, damping:24 }}
+            className="relative group bg-ink-900/60 border border-ink-500/80 hover:border-brand-500/60 transition-colors"
+          >
+            {/* Corner ticks */}
+            <CornerFrame />
+
+            {/* Header rail */}
+            <div className="flex items-center justify-between border-b border-ink-500/70 px-4 py-2 font-mono text-[10px] uppercase tracking-wider">
+              <span className="text-ink-200">{t.idx} · {catLabel(t.cat)}</span>
+              <div className="flex items-center gap-2">
+                {t.popular && <span className="text-brand-300">popular</span>}
+                {t.badge && (
+                  <span className="bg-accent-500 text-ink-950 px-1.5 py-[1px] font-bold">{t.badge}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-5">
+              {/* Name block */}
+              <div className="flex items-end justify-between gap-3">
+                <h3 className="display text-white text-[44px] leading-[0.95]">
+                  {t.name}
+                </h3>
+                <span className="font-mono text-ink-200 text-xs shrink-0 pb-1">v{t.ver}</span>
+              </div>
+
+              {/* Description */}
+              <p className="mt-3 text-sm text-ink-200 leading-relaxed line-clamp-2">{t.desc}</p>
+
+              {/* Spec table */}
+              <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-[11px]">
+                <Spec label="image" value={t.size} />
+                <Spec label="mem"   value={t.mem} />
+                <Spec label="cpu"   value={t.cpu} />
+                <Spec label="port"  value={t.port ? String(t.port) : '—'} />
+              </dl>
+
+              {/* Tags */}
+              <div className="mt-4 flex flex-wrap gap-1">
+                {t.tags.map(tag => (
+                  <span key={tag} className="font-mono text-[10px] uppercase tracking-wider text-ink-200 border border-ink-500 px-1.5 py-0.5">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+
+              {/* CTA row */}
+              <div className="mt-5 flex items-center justify-between">
+                <a href="#" className="font-mono text-[11px] text-ink-200 hover:text-white uppercase tracking-wider">
+                  manifest →
+                </a>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={()=>onDeploy(t)}
+                  className="group/btn relative overflow-hidden font-mono text-xs uppercase tracking-wider bg-brand-500 hover:bg-brand-600 text-ink-950 font-bold px-4 py-2"
+                >
+                  <span className="relative z-10">deploy</span>
+                  <motion.span
+                    aria-hidden="true"
+                    initial={{ x: 0 }}
+                    animate={{ x: hover ? 4 : 0 }}
+                    className="relative z-10 ml-1 inline-block"
+                  >→</motion.span>
+                </motion.button>
+              </div>
+            </div>
+          </motion.article>
+        );
+      }
+
+      function Spec({ label, value }) {
+        return <>
+          <dt className="text-ink-300 uppercase tracking-wider">{label}</dt>
+          <dd className="text-white text-right tabular-nums">{value}</dd>
+        </>;
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // DEPLOY SHEET (drawer bas)
+      // ─────────────────────────────────────────────────────────────
+      function DeploySheet({ template, onClose, onConfirm }) {
+        const [name, setName] = useState('');
+        const [stage, setStage] = useState('form'); // form | applying | done
+        useEffect(() => {
+          if (template) {
+            setName('sn-' + template.name.toLowerCase() + '-001');
+            setStage('form');
+          }
+        }, [template]);
+
+        const apply = () => {
+          setStage('applying');
+          setTimeout(() => { setStage('done'); }, 1600);
+          setTimeout(() => { onConfirm(template); onClose(); }, 2400);
+        };
+
+        return (
+          <AnimatePresence>
+            {template && (
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="fixed inset-0 z-50 bg-ink-950/80 backdrop-blur-sm" onClick={onClose} role="dialog" aria-modal="true"
+              >
+                <motion.div
+                  onClick={(e)=>e.stopPropagation()}
+                  initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y:'100%' }}
+                  transition={{ type:'spring', stiffness:320, damping:34 }}
+                  className="absolute inset-x-0 bottom-0 bg-ink-900 border-t border-brand-500/40"
+                >
+                  <div className="mx-auto max-w-[1400px] px-8 py-8 grid md:grid-cols-12 gap-8">
+                    {/* header */}
+                    <div className="md:col-span-4 md:border-r md:border-dashed md:border-ink-500/60 md:pr-8">
+                      <MonoLabel className="text-brand-300">§ deploy.plan</MonoLabel>
+                      <h2 className="display text-white text-5xl mt-2 leading-none">
+                        {template.name}
+                        <span className="text-brand-500">.</span>
+                      </h2>
+                      <p className="mt-2 font-mono text-xs text-ink-200">v{template.ver} · image {template.size}</p>
+                      <div className="mt-6 font-mono text-[11px] text-ink-200 space-y-1">
+                        <div>→ target: <span className="text-white">env:dev</span></div>
+                        <div>→ runner: <span className="text-white">worker-01</span></div>
+                        <div>→ eta: <span className="text-white">≈ 45 s</span></div>
+                      </div>
+                    </div>
+
+                    {/* form */}
+                    <div className="md:col-span-8">
+                      {stage === 'form' && (
+                        <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} className="space-y-5">
+                          <div className="grid md:grid-cols-2 gap-5">
+                            <label className="block">
+                              <MonoLabel>nom du déploiement</MonoLabel>
+                              <input value={name} onChange={(e)=>setName(e.target.value)}
+                                className="mt-1.5 w-full bg-ink-800 border border-ink-500 rounded-sm px-3 py-2 font-mono text-white focus:border-brand-500 focus:outline-none" />
+                            </label>
+                            <label className="block">
+                              <MonoLabel>taille</MonoLabel>
+                              <select className="mt-1.5 w-full bg-ink-800 border border-ink-500 rounded-sm px-3 py-2 font-mono text-white focus:border-brand-500 focus:outline-none">
+                                <option>small — 1 vCPU · 512 MB</option>
+                                <option>medium — 2 vCPU · 2 GB</option>
+                                <option>large — 4 vCPU · 8 GB</option>
+                              </select>
+                            </label>
+                          </div>
+
+                          <label className="flex items-start gap-2 font-mono text-xs text-ink-200">
+                            <input type="checkbox" defaultChecked className="mt-0.5 accent-brand-500" />
+                            j&rsquo;ai lu la note RGPD · données persistées dans mon propre tenant
+                          </label>
+
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-ink-500/50">
+                            <button onClick={onClose} className="font-mono text-xs uppercase tracking-wider text-ink-200 hover:text-white px-3 py-2">
+                              annuler
+                            </button>
+                            <motion.button whileTap={{scale:0.97}} onClick={apply}
+                              className="font-mono text-xs uppercase tracking-wider bg-brand-500 hover:bg-brand-600 text-ink-950 font-bold px-5 py-2">
+                              terraform apply →
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {stage === 'applying' && (
+                        <motion.div initial={{opacity:0}} animate={{opacity:1}} className="font-mono text-xs space-y-1 text-ink-200">
+                          <LogLine delay={0}>→ validating plan…</LogLine>
+                          <LogLine delay={200}>→ pulling image <span className="text-brand-300">{template.name.toLowerCase()}:{template.ver}</span>…</LogLine>
+                          <LogLine delay={500}>→ allocating resources ({template.cpu} · {template.mem})…</LogLine>
+                          <LogLine delay={900}>→ wiring network…</LogLine>
+                          <LogLine delay={1300}><span className="text-ok-500">✓ ready on {template.port ? 'port '+template.port : 'stdio'}</span></LogLine>
+                        </motion.div>
+                      )}
+
+                      {stage === 'done' && (
+                        <motion.div initial={{opacity:0,scale:.95}} animate={{opacity:1,scale:1}} className="flex items-center gap-3 font-mono text-sm text-ok-500">
+                          <Heartbeat color="bg-ok-500" /> déployé. redirection vers ~/deployments…
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        );
+      }
+
+      function LogLine({ delay=0, children }) {
+        return (
+          <motion.div
+            initial={{ opacity:0, x:-8 }}
+            animate={{ opacity:1, x:0 }}
+            transition={{ delay: delay/1000, duration: 0.2 }}
+          >{children}</motion.div>
+        );
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // PAGE
+      // ─────────────────────────────────────────────────────────────
+      function CatalogPage() {
+        const [q, setQ] = useState('');
+        const [cat, setCat] = useState('all');
+        const [selected, setSelected] = useState(null);
+        const [toast, setToast] = useState(null);
+
+        const filtered = useMemo(() => {
+          const norm = q.trim().toLowerCase();
+          return TEMPLATES.filter(t => {
+            const inCat = cat === 'all' || t.cat === cat;
+            const inQ = !norm || (t.name+' '+t.tags.join(' ')+' '+t.desc).toLowerCase().includes(norm);
+            return inCat && inQ;
+          });
+        }, [q, cat]);
+
+        // cmd+k focus le search
+        useEffect(() => {
+          const handler = (e) => {
+            if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k') {
+              e.preventDefault();
+              document.querySelector('input[placeholder^="rechercher"]')?.focus();
+            }
+          };
+          window.addEventListener('keydown', handler);
+          return () => window.removeEventListener('keydown', handler);
+        }, []);
+
+        useEffect(() => {
+          if (!toast) return;
+          const h = setTimeout(() => setToast(null), 3500);
+          return () => clearTimeout(h);
+        }, [toast]);
+
+        return (
+          <div className="min-h-screen">
+            <TopBar />
+            <Hero count={TEMPLATES.length} />
+            <FilterBar q={q} setQ={setQ} cat={cat} setCat={setCat} count={filtered.length} />
+
+            <main className="mx-auto max-w-[1400px] px-8 py-10">
+              <div className="flex items-baseline justify-between mb-6">
+                <div>
+                  <MonoLabel className="text-brand-300">§ 03 · manifest</MonoLabel>
+                  <h2 className="display text-white text-4xl mt-1">catalogue</h2>
+                </div>
+                <div className="font-mono text-[11px] text-ink-200 text-right">
+                  <div>sort · <span className="text-white">popular ↓</span></div>
+                  <div>updated · <span className="text-white">16 avril 2026</span></div>
+                </div>
+              </div>
+
+              <LayoutGroup>
+                <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <AnimatePresence mode="popLayout">
+                    {filtered.map((t, i) => (
+                      <TemplateCard key={t.id} t={t} i={i} onDeploy={setSelected} />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              </LayoutGroup>
+
+              {filtered.length === 0 && (
+                <motion.div initial={{opacity:0}} animate={{opacity:1}}
+                  className="relative border border-dashed border-ink-500 p-12 text-center font-mono text-ink-200">
+                  <CornerFrame />
+                  <div className="text-white text-lg mb-1">// no match found</div>
+                  <div className="text-xs">affinez la requête ou changez de catégorie.</div>
+                </motion.div>
+              )}
+            </main>
+
+            {/* footer technique */}
+            <footer className="border-t border-ink-500/50 mt-10">
+              <div className="mx-auto max-w-[1400px] px-8 py-5 flex items-center justify-between font-mono text-[11px] text-ink-200">
+                <div>stacknest · catalog.index · 2026-04-16</div>
+                <div className="flex items-center gap-4">
+                  <span>latency · <span className="text-white">28 ms</span></span>
+                  <span>region · <span className="text-white">eu-lyon-1</span></span>
+                  <span>© epsi openinnov</span>
+                </div>
+              </div>
+            </footer>
+
+            <DeploySheet
+              template={selected}
+              onClose={()=>setSelected(null)}
+              onConfirm={(t)=>setToast('deploy/'+t.id+' · ok')}
+            />
+
+            {/* toast */}
+            <AnimatePresence>
+              {toast && (
+                <motion.div
+                  initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:10 }}
+                  transition={{ type:'spring', stiffness:260, damping:22 }}
+                  role="status" aria-live="polite"
+                  className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-ink-800 border border-ok-500/40 px-4 py-2.5 font-mono text-xs text-ok-500"
+                >
+                  <Heartbeat color="bg-ok-500" /> {toast}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      }
+
+      createRoot(document.getElementById('root')).render(<CatalogPage />);
+    </script>
+  </body>
+</html>
