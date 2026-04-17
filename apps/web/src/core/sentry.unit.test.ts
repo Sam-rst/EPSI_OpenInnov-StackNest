@@ -38,4 +38,51 @@ describe('initSentry', () => {
 
     expect(initMock).not.toHaveBeenCalled()
   })
+
+  it('utilise un tracesSampleRate de 0.1 en prod', () => {
+    initSentry({ dsn: 'https://public@sentry.example/1', environment: 'prod' })
+
+    expect(initMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        environment: 'prod',
+        tracesSampleRate: 0.1,
+        replaysSessionSampleRate: 0,
+        replaysOnErrorSampleRate: 1.0,
+      }),
+    )
+  })
+
+  it('utilise un tracesSampleRate de 1.0 hors prod', () => {
+    initSentry({ dsn: 'https://public@sentry.example/1', environment: 'dev' })
+
+    expect(initMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tracesSampleRate: 1.0,
+      }),
+    )
+  })
+
+  it("retombe sur 'unknown' si l'environnement est absent", () => {
+    initSentry({ dsn: 'https://public@sentry.example/1', environment: undefined })
+
+    expect(initMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        environment: 'unknown',
+      }),
+    )
+  })
+
+  it('transmet le release au SDK quand fourni', () => {
+    initSentry({
+      dsn: 'https://public@sentry.example/1',
+      environment: 'dev',
+      release: 'web@1.2.3',
+    })
+
+    expect(initMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        release: 'web@1.2.3',
+      }),
+    )
+  })
 })

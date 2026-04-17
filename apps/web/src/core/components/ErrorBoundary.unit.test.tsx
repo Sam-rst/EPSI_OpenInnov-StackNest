@@ -36,4 +36,29 @@ describe('ErrorBoundary', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent(/une erreur/i)
   })
+
+  it('rend le fallback custom fourni en prop', () => {
+    render(
+      <ErrorBoundary fallback={<p>fallback custom</p>}>
+        <Boom />
+      </ErrorBoundary>,
+    )
+
+    expect(screen.getByText('fallback custom')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it("invoque onError avec l'erreur capturee", () => {
+    const onError = vi.fn()
+
+    render(
+      <ErrorBoundary onError={onError}>
+        <Boom />
+      </ErrorBoundary>,
+    )
+
+    expect(onError).toHaveBeenCalledOnce()
+    expect(onError.mock.calls[0][0]).toBeInstanceOf(Error)
+    expect((onError.mock.calls[0][0] as Error).message).toBe('boom')
+  })
 })

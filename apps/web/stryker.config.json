@@ -21,13 +21,7 @@
     "!src/App.css",
     "!src/assets/**"
   ],
-  "ignorePatterns": [
-    "dist",
-    "coverage",
-    "playwright-report",
-    "test-results",
-    "reports"
-  ],
+  "ignorePatterns": ["dist", "coverage", "playwright-report", "test-results", "reports"],
   "thresholds": {
     "high": 80,
     "low": 60,
