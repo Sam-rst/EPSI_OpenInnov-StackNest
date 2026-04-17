@@ -3,8 +3,13 @@
 from fastapi import FastAPI
 
 from app.core.config import get_settings
+from app.core.logging import configure_logging
+from app.core.middleware.logging_middleware import LoggingMiddleware
+
+configure_logging()
 
 app = FastAPI(title="StackNest API")
+app.add_middleware(LoggingMiddleware)
 
 
 @app.get("/health")
