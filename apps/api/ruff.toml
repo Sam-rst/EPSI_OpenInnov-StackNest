@@ -16,6 +16,7 @@ select = [
 ]
 ignore = [
     "E501",  # line too long (le formatter gere)
+    "N818",  # exception suffix "Error": le projet utilise "Exception" (DomainException, ...)
 ]
 
 [lint.per-file-ignores]
