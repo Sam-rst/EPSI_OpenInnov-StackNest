@@ -1,0 +1,180 @@
+# Guide developpeur — backend StackNest
+
+Ce guide decrit l'architecture, les conventions et la marche a suivre pour
+creer une nouvelle feature dans le backend.
+
+## Principes fondamentaux
+
+### 1 fichier = 1 classe
+
+Dans **toutes les couches** (domain, application, infrastructure, presentation),
+un fichier ne contient qu'une seule classe. Les modules `__init__.py` peuvent
+re-exporter les symboles publics si besoin.
+
+**Pourquoi ?** Lisibilite, navigation IDE, diffs git ciblees, tests faciles a localiser.
+
+### Clean Architecture + Vertical Slicing
+
+Chaque feature (auth, catalog, deployment, chat, dashboard) est un **slice vertical
+complet** — elle contient ses propres couches. Les features ne s'appellent pas
+entre elles ; elles passent par `core/` (technique) ou `shared/` (abstractions
+metier partagees).
+
+Regle de dependance (du haut vers le bas, jamais l'inverse) :
+
+```
+presentation -> application -> domain
+infrastructure -> domain (implemente les interfaces)
+```
+
+Le **domain ne depend de RIEN** (ni FastAPI, ni SQLAlchemy, ni Pydantic).
+
+### TDD strict (Red -> Green -> Blue)
+
+1. **RED** : ecrire le test qui echoue (commit `test(STN-XX): red — ...`)
+2. **GREEN** : implementation minimale pour que le test passe (commit `feat(STN-XX): green — ...`)
+3. **BLUE** : refacto sans changer le comportement (commit `refactor(STN-XX): blue — ...`)
+
+Chaque phase termine par son propre commit. Pas de batch.
+
+## Arborescence
+
+### Etat actuel (scaffolding minimal)
+
+```
+apps/api/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                       # FastAPI entrypoint
+│   ├── core/                         # Technique transverse
+│   │   ├── config.py                 # Settings (pydantic-settings)
+│   │   ├── logging.py                # configure_logging (structlog JSON)
+│   │   ├── sentry.py                 # init_sentry (no-op si DSN absent)
+│   │   ├── exception_handlers.py     # register_exception_handlers
+│   │   └── middleware/
+│   │       └── logging_middleware.py # LoggingMiddleware
+│   └── shared/                       # Abstractions metier partagees
+│       └── exceptions/
+│           └── domain_exception.py   # DomainException (base)
+├── tests/
+│   ├── unit/         # *.unit.py
+│   ├── integration/  # *.integ.py
+│   └── e2e/          # *.e2e.py
+└── pyproject.toml
+```
+
+Les dossiers de features (`auth/`, `catalog/`, ...) sont **crees au moment ou
+la feature arrive** — chaque ticket porte la creation de son dossier.
+
+### Structure cible d'une feature
+
+```
+app/{feature}/
+├── domain/
+│   ├── entities/        # Classes metier (1 fichier = 1 entite)
+│   ├── value_objects/   # frozen dataclass + __post_init__ (guard clauses)
+│   ├── enums/           # str Enum, jamais de magic strings
+│   ├── interfaces/      # ABC — contrats de repository
+│   ├── exceptions/      # Specifiques a la feature, herite de DomainException
+│   ├── factories/       # Creation complexe d'entites (UUID, defaults)
+│   └── events/          # Domain events
+├── application/
+│   ├── use_cases/       # 1 fichier = 1 use case
+│   ├── commands/        # DTO ecriture (dataclass pure)
+│   ├── queries/         # DTO lecture (CQRS optionnel)
+│   ├── results/         # DTO sortie use case
+│   ├── ports/           # Interfaces services externes (LLM, Terraform, Email)
+│   └── handlers/        # Event handlers applicatifs
+├── infrastructure/
+│   ├── models/          # SQLAlchemy models
+│   ├── repositories/    # Implementation des interfaces du domain
+│   └── mappers/         # Entity <-> SQLAlchemy model
+└── presentation/
+    ├── routers/         # APIRouter FastAPI, 1 fichier par ressource
+    ├── schemas/
+    │   ├── requests/    # Pydantic input HTTP
+    │   └── responses/   # Pydantic output HTTP
+    ├── mappers/         # Schema <-> Command, Entity <-> Response
+    └── dependencies/    # Depends() FastAPI (get_current_user, pagination...)
+```
+
+## Regles de placement
+
+| Si le code est... | Place-le dans... |
+|---|---|
+| Config, DB, Redis, logging, sentry, security, middleware, deps FastAPI transverses | `app/core/` |
+| Une abstraction metier utilisee par >= 2 features (ex : `DomainException`, `UserId` VO) | `app/shared/` |
+| Logique metier d'une feature precise | `app/{feature}/` (vertical slicing complet) |
+
+**Regle stricte** : `app/shared/` n'a **aucune** dependance sortante vers une feature.
+Si tu te retrouves a ecrire `from app.catalog... import ...` dans `app/shared/`, c'est
+que ton abstraction n'est pas vraiment partagee — elle appartient a `catalog/`.
+
+## Conventions Software Craftsmanship (phase Blue)
+
+- **Naming explicite** — pas d'abreviation, pas de `data`, `obj`, `tmp`.
+- **Fonctions <= 20 lignes**, single responsibility.
+- **Early return** — pas de `if/else` imbriques.
+- **Constantes nommees** (Enums) — pas de magic strings.
+- **Logs structures** (`structlog.get_logger(__name__).info("event_name", key=value)`).
+- **Exceptions custom typees** — `class TemplateNotFoundException(DomainException): ...`.
+- **Try/catch** uniquement sur l'**infrastructure** (reseau, DB, timers).
+  Le handler global transforme les `DomainException` en HTTP — pas de try/catch
+  dans les use cases ni les routers.
+- **Value Objects** (frozen dataclass) pour les types avec validation metier
+  (Email, Port, DatabaseName).
+- **Guard clauses** dans les entites (`__post_init__`).
+- **Factories** pour la creation complexe (UUID, defaults, dependances).
+- **Commands / Queries / Results** = dataclasses pures, **distinctes** des
+  Schemas Pydantic HTTP (decouple application <-> presentation).
+
+## Logs et exceptions
+
+### Logs structures (structlog JSON)
+
+```python
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+logger.info("template_created", template_id=str(template.id), name=template.name)
+logger.warning("quota_exceeded", user_id=str(user.id), quota=10)
+logger.error("terraform_apply_failed", deployment_id=str(deployment.id))
+```
+
+Tous les logs sortent en JSON sur stdout (config centrale `app/core/logging.py`).
+Niveaux : `INFO` actions normales, `WARNING` cas ignores, `ERROR` exceptions.
+
+### DomainException -> HTTP
+
+Le handler global (`app/core/exception_handlers.py`) intercepte toute
+`DomainException` et renvoie :
+
+```json
+{ "error": "TEMPLATE_NOT_FOUND", "message": "Template introuvable" }
+```
+
+avec le `http_status` configure dans l'exception.
+
+```python
+from app.shared.exceptions.domain_exception import DomainException
+
+
+class TemplateNotFoundException(DomainException):
+    def __init__(self, template_id: str) -> None:
+        super().__init__(
+            code="TEMPLATE_NOT_FOUND",
+            message=f"Template {template_id} introuvable",
+            http_status=404,
+        )
+```
+
+## Comment creer une nouvelle feature
+
+1. **Lire le ticket Jira** (STN-XX) — perimetre, criteres d'acceptation, scenarios de test.
+2. **Creer la branche** : `git checkout -b feature/STN-XX-description`.
+3. **Creer le dossier feature** : `app/{feature}/` avec les sous-dossiers strictement necessaires (YAGNI — pas de pre-creation).
+4. **TDD** : pour chaque CA, Red -> Green -> Blue avec un commit par phase.
+5. **Lint + types** : `uv run ruff check . && uv run mypy .` (0 erreur).
+6. **Couverture** : `uv run pytest --cov=app` (>= 80% global, 90% sur le metier).
+7. **Pousser** + ouvrir une PR vers `main`.
