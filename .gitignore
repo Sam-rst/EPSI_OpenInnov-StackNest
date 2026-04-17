@@ -9,6 +9,12 @@ __pycache__/
 *.pyc
 .venv/
 
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
 # Logs
 *.log
 
@@ -37,6 +43,8 @@ Thumbs.db
 # Coverage
 htmlcov/
 .coverage
+.coverage.*
+coverage.xml
 coverage/
 lcov.info
 
