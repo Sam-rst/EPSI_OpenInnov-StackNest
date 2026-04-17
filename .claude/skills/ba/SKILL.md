@@ -7,12 +7,36 @@ description: Generate Jira tickets with full DOR (Definition of Ready). Use when
 
 Orchestrates the full lifecycle of a Jira ticket from idea to "Prêt". The BA does NOT write specs alone — it drives a structured process that includes brainstorming, optional design, and collaborative spec writing.
 
+## Two-phase workflow — MANDATORY read before acting
+
+The BA applies the 13-step workflow **in 2 distinct phases** to save tokens and avoid dead work. **NEVER apply the full 13-step workflow in batch on dozens of tickets.**
+
+**Phase A — Backlog seeding (one-shot, all tickets of the project)**
+- Create all tickets of the project in status `Nouveau` with a **minimal skeleton** :
+  - Title + type + priority + SP estimate + fix version + Epic + labels
+  - Description : short Contexte + minimal Périmètre (no CA, no matrix, no dependencies)
+- Goal : full macro backlog visible from day 1, long-term planning possible, rough effort estimate.
+- **Triggered by** : user says "create all tickets", "batch create", "create the full project backlog".
+
+**Phase B — Just-in-time specification (2-sprint rolling window)**
+- At any time, fully specify ONLY tickets of the **next 2 sprints** (current + N+1).
+- For each ticket targeted : apply the 13-step workflow (transitions, brainstorming, full DOR, dependencies, complexity matrix, transitions to Prêt).
+- **Triggered by** : user says "spec the sprint", "prepare ticket STN-XX", "complete DOR".
+
+**Special sub-workflow for frontend tickets requiring a mockup :**
+1. Apply Phase B up to partial DOR written.
+2. Keep ticket in status `A spécifier` with label `attente-maquette`.
+3. Designer (typically Yassine) produces the mockup in `mockups/STN-XX/<page-slug>/` using the `frontend-design:frontend-design` skill.
+4. Once mockup is validated : remove `attente-maquette` label, complete DOR with mockup reference.
+5. Transition `A spécifier` → `A estimer` → `Prêt`.
+
 ## When to use
 
-- User wants to create a new ticket (feature, bug, task)
-- User wants to break down a feature into tickets
-- User mentions DOR, spec, or ticket creation
-- User says "ticket for X", "issue for X", "new feature", "new bug"
+- User wants to create a new ticket (feature, bug, task) → typically Phase A if batch, Phase B if solo
+- User wants to break down a feature into tickets → Phase A
+- User mentions DOR, spec, or ticket creation → Phase B
+- User says "ticket for X", "issue for X", "new feature", "new bug" → depends on scope
+- User says "spec the ticket", "prepare STN-XX", "complete DOR" → Phase B exclusively
 
 ## Workflow (13 steps)
 
