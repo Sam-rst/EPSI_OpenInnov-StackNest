@@ -10,11 +10,9 @@ def configure_logging(level: str = "INFO") -> None:
 
     Idempotent : peut etre appele plusieurs fois sans dupliquer les handlers.
     """
-    logging.basicConfig(
-        format="%(message)s",
-        level=getattr(logging, level.upper()),
-        force=True,
-    )
+    log_level = getattr(logging, level.upper())
+
+    logging.basicConfig(format="%(message)s", level=log_level, force=True)
 
     structlog.configure(
         processors=[
@@ -25,8 +23,6 @@ def configure_logging(level: str = "INFO") -> None:
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, level.upper())
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(log_level),
         cache_logger_on_first_use=True,
     )
