@@ -38,6 +38,7 @@ Port configurable via `PORT` (defaut 8000).
 | `uv run ruff check .` | Linter (0 erreur attendue) |
 | `uv run ruff format .` | Formate le code |
 | `uv run mypy .` | Type checking strict (0 erreur attendue) |
+| `docker run --rm -v "${PWD}":/app -w /app python:3.13-slim sh -c "pip install uv && uv sync --frozen && uv run mutmut run"` | Mutation testing (Linux/Docker — voir guide) |
 
 ## Endpoints transverses
 

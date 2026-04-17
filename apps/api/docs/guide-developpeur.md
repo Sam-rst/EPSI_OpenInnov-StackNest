@@ -169,6 +169,60 @@ class TemplateNotFoundException(DomainException):
         )
 ```
 
+## Mutation testing (mutmut)
+
+La couverture de tests dit "ce code est execute". Le **mutation testing** dit
+"les tests detectent vraiment un changement de comportement". C'est le filet
+complementaire qui rend la coverage credible.
+
+### Cible
+
+On mute uniquement la **logique metier** :
+
+- `app/core/` — config, handlers, middleware (technique transverse)
+- `app/shared/` — abstractions metier partagees
+- `app/{feature}/application/` — use cases, services
+- `app/{feature}/domain/` — entities, value objects (les regles metier)
+
+On **ne mute pas** :
+
+- `app/{feature}/infrastructure/` — couvert par les tests d'integration ASGI / DB
+- `app/{feature}/presentation/` — meme raison
+
+A chaque nouvelle feature, ajoute son `application/` et `domain/` dans
+`paths_to_mutate` (`pyproject.toml`, section `[tool.mutmut]`).
+
+### Comment lancer
+
+Mutmut **n'est pas supporte natif sur Windows** ([issue 397](https://github.com/boxed/mutmut/issues/397)).
+Deux modes d'execution :
+
+**1. CI (GitHub Actions Linux)** — execution automatique a chaque PR.
+
+**2. Local (Docker, cross-platform)** :
+
+```bash
+docker run --rm -v "${PWD}":/app -w /app python:3.13-slim \
+  sh -c "pip install uv && uv sync --frozen && uv run mutmut run"
+```
+
+Plus tard, quand `infra/docker/docker-compose.dev.yml` existera (STN-11), un
+service `mutmut` permettra : `docker compose run --rm mutmut`.
+
+### Seuil & interpretation
+
+- **Seuil de demarrage : 60% mutation score** — point de depart, a durcir
+  progressivement vers 80% au fil des sprints.
+- **Mutation tuee** = un test a echoue quand on a modifie le code -> bon
+  signal, le test est utile.
+- **Mutation survivante** = aucun test n'a echoue -> ton test ne couvre pas
+  vraiment ce comportement, il faut renforcer ou ajouter un cas.
+- **Mutation timeout / suspicious** = a investiguer manuellement.
+
+Mutation testing est **lent** (1 fichier modifie = N runs de la suite). Ne le
+lance pas dans la boucle TDD — reserve-le aux relectures de fin de feature
+ou a la CI.
+
 ## Comment creer une nouvelle feature
 
 1. **Lire le ticket Jira** (STN-XX) — perimetre, criteres d'acceptation, scenarios de test.

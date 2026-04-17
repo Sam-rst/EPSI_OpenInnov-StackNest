@@ -71,3 +71,24 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
 ]
+
+# Mutation testing : complementaire a la coverage. La coverage dit "ce code est
+# execute", mutmut dit "les tests detectent vraiment un changement de
+# comportement". Cible la logique metier (use cases, services, value objects,
+# entities) — pas l'infra ni la presentation (deja couverts par les tests
+# d'integration ASGI).
+[tool.mutmut]
+paths_to_mutate = [
+    "app/core/",
+    "app/shared/",
+    # A ajouter au fil des features :
+    # "app/auth/application/",
+    # "app/auth/domain/",
+    # "app/catalog/application/",
+    # ...
+]
+tests_dir = "tests/"
+runner = "uv run pytest -x --no-cov -q"
+# Echec global si moins de 60% des mutations sont tuees (point de depart, a durcir).
+# mutmut 3.x renvoie code de retour 1 si le seuil n'est pas atteint quand on
+# utilise --CI ou via la cmd 'mutmut results --threshold 60'.
