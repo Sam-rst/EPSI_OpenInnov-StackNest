@@ -35,16 +35,21 @@ package = false
 
 [tool.pytest.ini_options]
 minversion = "8.0"
+# import-mode=importlib : requis pour que pytest importe des fichiers aux noms
+# contenant des dots (test_x.unit.py, test_x.integ.py, test_x.e2e.py). Impose
+# aussi de ne PAS avoir d'__init__.py dans tests/ (namespace packages).
 addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
+    "--import-mode=importlib",
     "--cov=app",
     "--cov-report=term-missing",
     "--cov-report=xml",
 ]
 testpaths = ["tests"]
 python_files = ["test_*.unit.py", "test_*.integ.py", "test_*.e2e.py"]
+pythonpath = ["."]
 asyncio_mode = "auto"
 markers = [
     "unit: tests unitaires (rapides, pas d'I/O)",
