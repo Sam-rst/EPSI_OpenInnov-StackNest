@@ -2,12 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🤖 Session Claude Code — Démarrage rapide (à exécuter à chaque nouvelle session)
+
+**IMPORTANT** : si tu démarres dans ce repo (notamment après un `git clone` sur une nouvelle machine / nouveau dossier), tu n'as probablement PAS de mémoire utilisateur (elle est stockée par chemin absolu dans `~/.claude/projects/<hash>/memory/`). Suis ce protocole :
+
+1. **Annonce à l'utilisateur** en 1 phrase : "Je démarre dans StackNest (IDP FastAPI + React). Je vais chercher le prochain ticket à bosser."
+2. **Invoke le skill `/next-task`** pour identifier le prochain ticket Jira à prendre (Prêt, priorité la plus haute, non bloqué, pas `attente-maquette`, prérequis terminés).
+3. **Vérifie l'état git** : branche courante, état working tree. Si sur `main`, créer `feature/STN-XX-slug` avant de toucher au code.
+4. **Rappel conventions projet** (à connaître par coeur — pas besoin de les relire à chaque fois, sont ci-dessous) :
+   - TDD strict Red → Green → Blue (skill `/TDD`)
+   - Commits en français, référencer `STN-XX`
+   - 1 fichier = 1 classe (backend), 1 fichier = 1 composant (frontend)
+   - Clean Archi vertical slicing : `domain/` → `application/` → `infrastructure/` + `presentation/`
+   - Branches `feature/STN-XX-description`, merge via PR vers `main`
+5. **Attends la validation user** avant de `git checkout -b`, coder, ou modifier du code.
+
+Le skill `/next-task` est committé dans `.claude/skills/next-task/` donc il voyage avec le repo — dispo dans chaque clone.
+
 ## Project Overview
 
 StackNest is an Internal Developer Platform (IDP) that enables technical teams to provision IT resources (VMs, databases, environments) autonomously via a web UI or an AI chatbot, using Terraform and Docker.
 
 The entire UI is in **French** — all labels, text, and user-facing strings must remain in French.
-Commits must be in **French** and reference the Jira ticket (EOS-XX).
+Commits must be in **French** and reference the Jira ticket (**STN-XX**, pas `EOS-XX`).
 
 ## Team
 
