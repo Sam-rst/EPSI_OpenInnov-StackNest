@@ -202,11 +202,42 @@ Minimum 3 criteres, format Given/When/Then :
 |---|---|
 | **Titre** | Court et explicite, prefixe domaine : `[Store]`, `[Auth]`, `[Infra]`, `[ChatOps]`, `[Dashboard]`, `[Docs]`, `[DevOps]`, `[Security]` |
 | **Type** | Story / Bug / Tâche |
-| **Priorite** | Highest / High / Medium / Low / Lowest |
-| **Story Points** | Fibonacci : 1, 2, 3, 5, 8, 13, 21 |
-| **Epic** | STN-1 Store, STN-2 Auth, STN-3 Infra, STN-4 ChatOps, STN-5 Dashboard, STN-6 Docs, STN-7 DevOps, STN-8 Security |
+| **Priorite** | Highest / High / Medium / Low / Lowest — voir mapping MoSCoW ci-dessous |
+| **Story Points** | Fibonacci : 1, 2, 3, 5, 8 (**max 5 en pratique** — voir règle ci-dessous) |
+| **Epic** | STN-1 Store, STN-2 Auth, STN-3 Infra, STN-4 ChatOps, STN-5 Dashboard, STN-6 Docs, STN-7 DevOps, STN-8 Security, STN-XX [Core] UI Shell & Layout |
 | **Fix Version** | v0.1.0 to v0.9.0 |
 | **Labels** | Domaine: `backend`, `frontend`, `infra`, `database`, `security`, `ia`. Nature: `tech-debt`, `ux`, `performance`, `documentation`, `design`. Contexte: `quick-win`, `spike`, `bloquant` |
+
+### Règle de découpage atomique (≤5 SP)
+
+Aucun ticket ne doit dépasser **5 SP**. Au-delà, on découpe selon une de ces granularités :
+
+| Granularité | Exemple |
+|---|---|
+| **1 endpoint API = 1 ticket** (route + use case + repo + tests) | `POST /auth/login` |
+| **1 composant React réutilisable = 1 ticket** (component + mapper + tests) | `TemplateCard` compound |
+| **1 page/route frontend = 1 ticket** (assemble les composants déjà livrés) | Page `/catalog` |
+| **1 use case métier isolé = 1 ticket** (si complexe avec logique domaine) | `ValidateIntent` anti-hallucination |
+| **1 migration BDD = 1 ticket** (tables + indexes + contraintes) | Migration `deployments` |
+| **1 entity/VO = 1 ticket** (entity + VOs associés + enums) | `Template` + VOs + `TemplateCategory` |
+
+**Pas de "gros ticket frontend + backend + BDD".** Chaque couche / composant / endpoint mérite son propre commit TDD (Red-Green-Blue), sa propre MR, sa propre review. Exception : un scaffolding initial (ticket setup) peut excéder ponctuellement.
+
+### Mapping priorité Jira ↔ MoSCoW
+
+| Priorité Jira | MoSCoW | Signification | Comportement sprint |
+|---|---|---|---|
+| **Highest** | Bloquant | Si pas livré, le sprint est un échec | Doit être embarqué en premier |
+| **High** | MUST | Nécessaire pour que la version ait du sens | Embarqué après les Highest |
+| **Medium** | SHOULD | Améliore la version mais pas essentiel | Embarqué si capacité restante |
+| **Low** | COULD | Confort, polish | Bumpable en version suivante ou v0.9.0+ |
+| **Lowest** | Won't | Reporté post-jury par défaut | Pas embarqué dans les sprints MVP |
+
+### Backlog vs vélocité (approche Scrum master)
+
+Le **total des SP d'une fix version peut dépasser la vélocité du sprint** — c'est un **backlog**, pas un engagement. À chaque sprint planning, l'équipe pioche dans l'ordre Highest → High → Medium jusqu'à saturation du budget réaliste (~15-20 SP/sem pour 2 devs × 15h). Les SHOULD/COULD non embarqués glissent naturellement en v0.9.0+ si pas traités d'ici la fin de sprint.
+
+**Fin de sprint** : calculer vélocité réelle (SP livrés / SP embarqués) → ajuster sprint suivant. Ne JAMAIS supprimer un ticket non-fait — toujours bumper en version suivante.
 
 ---
 
