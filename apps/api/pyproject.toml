@@ -29,3 +29,39 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.11",
 ]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+]
+testpaths = ["tests"]
+python_files = ["test_*.unit.py", "test_*.integ.py", "test_*.e2e.py"]
+asyncio_mode = "auto"
+markers = [
+    "unit: tests unitaires (rapides, pas d'I/O)",
+    "integ: tests d'integration (testcontainers, DB, Redis)",
+    "e2e: tests end-to-end (stack complet)",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = ["app/**/__init__.py"]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
