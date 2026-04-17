@@ -6,8 +6,11 @@ from app.core.config import get_settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware.logging_middleware import LoggingMiddleware
+from app.core.sentry import init_sentry
 
 configure_logging()
+_settings = get_settings()
+init_sentry(dsn=_settings.sentry_dsn, environment=_settings.app_env)
 
 app = FastAPI(title="StackNest API")
 app.add_middleware(LoggingMiddleware)

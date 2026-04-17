@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     git_commit: str = "unknown"
     app_env: str = "dev"
     deployed_at: str = "1970-01-01T00:00:00Z"
+    sentry_dsn: str = ""
 
 
 @lru_cache
