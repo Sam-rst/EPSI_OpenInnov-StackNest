@@ -54,16 +54,12 @@ src/
 │   ├── stores/ui.store.ts          # Store zustand UI (sidebar, etc.)
 │   ├── router.tsx                  # createBrowserRouter
 │   └── sentry.ts                   # initSentry conditionnel
-├── auth/                           # Feature auth (vide, archi complète)
-├── catalog/
-├── chat/
-├── dashboard/
-├── deployment/
+├── <feature>/                      # Créée à chaque sprint (voir guide dev)
 ├── App.tsx                         # ErrorBoundary > Banner > RouterProvider
 └── main.tsx                        # Entrée, initSentry + createRoot
 ```
 
-Chaque feature suit la **Clean Architecture vertical slicing** avec les sous-dossiers `types/{dto,models,enums,guards}`, `mappers/`, `services/`, `hooks/`, `components/`, `pages/`.
+Les dossiers de features (`auth/`, `catalog/`, `chat/`, `dashboard/`, `deployment/`…) sont créés **au fur et à mesure des sprints**, pas à l'avance. Chacune suit la **Clean Architecture vertical slicing** avec les sous-dossiers `types/{dto,models,enums,guards}`, `mappers/`, `services/`, `hooks/`, `components/`, `pages/` (voir [`docs/guide-developpeur.md`](docs/guide-developpeur.md)).
 
 ## Conventions
 

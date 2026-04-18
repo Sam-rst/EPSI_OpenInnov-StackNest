@@ -101,15 +101,13 @@ Each feature has its own domain/application/infrastructure/presentation layers. 
 ```
 apps/web/src/
 ├── core/                    # Config, client API, auth context, layout, router
-├── auth/                    # types/ mappers/ services/ hooks/ components/ pages/
-├── catalog/
-├── deployment/
-├── chat/
-├── dashboard/
+├── <feature>/               # types/ mappers/ services/ hooks/ components/ pages/
 └── main.tsx
 ```
 
 **1 fichier = 1 composant.** Types: dto/ + models/ + enums/ + guards/. Separation DTO (miroir API) / Model (UI enrichi) avec mappers. Compound components quand > 100 lignes.
+
+**Ne pas pre-creer les dossiers de features** (auth/, catalog/, chat/, dashboard/, deployment/, etc.). Les features sont creees une par une au fil des sprints, a partir du ticket qui les porte. Idem cote backend dans `apps/api/app/`.
 
 ## Skills
 

@@ -4,7 +4,7 @@ Ce guide documente les conventions d'architecture du frontend StackNest. Toute n
 
 ## 1. Principes
 
-- **Clean Architecture vertical slicing** : chaque feature est autonome (`auth/`, `catalog/`, `chat/`, `dashboard/`, `deployment/`) et ne dépend que de `core/`.
+- **Clean Architecture vertical slicing** : chaque feature est autonome (exemples : `auth/`, `catalog/`, `chat/`, `dashboard/`, `deployment/`) et ne dépend que de `core/`. Les features sont créées **à la demande au fil des sprints** — ne jamais pré-créer les dossiers vides.
 - **1 fichier = 1 composant / 1 type / 1 hook**. Pas de fichier "fourre-tout".
 - **Séparation DTO / Model** : les DTO sont le miroir exact de l'API (snake_case, types primitifs), les Models sont la représentation UI enrichie (camelCase, `Date`, computed fields). Les mappers font le pont.
 - **Container / Presentational** : les `pages/` orchestrent (data fetching, état), les `components/` affichent.
