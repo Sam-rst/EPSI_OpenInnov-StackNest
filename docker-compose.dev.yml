@@ -1,0 +1,45 @@
+# Override dev de StackNest.
+# Usage : docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Rajoute :
+#   - hot reload API (uvicorn --reload + volume monte sur apps/api/app)
+#   - Vite dev server pour l'UI (HMR) servi via l'image node (pas nginx)
+#   - expose DB et Redis sur l'hote pour les outils devs (psql, redis-cli)
+#
+# Nginx (apps/web/Dockerfile) reste utilise pour les envs preview/prod.
+
+services:
+  db:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  api:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./apps/api/app:/app/app:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      APP_ENV: dev
+
+  # En dev on remplace l'image Nginx par un conteneur Node qui fait tourner
+  # Vite dev server (HMR). Le proxy '/api' -> 'http://api:8000' est configure
+  # dans vite.config.ts via VITE_API_PROXY_TARGET.
+  ui:
+    image: node:20-alpine
+    build: !reset null
+    working_dir: /app
+    command: ["sh", "-c", "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173"]
+    environment:
+      VITE_API_PROXY_TARGET: http://api:8000
+      VITE_ENVIRONMENT: ${VITE_ENVIRONMENT:-dev}
+      VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    ports: !override
+      - "${UI_PORT:-8080}:5173"
