@@ -35,9 +35,7 @@ async def client() -> AsyncIterator[AsyncClient]:
 
 
 class TestVersionEndpoint:
-    async def test_returns_200_with_build_metadata(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_returns_200_with_build_metadata(self, client: AsyncClient) -> None:
         """Etant donne un Settings de test injecte, quand on appelle GET /version,
         alors 200 + body avec les 4 champs version/commit/env/deployed_at."""
         response = await client.get("/version")

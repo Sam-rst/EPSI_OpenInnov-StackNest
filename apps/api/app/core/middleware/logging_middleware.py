@@ -13,9 +13,7 @@ _logger = structlog.get_logger(__name__)
 class LoggingMiddleware(BaseHTTPMiddleware):
     """Emet un event 'http_request' avec method, path, status, duration_ms."""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         start = time.perf_counter()
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - start) * 1000, 2)

@@ -20,9 +20,7 @@ class TestLoggingMiddleware:
         contient method=GET, path=/health, status=200, duration_ms (numerique)."""
         transport = ASGITransport(app=app)
         with structlog.testing.capture_logs() as captured:
-            async with AsyncClient(
-                transport=transport, base_url="http://test"
-            ) as client:
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.get("/health")
 
         assert response.status_code == 200
