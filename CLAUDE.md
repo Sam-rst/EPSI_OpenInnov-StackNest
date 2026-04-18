@@ -153,6 +153,13 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 - Pre-commit: Husky + lint-staged (auto lint/format)
 - CI is automatic (push/PR). **CD is ALWAYS manual** (workflow_dispatch).
 
+### PR conventions
+
+- **Titre** : `STN-XX — [Domaine] Description courte` (FR, <70 caracteres)
+- **Body** : sections obligatoires — `Résumé`, `Changements principaux`, `Validation (déjà exécutée)` (table des checks locaux), `Critères d'acceptation` (checklist copiée du ticket), `Plan de test (reviewer)`
+- **Plan de test actionnable** : chaque étape DOIT contenir les commandes exactes à copier-coller (pas juste une description). Inclure : prérequis, récupération de la branche, checks locaux, étapes de validation UI avec URL, tests E2E/mutation si applicable, build Docker si applicable, nettoyage. But : le reviewer ne doit pas avoir à deviner comment tester.
+- Utiliser `gh pr create --base main` (gh.exe dans `/c/Program Files/GitHub CLI/`, préfixer PATH si bash). Ne jamais ajouter `Co-Authored-By`.
+
 ### Environments (1 active at a time)
 
 | Env | Usage | Deploy trigger |
