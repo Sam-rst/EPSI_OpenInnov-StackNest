@@ -47,29 +47,52 @@ stacknest/
 
 ## Demarrage rapide
 
+### Option A — Tout-en-un via Docker Compose (recommande)
+
+Un seul `up` demarre l'UI, l'API, le worker, la DB et Redis avec hot reload sur le back ET le front.
+
 ```bash
-# 1. Cloner le repo
 git clone https://github.com/Sam-rst/EPSI_OpenInnov-StackNest.git
 cd EPSI_OpenInnov-StackNest
+cp .env.example .env
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
 
-# 2. Installer les outils root (husky pre-commit)
-npm install
+- UI (Vite HMR)       : http://localhost:8080
+- API (FastAPI reload) : http://localhost:8080/api  (ou http://localhost:8000 direct)
+- Docs Swagger         : http://localhost:8000/docs
+- PostgreSQL           : localhost:5432 (stacknest / stacknest)
+- Redis                : localhost:6379
 
-# 3. Backend
+Modifier un fichier sous `apps/api/app/` → uvicorn se reload. Modifier un fichier sous `apps/web/src/` → Vite HMR. Pour arreter : `docker compose down` (ajouter `-v` pour supprimer les volumes db/redis).
+
+Le service `ollama` n'est pas demarre par defaut — utiliser `--profile ollama` pour l'activer.
+
+### Option B — Lancer chaque service en natif
+
+Utile si tu ne veux pas Docker ou pour debugger finement un service.
+
+```bash
+npm install                          # pre-commit husky
+
+# Backend
 cd apps/api
 uv sync
 uv run uvicorn app.main:app --reload
 
-# 4. Frontend
+# Frontend (nouveau terminal)
 cd apps/web
 npm install
 npm run dev
-
-# 5. Docker Compose (tous les services)
-cd infra/docker
-cp .env.example .env
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
+
+### Smoke test stack complet
+
+```bash
+bash tests/infra/test_docker_compose_dev.sh
+```
+
+Valide que `docker compose up` demarre et que UI + API repondent 200.
 
 ## Environnements
 
