@@ -1,8 +1,10 @@
 """Entrypoint FastAPI de StackNest API."""
 
-from fastapi import FastAPI
+from typing import Annotated
 
-from app.core.config import get_settings
+from fastapi import Depends, FastAPI
+
+from app.core.config import Settings, get_settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware.logging_middleware import LoggingMiddleware
@@ -22,9 +24,11 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+
 @app.get("/version")
-async def version() -> dict[str, str]:
-    settings = get_settings()
+async def version(settings: SettingsDep) -> dict[str, str]:
     return {
         "version": settings.app_version,
         "commit": settings.git_commit,
