@@ -7,9 +7,24 @@ creer une nouvelle feature dans le backend.
 
 ### 1 fichier = 1 classe
 
-Dans **toutes les couches** (domain, application, infrastructure, presentation),
-un fichier ne contient qu'une seule classe. Les modules `__init__.py` peuvent
-re-exporter les symboles publics si besoin.
+Dans les **couches metier** des features (domain, application, infrastructure,
+presentation), un fichier ne contient qu'**une seule classe**. Les modules
+`__init__.py` peuvent re-exporter les symboles publics si besoin.
+
+**Exception assumee pour `app/core/`** : le noyau technique transverse peut
+contenir des **fonctions utilitaires** sans classe (`configure_logging`,
+`init_sentry`, `register_exception_handlers`). La regle s'applique alors comme
+**1 fichier = 1 responsabilite technique** :
+
+- `core/config.py` -> la classe `Settings` (+ son factory `get_settings`)
+- `core/logging.py` -> la fonction `configure_logging`
+- `core/sentry.py` -> la fonction `init_sentry`
+- `core/exception_handlers.py` -> la fonction `register_exception_handlers`
+  (+ son handler prive `_handle_domain_exception`)
+- `core/middleware/logging_middleware.py` -> la classe `LoggingMiddleware`
+
+Tout nouveau fichier `core/` doit avoir un nom qui decrit sa responsabilite
+et ne doit rien exporter d'autre.
 
 **Pourquoi ?** Lisibilite, navigation IDE, diffs git ciblees, tests faciles a localiser.
 
