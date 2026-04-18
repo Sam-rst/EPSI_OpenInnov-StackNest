@@ -10,7 +10,7 @@ class DomainException(Exception):
     JAMAIS les attraper : try/except sur l'infra uniquement.
     """
 
-    def __init__(self, code: str, message: str, http_status: int) -> None:
+    def __init__(self, *, code: str, message: str, http_status: int) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
