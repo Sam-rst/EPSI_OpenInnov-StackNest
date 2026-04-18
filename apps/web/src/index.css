@@ -1,0 +1,34 @@
+@import 'tailwindcss';
+
+/*
+ * Charte graphique StackNest (CA3 / STN-10)
+ * Configuration en CSS (Tailwind v4) — pas de tailwind.config.ts nécessaire.
+ */
+@theme {
+  --color-night: #032233;
+  --color-cyan: #0d9297;
+  --color-yellow: #fea21f;
+  --color-error: #c42b1c;
+  --color-success: #22c55e;
+
+  --font-sans: 'Inter', 'Roboto', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}

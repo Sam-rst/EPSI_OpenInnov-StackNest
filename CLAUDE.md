@@ -101,15 +101,13 @@ Each feature has its own domain/application/infrastructure/presentation layers. 
 ```
 apps/web/src/
 ├── core/                    # Config, client API, auth context, layout, router
-├── auth/                    # types/ mappers/ services/ hooks/ components/ pages/
-├── catalog/
-├── deployment/
-├── chat/
-├── dashboard/
+├── <feature>/               # types/ mappers/ services/ hooks/ components/ pages/
 └── main.tsx
 ```
 
 **1 fichier = 1 composant.** Types: dto/ + models/ + enums/ + guards/. Separation DTO (miroir API) / Model (UI enrichi) avec mappers. Compound components quand > 100 lignes.
+
+**Ne pas pre-creer les dossiers de features** (auth/, catalog/, chat/, dashboard/, deployment/, etc.). Les features sont creees une par une au fil des sprints, a partir du ticket qui les porte. Idem cote backend dans `apps/api/app/`.
 
 ## Skills
 
@@ -138,11 +136,16 @@ apps/web/src/
 
 Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 
+**Strict lint** : `eslint --max-warnings 0` (tout warning casse la CI). Frontend utilise `typescript-eslint/strict` + `typescript-eslint/stylistic`. Prettier `--check` fait autorité sur le format (CRLF interdit, endOfLine=lf).
+
+**Scripts npm standardisés (frontend)** : `lint` / `lint:fix` / `format:check` / `format:write` (alias de `format`) / `typecheck` / `test` / `test:watch` / `test:coverage` / `e2e` / `test:mutation` / `build`.
+
 ### Test coverage
 
 - **80% global minimum**, **90% on business logic**
 - 3 levels: unit (.unit.), integration (.integ.), E2E (.e2e.)
-- Backend: pytest + testcontainers. Frontend: vitest + MSW + Playwright.
+- Backend: pytest + testcontainers, tests dans `tests/` séparé (convention Python).
+- Frontend: vitest + MSW + Playwright. Tests unit/integ colocalisés dans `__tests__/` à côté du code (convention JS). E2E dans `apps/web/tests/e2e/`.
 
 ## Trunk-Based Development (TBD)
 
@@ -152,6 +155,13 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 - Never add `Co-Authored-By`
 - Pre-commit: Husky + lint-staged (auto lint/format)
 - CI is automatic (push/PR). **CD is ALWAYS manual** (workflow_dispatch).
+
+### PR conventions
+
+- **Titre** : `STN-XX — [Domaine] Description courte` (FR, <70 caracteres)
+- **Body** : sections obligatoires — `Résumé`, `Changements principaux`, `Validation (déjà exécutée)` (table des checks locaux), `Critères d'acceptation` (checklist copiée du ticket), `Plan de test (reviewer)`
+- **Plan de test actionnable** : chaque étape DOIT contenir les commandes exactes à copier-coller (pas juste une description). Inclure : prérequis, récupération de la branche, checks locaux, étapes de validation UI avec URL, tests E2E/mutation si applicable, build Docker si applicable, nettoyage. But : le reviewer ne doit pas avoir à deviner comment tester.
+- Utiliser `gh pr create --base main` (gh.exe dans `/c/Program Files/GitHub CLI/`, préfixer PATH si bash). Ne jamais ajouter `Co-Authored-By`.
 
 ### Environments (1 active at a time)
 
