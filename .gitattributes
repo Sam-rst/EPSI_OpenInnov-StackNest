@@ -1,0 +1,16 @@
+# Force LF pour tous les fichiers textes (cohérence cross-OS).
+* text=auto eol=lf
+
+# Scripts shell : LF obligatoire (sinon bash casse sous Windows).
+*.sh text eol=lf
+
+# Fichiers Terraform : LF (fmt attend LF).
+*.tf text eol=lf
+*.tfvars text eol=lf
+*.hcl text eol=lf
+
+# Fichiers binaires : ne pas toucher.
+*.png binary
+*.jpg binary
+*.ico binary
+*.svg text eol=lf
