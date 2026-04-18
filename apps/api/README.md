@@ -28,19 +28,42 @@ Port configurable via `PORT` (defaut 8000).
 
 ## Commandes utiles
 
+Le projet utilise **`poethepoet`** (task runner Python) pour standardiser les
+commandes — parité avec les scripts npm côté frontend. Les tâches vivent dans
+`pyproject.toml` (`[tool.poe.tasks]`) et s'exécutent via `uv run poe <task>`.
+
+### Via poe (recommandé)
+
+| Commande | Équivalent frontend | Effet |
+|---|---|---|
+| `uv run poe lint` | `npm run lint` | Linter ruff, 0 erreur attendue |
+| `uv run poe lint:fix` | `npm run lint:fix` | Linter + auto-fix |
+| `uv run poe format:check` | `npm run format:check` | Vérifie le format (échoue si pas clean) |
+| `uv run poe format` | `npm run format:write` | Applique le format (alias : `format:write`) |
+| `uv run poe typecheck` | `npm run typecheck` | `mypy` en mode strict, 0 erreur attendue |
+| `uv run poe test` | `npm run test` | Tous les tests + coverage (échoue si < 80%) |
+| `uv run poe test:unit` | — | Uniquement `.unit.py`, pas de coverage — boucle TDD rapide |
+| `uv run poe test:integ` | — | Uniquement `.integ.py` |
+| `uv run poe test:coverage` | `npm run test:coverage` | Tests + rapport HTML (`htmlcov/index.html`) |
+| `uv run poe e2e` | `npm run e2e` | Uniquement `.e2e.py` |
+| `uv run poe test:mutation` | `npm run test:mutation` | Mutation testing (mutmut) — voir note Windows ci-dessous |
+| `uv run poe build` | `npm run build` | `docker build -t stacknest-api:local .` |
+| **`uv run poe check`** | **`npm run check`** | **Gate qualité complet : lint + format:check + typecheck + test. Arrête au 1er échec.** |
+| `uv run poe fix` | — | Auto-fix linter + format en une commande |
+
+**Windows + `test:mutation`** : `mutmut` ne supporte pas natif win32. Lance plutôt :
+```bash
+docker run --rm -v "${PWD}":/app -w /app python:3.13-slim \
+  sh -c "pip install uv && uv sync --frozen && uv run mutmut run"
+```
+
+### Via uv direct (fallback)
+
 | Commande | Effet |
 |---|---|
-| `uv run uvicorn app.main:app --reload` | Demarre le serveur en mode dev (hot reload) |
-| `uv run pytest` | Lance toute la suite de tests |
-| `uv run pytest -m unit -v` | Tests unitaires uniquement (boucle TDD) |
-| `uv run pytest -m integ -v` | Tests d'integration uniquement |
-| `uv run pytest -m e2e -v` | Tests E2E uniquement |
-| `uv run pytest app/auth/` | Tous les tests d'un slice vertical |
-| `uv run pytest --cov=app` | Tests + rapport de couverture |
-| `uv run ruff check .` | Linter (0 erreur attendue) |
-| `uv run ruff format .` | Formate le code |
-| `uv run mypy .` | Type checking strict (0 erreur attendue) |
-| `docker run --rm -v "${PWD}":/app -w /app python:3.13-slim sh -c "pip install uv && uv sync --frozen && uv run mutmut run"` | Mutation testing (Linux/Docker — voir guide) |
+| `uv run uvicorn app.main:app --reload` | Démarre le serveur en mode dev (hot reload) |
+| `uv run pytest app/auth/` | Tous les tests d'un slice vertical (filtrage par chemin) |
+| `uv run pytest -k "test_login"` | Filtre par nom de test |
 
 ## Endpoints transverses
 

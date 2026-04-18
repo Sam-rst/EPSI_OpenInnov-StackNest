@@ -25,6 +25,7 @@ dependencies = [
 dev = [
     "mutmut>=3.5.0",
     "mypy>=1.20.1",
+    "poethepoet>=0.44.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.1.0",
@@ -47,6 +48,7 @@ addopts = [
     "--cov=app",
     "--cov-report=term-missing",
     "--cov-report=xml",
+    "--cov-fail-under=80",
 ]
 testpaths = ["app", "tests"]
 python_files = ["test_*.unit.py", "test_*.integ.py", "test_*.e2e.py"]
@@ -94,3 +96,31 @@ exclude = ["**/__tests__/**"]
 # Echec global si moins de 60% des mutations sont tuees (point de depart, a durcir).
 # mutmut 3.x renvoie code de retour 1 si le seuil n'est pas atteint quand on
 # utilise --CI ou via la cmd 'mutmut results --threshold 60'.
+
+# Task runner (equivalent des scripts npm cote frontend). Usage : uv run poe <task>.
+# Les tasks composites (list) s'arretent au premier echec.
+[tool.poe.tasks]
+# --- Quality ---
+lint           = "ruff check ."
+"lint:fix"     = "ruff check . --fix"
+"format:check" = "ruff format --check ."
+format         = "ruff format ."
+"format:write" = "ruff format ."           # alias explicite (parite frontend)
+typecheck      = "mypy ."
+
+# --- Tests ---
+test           = "pytest"                  # tout + coverage + seuil 80%
+"test:unit"    = "pytest -m unit --no-cov" # boucle TDD rapide
+"test:integ"   = "pytest -m integ"
+"test:coverage"= "pytest --cov-report=html"
+e2e            = "pytest -m e2e"
+# Mutation testing : natif Linux/Mac/CI. Sur Windows, utiliser la commande Docker
+# documentee dans le README (mutmut ne supporte pas natif win32).
+"test:mutation"= "mutmut run"
+
+# --- Build ---
+build          = "docker build -t stacknest-api:local ."
+
+# --- Composites ---
+check          = ["lint", "format:check", "typecheck", "test"]  # gate CI complet
+fix            = ["lint:fix", "format"]                          # auto-fix tout

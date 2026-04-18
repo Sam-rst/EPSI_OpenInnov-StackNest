@@ -273,14 +273,17 @@ Le hook est dans `conftest.py` a la racine de `apps/api/`.
 
 ### Commandes
 
+Tout passe par `poe` (defini dans `pyproject.toml` sous `[tool.poe.tasks]`).
+Voir le tableau complet dans `README.md`. Principales :
+
 | Commande | Effet |
 |---|---|
-| `uv run pytest` | Tout |
-| `uv run pytest -m unit` | Unit uniquement (boucle TDD rapide) |
-| `uv run pytest -m integ` | Integration uniquement |
-| `uv run pytest -m e2e` | E2E uniquement |
-| `uv run pytest app/auth/` | Tous les tests du slice auth |
-| `uv run pytest app/auth/domain/entities/__tests__/unit/` | Tests unit des entites auth |
+| `uv run poe test` | Tout + coverage (echec si < 80%) |
+| `uv run poe test:unit` | Unit uniquement, sans coverage — boucle TDD rapide |
+| `uv run poe test:integ` | Integration uniquement |
+| `uv run poe e2e` | E2E uniquement |
+| `uv run poe check` | Gate complet : lint + format:check + typecheck + test. A lancer avant chaque push. |
+| `uv run pytest app/auth/` | Filtrage par chemin quand tu bosses sur un slice precis |
 
 ## Mutation testing (mutmut)
 
