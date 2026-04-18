@@ -8,9 +8,9 @@ from app.core.config import Settings, get_settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware.logging_middleware import LoggingMiddleware
-from app.core.presentation.schemas.responses.health_response import HealthResponse
 from app.core.presentation.schemas.responses.version_response import VersionResponse
 from app.core.sentry import init_sentry
+from app.health.presentation.routers.health_router import router as health_router
 
 configure_logging()
 _settings = get_settings()
@@ -38,20 +38,10 @@ app = FastAPI(
 )
 app.add_middleware(LoggingMiddleware)
 register_exception_handlers(app)
+app.include_router(health_router)
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
-
-
-@app.get("/health", tags=["Platform"], summary="Liveness probe")
-async def health() -> HealthResponse:
-    """Retourne `200 OK` avec `{ status: 'ok' }` si l'API est demarree.
-
-    Utilise par Kubernetes / Docker pour determiner si le container doit etre
-    redemarre. Pas de dependance externe verifiee (pas de DB, pas de Redis) —
-    c'est une **liveness**, pas une readiness.
-    """
-    return HealthResponse(status="ok")
 
 
 @app.get("/version", tags=["Platform"], summary="Metadonnees de build et de deploiement")
