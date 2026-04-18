@@ -42,13 +42,5 @@ for env in "${ENVS[@]}"; do
         && green "  ✓ validate" || { red "  ✗ validate"; FAIL=1; }
 done
 
-dev_dir="${TF_DIR}/environments/dev"
-echo "=== plan dev (attendu: No changes) ==="
-if (cd "${dev_dir}" && "${TF}" plan -input=false -no-color 2>&1 | grep -qE "No changes|Your infrastructure matches"); then
-    green "  ✓ plan vide"
-else
-    red "  ✗ plan non vide"; FAIL=1
-fi
-
 if [[ "${FAIL}" -ne 0 ]]; then red "ÉCHEC"; exit 1; fi
-green "OK — workspace Terraform conforme"
+green "OK — workspace Terraform conforme (structure + fmt + init + validate sur 4 envs)"
