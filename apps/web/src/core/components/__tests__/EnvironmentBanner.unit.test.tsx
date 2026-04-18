@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { EnvironmentBanner } from './EnvironmentBanner'
+import { EnvironmentBanner } from '../EnvironmentBanner'
 
 describe('EnvironmentBanner', () => {
   it('affiche le bandeau dev en bleu', () => {

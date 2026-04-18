@@ -79,9 +79,11 @@ Obligatoire pour tout nouveau code.
 
 Conventions :
 
+- **Emplacement** : tests colocalisés dans un sous-dossier `__tests__/` à côté du code (ex: `src/core/components/__tests__/EnvironmentBanner.unit.test.tsx`). Pas de fichier test directement à côté du code.
 - `*.unit.test.tsx` — tests unitaires (isolés, rapides)
 - `*.integ.test.tsx` — tests d'intégration (MSW, plusieurs composants)
-- `tests/e2e/*.spec.ts` — tests Playwright
+- `tests/e2e/*.e2e.test.ts` — tests Playwright (hors `src/` car non liés à un composant)
+- `tests/setup.ts`, `tests/mocks/` — setup vitest global et handlers MSW partagés
 
 Lancer :
 

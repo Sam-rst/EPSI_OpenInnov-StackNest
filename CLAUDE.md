@@ -144,7 +144,8 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 
 - **80% global minimum**, **90% on business logic**
 - 3 levels: unit (.unit.), integration (.integ.), E2E (.e2e.)
-- Backend: pytest + testcontainers. Frontend: vitest + MSW + Playwright.
+- Backend: pytest + testcontainers, tests dans `tests/` séparé (convention Python).
+- Frontend: vitest + MSW + Playwright. Tests unit/integ colocalisés dans `__tests__/` à côté du code (convention JS). E2E dans `apps/web/tests/e2e/`.
 
 ## Trunk-Based Development (TBD)
 

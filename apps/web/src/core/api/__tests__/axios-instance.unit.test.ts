@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
-import { server } from '../../../tests/mocks/server'
-import { createApiClient } from './axios-instance'
+import { server } from '../../../../tests/mocks/server'
+import { createApiClient } from '../axios-instance'
 
 describe('createApiClient', () => {
   it('prefixe les requetes avec la baseUrl fournie', async () => {

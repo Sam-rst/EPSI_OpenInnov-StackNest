@@ -13,6 +13,7 @@
   "coverageAnalysis": "perTest",
   "mutate": [
     "src/**/*.{ts,tsx}",
+    "!src/**/__tests__/**",
     "!src/**/*.test.{ts,tsx}",
     "!src/**/*.unit.test.{ts,tsx}",
     "!src/**/*.integ.test.{ts,tsx}",

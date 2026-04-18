@@ -66,7 +66,7 @@ Les dossiers de features (`auth/`, `catalog/`, `chat/`, `dashboard/`, `deploymen
 - **1 fichier = 1 composant / 1 type / 1 hook**
 - **Séparation DTO (snake_case miroir API) / Model (camelCase UI)** via mappers
 - **TDD strict** Red → Green → Blue (voir [`docs/guide-developpeur.md`](docs/guide-developpeur.md))
-- **Conventions de tests** : `*.unit.test.ts(x)`, `*.integ.test.ts(x)`, `tests/e2e/*.spec.ts`
+- **Conventions de tests** : colocalisés dans `__tests__/` à côté du code (`*.unit.test.ts(x)`, `*.integ.test.ts(x)`), E2E dans `tests/e2e/*.e2e.test.ts`
 - **Commits en français** référençant `STN-XX`
 
 ## Docker

@@ -8,7 +8,7 @@ vi.mock('@sentry/react', () => ({
   replayIntegration: vi.fn(() => ({ name: 'Replay' })),
 }))
 
-import { initSentry } from './sentry'
+import { initSentry } from '../sentry'
 
 describe('initSentry', () => {
   beforeEach(() => {
