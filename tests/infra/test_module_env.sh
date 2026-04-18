@@ -31,7 +31,7 @@ rm -rf .terraform plan.bin plan.json
 "${TF}" plan -out=plan.bin -input=false -no-color >/dev/null
 "${TF}" show -json plan.bin >plan.json
 
-uv run python - <<PY
+PYTHONIOENCODING=utf-8 uv run python - <<PY
 import json, sys
 with open("plan.json", encoding="utf-8") as f:
     plan = json.load(f)
@@ -71,9 +71,9 @@ for k, v in expected_out.items():
         failures.append(f"output {k}={actual} != {v}")
 
 if failures:
-    print("\n".join(f"  ✗ {f}" for f in failures))
+    print("\n".join(f"  [FAIL] {f}" for f in failures))
     sys.exit(1)
-print("  ✓ ressources + labels + outputs OK")
+print("  [OK] ressources + labels + outputs")
 PY
 
 rm -f plan.bin plan.json
