@@ -50,6 +50,10 @@ services:
       VITE_API_PROXY_TARGET: http://api:8000
       VITE_ENVIRONMENT: ${VITE_ENVIRONMENT:-dev}
       VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+      # Force le watcher Vite en mode polling : le bind-mount Windows/macOS
+      # vers le container Linux ne propage pas inotify, donc les changements
+      # sur ./apps/web restent invisibles cote container sans polling.
+      VITE_USE_POLLING: "true"
     volumes:
       - ./apps/web:/app
       - /app/node_modules
