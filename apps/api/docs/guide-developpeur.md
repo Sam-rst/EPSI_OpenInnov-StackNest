@@ -57,9 +57,15 @@ apps/api/
 │       └── exceptions/
 │           └── domain_exception.py   # DomainException (base)
 ├── tests/
-│   ├── unit/         # *.unit.py
+│   ├── unit/         # *.unit.py      — level-first puis sous-dossier par feature
+│   │   ├── core/
+│   │   ├── shared/
+│   │   └── {feature}/
 │   ├── integration/  # *.integ.py
+│   │   ├── core/
+│   │   └── {feature}/
 │   └── e2e/          # *.e2e.py
+│       └── scenarios/                 # scenarios cross-feature
 └── pyproject.toml
 ```
 
