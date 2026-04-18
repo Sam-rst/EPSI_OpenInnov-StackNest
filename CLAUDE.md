@@ -138,6 +138,10 @@ apps/web/src/
 
 Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 
+**Strict lint** : `eslint --max-warnings 0` (tout warning casse la CI). Frontend utilise `typescript-eslint/strict` + `typescript-eslint/stylistic`. Prettier `--check` fait autorité sur le format (CRLF interdit, endOfLine=lf).
+
+**Scripts npm standardisés (frontend)** : `lint` / `lint:fix` / `format:check` / `format:write` (alias de `format`) / `typecheck` / `test` / `test:watch` / `test:coverage` / `e2e` / `test:mutation` / `build`.
+
 ### Test coverage
 
 - **80% global minimum**, **90% on business logic**

@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from 'axios'
 
-type CreateApiClientOptions = {
+interface CreateApiClientOptions {
   baseUrl: string
   timeoutMs?: number
 }

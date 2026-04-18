@@ -1,6 +1,6 @@
 export type Environment = 'dev' | 'test' | 'preview' | 'prod'
 
-type BannerStyle = {
+interface BannerStyle {
   label: string
   className: string
 }
@@ -20,7 +20,7 @@ const BANNER_STYLES: Record<Exclude<Environment, 'prod'>, BannerStyle> = {
   },
 }
 
-type EnvironmentBannerProps = {
+interface EnvironmentBannerProps {
   environment: string | undefined
 }
 

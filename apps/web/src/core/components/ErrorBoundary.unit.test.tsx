@@ -10,7 +10,7 @@ describe('ErrorBoundary', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>
 
   beforeAll(() => {
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(vi.fn())
   })
 
   afterAll(() => {

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type UiState = {
+interface UiState {
   sidebarOpen: boolean
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void

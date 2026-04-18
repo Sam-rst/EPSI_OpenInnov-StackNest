@@ -9,7 +9,12 @@ initSentry({
   environment: import.meta.env.VITE_ENVIRONMENT,
 })
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root')
+if (!rootElement) {
+  throw new Error('Element #root introuvable dans index.html')
+}
+
+createRoot(rootElement).render(
   <StrictMode>
     <App />
   </StrictMode>,

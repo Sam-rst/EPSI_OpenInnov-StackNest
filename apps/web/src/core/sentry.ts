@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react'
 
-type InitSentryOptions = {
+interface InitSentryOptions {
   dsn: string | undefined
   environment: string | undefined
   release?: string
