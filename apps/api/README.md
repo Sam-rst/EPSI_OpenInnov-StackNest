@@ -32,8 +32,10 @@ Port configurable via `PORT` (defaut 8000).
 |---|---|
 | `uv run uvicorn app.main:app --reload` | Demarre le serveur en mode dev (hot reload) |
 | `uv run pytest` | Lance toute la suite de tests |
-| `uv run pytest tests/unit/ -v` | Tests unitaires uniquement |
-| `uv run pytest tests/integration/ -v` | Tests d'integration uniquement |
+| `uv run pytest -m unit -v` | Tests unitaires uniquement (boucle TDD) |
+| `uv run pytest -m integ -v` | Tests d'integration uniquement |
+| `uv run pytest -m e2e -v` | Tests E2E uniquement |
+| `uv run pytest app/auth/` | Tous les tests d'un slice vertical |
 | `uv run pytest --cov=app` | Tests + rapport de couverture |
 | `uv run ruff check .` | Linter (0 erreur attendue) |
 | `uv run ruff format .` | Formate le code |

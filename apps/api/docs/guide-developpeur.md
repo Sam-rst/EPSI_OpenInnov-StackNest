@@ -56,16 +56,10 @@ apps/api/
 │   └── shared/                       # Abstractions metier partagees
 │       └── exceptions/
 │           └── domain_exception.py   # DomainException (base)
+├── conftest.py        # auto-markers pytest selon le suffixe du fichier
 ├── tests/
-│   ├── unit/         # *.unit.py      — level-first puis sous-dossier par feature
-│   │   ├── core/
-│   │   ├── shared/
-│   │   └── {feature}/
-│   ├── integration/  # *.integ.py
-│   │   ├── core/
-│   │   └── {feature}/
-│   └── e2e/          # *.e2e.py
-│       └── scenarios/                 # scenarios cross-feature
+│   └── e2e/
+│       └── scenarios/ # *.e2e.py — scenarios cross-feature uniquement
 └── pyproject.toml
 ```
 
@@ -174,6 +168,104 @@ class TemplateNotFoundException(DomainException):
             http_status=404,
         )
 ```
+
+## Tests
+
+### Convention co-located `__tests__/`
+
+Les tests vivent a cote du code qu'ils testent, dans un dossier
+`__tests__/{unit,integration}/` selon le niveau. Cette convention est la
+meme que cote frontend (consistance DX).
+
+**Avantages :**
+
+- Pas de duplication de la structure (source de verite unique = `app/`).
+- Supprimer un dossier supprime aussi ses tests.
+- Navigation naturelle : les tests d'une entite sont dans le meme dossier
+  que l'entite.
+
+**Arbre type d'une feature :**
+
+```
+app/auth/
+├── domain/
+│   ├── entities/
+│   │   ├── __tests__/
+│   │   │   └── unit/
+│   │   │       └── test_user_entity.unit.py
+│   │   └── user.py
+│   ├── value_objects/
+│   │   ├── __tests__/
+│   │   │   └── unit/
+│   │   │       └── test_email_vo.unit.py
+│   │   └── email.py
+│   └── factories/
+│       ├── __tests__/
+│       │   └── unit/
+│       │       └── test_user_factory.unit.py
+│       └── user_factory.py
+├── application/
+│   └── use_cases/
+│       ├── __tests__/
+│       │   ├── unit/                                  # mocks uniquement
+│       │   │   └── test_login_use_case.unit.py
+│       │   └── integration/                           # vrai adapter
+│       │       └── test_register_use_case.integ.py
+│       └── login.py
+├── infrastructure/
+│   └── repositories/
+│       ├── __tests__/
+│       │   └── integration/                           # real DB via testcontainers
+│       │       └── test_user_repository.integ.py
+│       └── user_repository.py
+└── presentation/
+    └── routers/
+        ├── __tests__/
+        │   └── integration/                           # real ASGI via httpx
+        │       └── test_auth_router.integ.py
+        └── auth_router.py
+```
+
+**E2E** : reste au top niveau dans `tests/e2e/scenarios/` car par nature
+cross-feature.
+
+**YAGNI** : pas de dossier vide. On cree `__tests__/unit/` ou
+`__tests__/integration/` seulement quand on y met un test.
+
+### Regles par couche
+
+| Couche | Unit | Integ |
+|---|---|---|
+| `domain/entities` | Oui | Non |
+| `domain/value_objects` | Oui | Non |
+| `domain/factories` | Oui | Non |
+| `domain/interfaces` | Non (ABC) | Non |
+| `domain/exceptions` | Optionnel | Non |
+| `application/use_cases` | Oui (mocks) | Parfois (stack reel) |
+| `application/commands` / `queries` / `results` | Non (dataclass pur) | Non |
+| `application/ports` | Non (ABC) | Non |
+| `infrastructure/repositories` | Non | Oui (real DB) |
+| `infrastructure/mappers` | Oui | Rare |
+| `presentation/routers` | Non | Oui (real ASGI) |
+
+### Suffixe = source de verite du niveau
+
+- `test_*.unit.py`  -> marker `unit` auto-applique
+- `test_*.integ.py` -> marker `integ` auto-applique
+- `test_*.e2e.py`   -> marker `e2e` auto-applique
+
+Le hook est dans `conftest.py` a la racine de `apps/api/`.
+
+### Commandes
+
+| Commande | Effet |
+|---|---|
+| `uv run pytest` | Tout |
+| `uv run pytest -m unit` | Unit uniquement (boucle TDD rapide) |
+| `uv run pytest -m integ` | Integration uniquement |
+| `uv run pytest -m e2e` | E2E uniquement |
+| `uv run pytest app/auth/` | Tous les tests du slice auth |
+| `uv run pytest app/auth/domain/entities/__tests__/unit/` | Tests unit des entites auth |
 
 ## Mutation testing (mutmut)
 

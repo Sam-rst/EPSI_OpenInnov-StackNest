@@ -48,7 +48,7 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=xml",
 ]
-testpaths = ["tests"]
+testpaths = ["app", "tests"]
 python_files = ["test_*.unit.py", "test_*.integ.py", "test_*.e2e.py"]
 pythonpath = ["."]
 asyncio_mode = "auto"
@@ -61,7 +61,7 @@ markers = [
 [tool.coverage.run]
 source = ["app"]
 branch = true
-omit = ["app/**/__init__.py"]
+omit = ["app/**/__init__.py", "app/**/__tests__/**"]
 
 [tool.coverage.report]
 precision = 2
@@ -87,8 +87,10 @@ paths_to_mutate = [
     # "app/catalog/application/",
     # ...
 ]
-tests_dir = "tests/"
+tests_dir = "app/"
 runner = "uv run pytest -x --no-cov -q"
+# Exclut les fichiers de test (co-located dans __tests__/) des cibles a muter.
+exclude = ["**/__tests__/**"]
 # Echec global si moins de 60% des mutations sont tuees (point de depart, a durcir).
 # mutmut 3.x renvoie code de retour 1 si le seuil n'est pas atteint quand on
 # utilise --CI ou via la cmd 'mutmut results --threshold 60'.
