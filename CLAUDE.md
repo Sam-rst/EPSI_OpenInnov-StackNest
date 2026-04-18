@@ -144,8 +144,9 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 
 - **80% global minimum**, **90% on business logic**
 - 3 levels: unit (.unit.), integration (.integ.), E2E (.e2e.)
-- Backend: pytest + testcontainers, tests dans `tests/` séparé (convention Python).
-- Frontend: vitest + MSW + Playwright. Tests unit/integ colocalisés dans `__tests__/` à côté du code (convention JS). E2E dans `apps/web/tests/e2e/`.
+- **Tests unit/integ colocalisés** dans `__tests__/{unit,integration}/` à côté du code (convention unifiée back + front). **E2E** dans `tests/e2e/scenarios/` (backend) ou `apps/web/tests/e2e/` (frontend) car cross-feature par nature.
+- Backend: pytest + testcontainers. Auto-marker pytest (via `conftest.py` racine) qui applique `@pytest.mark.{unit,integ,e2e}` selon le suffixe du fichier (`*.unit.py` / `*.integ.py` / `*.e2e.py`). Commandes : `uv run pytest -m unit` (boucle TDD rapide), `-m integ`, `-m e2e`, ou `uv run pytest app/{feature}/` pour un slice vertical.
+- Frontend: vitest + MSW + Playwright.
 
 ## Trunk-Based Development (TBD)
 
