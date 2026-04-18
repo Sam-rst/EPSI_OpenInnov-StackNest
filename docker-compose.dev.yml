@@ -18,7 +18,19 @@ services:
       - "${REDIS_PORT:-6379}:6379"
 
   api:
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # --root-path /api : informe FastAPI qu'il est servi derriere le prefixe
+    # /api (Vite proxy en dev, Nginx en preview/prod). Necessaire pour que
+    # Swagger UI genere la bonne URL d'openapi.json a /api/openapi.json.
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --root-path
+      - /api
     volumes:
       - ./apps/api/app:/app/app:ro
     ports:
