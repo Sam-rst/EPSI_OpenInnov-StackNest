@@ -286,8 +286,9 @@ jobs:
           directory: .
           framework: terraform,dockerfile
           quiet: true
-          soft_fail: true # mode baseline : on logge les findings sans bloquer.
-            # A durcir (soft_fail: false) quand on aura fait le tri sur l'existant.
+          # soft_fail: false (defaut). Si des findings LOW/MEDIUM apparaissent
+          # sur l'existant, whitelister via un .checkov.yaml plutot que relacher
+          # soft_fail. Objectif : zero finding non-explique.
 
   test-infra:
     name: test-infra
