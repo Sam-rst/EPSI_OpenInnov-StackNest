@@ -1,0 +1,123 @@
+name: CI
+
+# Workflow rapide (~3-4 min cible) declenche sur chaque push / PR.
+# Les taches lentes (e2e, mutation testing, sonar, scans profonds) vivent dans
+# ci-nightly.yml et s'executent a 20h via schedule.
+#
+# Pattern : fan-out par stack (api / web / infra), fan-in via job *-gate.
+# Un seul 'ci-ok' final sert de required check pour la branch protection.
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+# Annule les runs precedents sur la meme branche (evite de payer 2x
+# quand on push rapidement).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # Stage 1 — Lint (fan-out)
+  # ────────────────────────────────────────────────────────────
+
+  lint-api:
+    name: Lint · API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+      - name: Install dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+      - name: Lint + format check + typecheck
+        working-directory: apps/api
+        run: |
+          uv run poe lint
+          uv run poe format:check
+          uv run poe typecheck
+
+  lint-web:
+    name: Lint · Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Lint + format check + typecheck
+        working-directory: apps/web
+        run: |
+          npm run lint
+          npm run format:check
+          npm run typecheck
+
+  lint-infra:
+    name: Lint · Infra
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint (GitHub workflows)
+        uses: raven-actions/actionlint@v2
+      - name: Terraform fmt check
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9"
+      - name: Run terraform fmt
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+
+  # ────────────────────────────────────────────────────────────
+  # Stage Gate — Fan-in du stage 1
+  # ────────────────────────────────────────────────────────────
+
+  lint-gate:
+    name: Lint · Gate
+    needs: [lint-api, lint-web, lint-infra]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all lint jobs succeeded
+        env:
+          RESULT_API: ${{ needs.lint-api.result }}
+          RESULT_WEB: ${{ needs.lint-web.result }}
+          RESULT_INFRA: ${{ needs.lint-infra.result }}
+        run: |
+          echo "api=$RESULT_API | web=$RESULT_WEB | infra=$RESULT_INFRA"
+          if [[ "$RESULT_API" != "success" || "$RESULT_WEB" != "success" || "$RESULT_INFRA" != "success" ]]; then
+            echo "::error::At least one lint job failed"
+            exit 1
+          fi
+
+  # ────────────────────────────────────────────────────────────
+  # Sentinelle finale — seul required check pour branch protection
+  # ────────────────────────────────────────────────────────────
+
+  ci-ok:
+    name: CI · OK
+    needs: [lint-gate]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all gates succeeded
+        env:
+          RESULT_LINT: ${{ needs.lint-gate.result }}
+        run: |
+          if [[ "$RESULT_LINT" != "success" ]]; then
+            echo "::error::At least one stage gate failed"
+            exit 1
+          fi
+          echo "✅ All CI gates passed"
