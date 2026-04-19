@@ -181,6 +181,12 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          # Cles derivees de GitHub : robuste si rename du user/repo ou fork.
+          # Defaut SonarCloud attend organization en lowercase du owner.
+          args: >
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -Dsonar.organization=${{ github.repository_owner }}
 
   # ═══════════════════════════════════════════════════════════
   # Review reports — verifie qu'un rapport d'etonnement existe
