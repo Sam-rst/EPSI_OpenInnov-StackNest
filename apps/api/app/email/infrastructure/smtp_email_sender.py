@@ -6,8 +6,8 @@ from email.message import EmailMessage as StdlibEmailMessage
 import structlog
 from aiosmtplib import SMTP
 
-from app.core.email.domain.exceptions.email_delivery_exception import EmailDeliveryException
-from app.core.email.domain.value_objects.email_message import EmailMessage
+from app.email.domain.exceptions.email_delivery_exception import EmailDeliveryException
+from app.email.domain.value_objects.email_message import EmailMessage
 
 _logger = structlog.get_logger(__name__)
 

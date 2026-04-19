@@ -14,8 +14,8 @@ import httpx
 import pytest
 from testcontainers.core.container import DockerContainer
 
-from app.core.email.domain.value_objects.email_message import EmailMessage
-from app.core.email.infrastructure.smtp_email_sender import SmtpEmailSender
+from app.email.domain.value_objects.email_message import EmailMessage
+from app.email.infrastructure.smtp_email_sender import SmtpEmailSender
 
 
 def _wait_for_port(container: DockerContainer, port: int, timeout: float = 30.0) -> int:

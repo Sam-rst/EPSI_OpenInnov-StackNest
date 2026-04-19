@@ -2,7 +2,7 @@
 
 from typing import Protocol, runtime_checkable
 
-from app.core.email.domain.value_objects.email_message import EmailMessage
+from app.email.domain.value_objects.email_message import EmailMessage
 
 
 @runtime_checkable

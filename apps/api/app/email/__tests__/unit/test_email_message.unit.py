@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.core.email.domain.value_objects.email_message import EmailMessage
+from app.email.domain.value_objects.email_message import EmailMessage
 
 
 class TestEmailMessage:

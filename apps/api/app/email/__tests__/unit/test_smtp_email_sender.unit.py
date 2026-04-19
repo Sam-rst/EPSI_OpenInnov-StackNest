@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from structlog.testing import capture_logs
 
-from app.core.email.domain.exceptions.email_delivery_exception import EmailDeliveryException
-from app.core.email.domain.value_objects.email_message import EmailMessage
-from app.core.email.infrastructure.smtp_email_sender import SmtpEmailSender
+from app.email.domain.exceptions.email_delivery_exception import EmailDeliveryException
+from app.email.domain.value_objects.email_message import EmailMessage
+from app.email.infrastructure.smtp_email_sender import SmtpEmailSender
 
 
 class TestSmtpEmailSenderSuccess:
@@ -27,7 +27,7 @@ class TestSmtpEmailSenderSuccess:
             body_text="Bonjour",
         )
 
-        with patch("app.core.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
+        with patch("app.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
             smtp_instance = AsyncMock()
             smtp_class.return_value = smtp_instance
 
@@ -70,7 +70,7 @@ class TestSmtpEmailSenderLogging:
             body_text="x",
         )
 
-        with patch("app.core.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
+        with patch("app.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
             smtp_class.return_value = AsyncMock()
 
             with capture_logs() as logs:
@@ -103,7 +103,7 @@ class TestSmtpEmailSenderFailure:
             body_text="t",
         )
 
-        with patch("app.core.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
+        with patch("app.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
             smtp_instance = AsyncMock()
             smtp_instance.connect.side_effect = TimeoutError("connect timed out")
             smtp_class.return_value = smtp_instance
@@ -131,7 +131,7 @@ class TestSmtpEmailSenderFailure:
             body_text="t",
         )
 
-        with patch("app.core.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
+        with patch("app.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
             smtp_instance = AsyncMock()
             smtp_instance.send_message.side_effect = RuntimeError("relay refused")
             smtp_class.return_value = smtp_instance
