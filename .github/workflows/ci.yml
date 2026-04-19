@@ -1,19 +1,23 @@
 name: CI
 
-# Workflow rapide (~3-4 min cible) declenche sur chaque push / PR.
-# Les taches lentes (e2e, mutation testing, sonar, scans profonds) vivent dans
+# Workflow rapide (~3-5 min cible) declenche sur chaque push / PR.
+# Les taches lentes (e2e, mutation testing, deep security) vivent dans
 # ci-nightly.yml et s'executent a 20h via schedule.
 #
-# Pattern : fan-out par stack (api / web / infra), fan-in via job *-gate.
-# Un seul 'ci-ok' final sert de required check pour la branch protection.
+# Topologie : 3 lanes parallèles et indépendantes (api / web / infra).
+# Chaque lane chaine ses etapes en sequentiel via `needs:` — si lint-api
+# casse, format-api / typecheck-api / test-*-api / build-api ne tournent
+# pas. Les lanes ne s'attendent pas entre elles (pas de gate global par
+# stage) : l'api avance meme si web echoue au lint.
+#
+# Sentinelle finale `ci-ok` attend les 3 builds. C'est le seul required
+# check a configurer cote branch protection.
 
 on:
   push:
   pull_request:
     branches: [main]
 
-# Annule les runs precedents sur la meme branche (evite de payer 2x
-# quand on push rapidement).
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -22,12 +26,12 @@ permissions:
   contents: read
 
 jobs:
-  # ────────────────────────────────────────────────────────────
-  # Stage 1 — Lint (fan-out)
-  # ────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════
+  # Lane API — apps/api (Python 3.13, uv, FastAPI)
+  # ═══════════════════════════════════════════════════════════
 
   lint-api:
-    name: Lint · API
+    name: lint-api
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,15 +42,100 @@ jobs:
       - name: Install dependencies
         working-directory: apps/api
         run: uv sync --frozen
-      - name: Lint + format check + typecheck
+      - name: ruff check
         working-directory: apps/api
-        run: |
-          uv run poe lint
-          uv run poe format:check
-          uv run poe typecheck
+        run: uv run poe lint
+
+  format-api:
+    name: format-api
+    needs: [lint-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+      - name: Install dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+      - name: ruff format --check
+        working-directory: apps/api
+        run: uv run poe format:check
+
+  typecheck-api:
+    name: typecheck-api
+    needs: [format-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+      - name: Install dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+      - name: mypy strict
+        working-directory: apps/api
+        run: uv run poe typecheck
+
+  test-unit-api:
+    name: test-unit-api
+    needs: [typecheck-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+      - name: Install dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+      - name: pytest -m unit
+        working-directory: apps/api
+        run: uv run poe test:unit
+
+  test-integ-api:
+    name: test-integ-api
+    needs: [test-unit-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+      - name: Install dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+      - name: pytest -m integ
+        working-directory: apps/api
+        run: uv run poe test:integ
+
+  build-api:
+    name: build-api
+    needs: [test-integ-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/api
+          push: false
+          tags: stacknest-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+  # ═══════════════════════════════════════════════════════════
+  # Lane WEB — apps/web (Node 22, Vite, React)
+  # ═══════════════════════════════════════════════════════════
 
   lint-web:
-    name: Lint · Web
+    name: lint-web
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,99 +147,157 @@ jobs:
       - name: Install dependencies
         working-directory: apps/web
         run: npm ci
-      - name: Lint + format check + typecheck
+      - name: eslint
         working-directory: apps/web
-        run: |
-          npm run lint
-          npm run format:check
-          npm run typecheck
+        run: npm run lint
+
+  format-web:
+    name: format-web
+    needs: [lint-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: prettier --check
+        working-directory: apps/web
+        run: npm run format:check
+
+  typecheck-web:
+    name: typecheck-web
+    needs: [format-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: tsc --noEmit
+        working-directory: apps/web
+        run: npm run typecheck
+
+  test-unit-web:
+    name: test-unit-web
+    needs: [typecheck-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: vitest unit
+        working-directory: apps/web
+        run: npm run test:unit
+
+  test-integ-web:
+    name: test-integ-web
+    needs: [test-unit-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: vitest integ
+        working-directory: apps/web
+        run: npm run test:integ
+
+  build-web:
+    name: build-web
+    needs: [test-integ-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          push: false
+          tags: stacknest-web:ci
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+  # ═══════════════════════════════════════════════════════════
+  # Lane INFRA — infra/ (Terraform, Docker Compose, GitHub Actions)
+  # ═══════════════════════════════════════════════════════════
 
   lint-infra:
-    name: Lint · Infra
+    name: lint-infra
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: actionlint (GitHub workflows)
         uses: raven-actions/actionlint@v2
-      - name: Terraform fmt check
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9"
-      - name: Run terraform fmt
-        working-directory: infra/terraform
-        run: terraform fmt -check -recursive
 
-  # ────────────────────────────────────────────────────────────
-  # Stage Gate — Fan-in du stage 1
-  # ────────────────────────────────────────────────────────────
-
-  lint-gate:
-    name: Lint · Gate
-    needs: [lint-api, lint-web, lint-infra]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify all lint jobs succeeded
-        env:
-          RESULT_API: ${{ needs.lint-api.result }}
-          RESULT_WEB: ${{ needs.lint-web.result }}
-          RESULT_INFRA: ${{ needs.lint-infra.result }}
-        run: |
-          echo "api=$RESULT_API | web=$RESULT_WEB | infra=$RESULT_INFRA"
-          if [[ "$RESULT_API" != "success" || "$RESULT_WEB" != "success" || "$RESULT_INFRA" != "success" ]]; then
-            echo "::error::At least one lint job failed"
-            exit 1
-          fi
-
-  # ────────────────────────────────────────────────────────────
-  # Stage 2 — Tests rapides (fan-out, needs: lint-gate)
-  # ────────────────────────────────────────────────────────────
-
-  test-api:
-    name: Tests · API
-    needs: [lint-gate]
+  format-infra:
+    name: format-infra
+    needs: [lint-infra]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9"
+      - name: terraform fmt -check
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+
+  typecheck-infra:
+    name: typecheck-infra
+    needs: [format-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9"
+      - name: terraform validate (tous les environnements)
+        run: |
+          set -euo pipefail
+          for env_dir in infra/terraform/environments/*/; do
+            echo "::group::$env_dir"
+            (cd "$env_dir" && terraform init -backend=false -input=false -no-color && terraform validate -no-color)
+            echo "::endgroup::"
+          done
+
+  test-infra:
+    name: test-infra
+    needs: [typecheck-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9"
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: "apps/api/uv.lock"
-      - name: Install dependencies
+      - name: Install API dependencies (pour les scripts qui utilisent uv run python)
         working-directory: apps/api
         run: uv sync --frozen
-      - name: Unit + integration tests (cov seuil 80%)
-        working-directory: apps/api
-        run: uv run poe test
-
-  test-web:
-    name: Tests · Web
-    needs: [lint-gate]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci
-      - name: Unit + integration tests with coverage
-        working-directory: apps/web
-        run: npm run test:coverage
-
-  test-infra:
-    name: Tests · Infra
-    needs: [lint-gate]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9"
       - name: Run shell tests
         run: |
           set -euo pipefail
@@ -160,42 +307,36 @@ jobs:
             echo "::endgroup::"
           done
 
-  test-gate:
-    name: Tests · Gate
-    needs: [test-api, test-web, test-infra]
-    if: always()
+  build-stack:
+    name: build-stack
+    needs: [test-infra]
     runs-on: ubuntu-latest
     steps:
-      - name: Verify all test jobs succeeded
-        env:
-          RESULT_API: ${{ needs.test-api.result }}
-          RESULT_WEB: ${{ needs.test-web.result }}
-          RESULT_INFRA: ${{ needs.test-infra.result }}
+      - uses: actions/checkout@v4
+      - name: Validate docker compose config (base + dev override)
         run: |
-          echo "api=$RESULT_API | web=$RESULT_WEB | infra=$RESULT_INFRA"
-          if [[ "$RESULT_API" != "success" || "$RESULT_WEB" != "success" || "$RESULT_INFRA" != "success" ]]; then
-            echo "::error::At least one test job failed"
-            exit 1
-          fi
+          docker compose -f docker-compose.yml config > /dev/null
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config > /dev/null
 
-  # ────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════
   # Sentinelle finale — seul required check pour branch protection
-  # ────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════
 
   ci-ok:
-    name: CI · OK
-    needs: [lint-gate, test-gate]
+    name: ci-ok
+    needs: [build-api, build-web, build-stack]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Verify all gates succeeded
+      - name: Verify all lane builds succeeded
         env:
-          RESULT_LINT: ${{ needs.lint-gate.result }}
-          RESULT_TEST: ${{ needs.test-gate.result }}
+          RESULT_API: ${{ needs.build-api.result }}
+          RESULT_WEB: ${{ needs.build-web.result }}
+          RESULT_STACK: ${{ needs.build-stack.result }}
         run: |
-          echo "lint=$RESULT_LINT | test=$RESULT_TEST"
-          if [[ "$RESULT_LINT" != "success" || "$RESULT_TEST" != "success" ]]; then
-            echo "::error::At least one stage gate failed"
+          echo "api=$RESULT_API | web=$RESULT_WEB | stack=$RESULT_STACK"
+          if [[ "$RESULT_API" != "success" || "$RESULT_WEB" != "success" || "$RESULT_STACK" != "success" ]]; then
+            echo "::error::At least one lane build failed"
             exit 1
           fi
-          echo "✅ All CI gates passed"
+          echo "✅ All CI lanes green"
