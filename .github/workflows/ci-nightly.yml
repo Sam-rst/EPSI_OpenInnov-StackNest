@@ -1,0 +1,270 @@
+name: CI Nightly
+
+# Workflow lent (~15-30 min) declenche chaque nuit a 20h UTC.
+# Complete la CI rapide (ci.yml) avec les taches que tu ne veux pas dans
+# la boucle dev :
+# - Tests E2E (Playwright, pytest e2e + testcontainers)
+# - Mutation testing (mutmut, stryker)
+# - Scans de securite profonds (Trivy sur containers, pip-audit, npm audit)
+# - Verification des rapports d'etonnement pour les PR mergees
+#
+# Notifications :
+# - Email natif GitHub sur failure (repo settings -> Notifications -> Actions)
+# - Step summary riche sur chaque run (visible sur la page du run GitHub Actions)
+#
+# Declenche manuellement via workflow_dispatch pour debug / re-run.
+
+on:
+  schedule:
+    - cron: "0 20 * * *" # 20h UTC (tous les jours)
+  workflow_dispatch:
+
+concurrency:
+  group: ci-nightly
+  cancel-in-progress: false # un nightly en cours ne s'annule pas
+
+permissions:
+  contents: read
+  issues: write # requis pour eventuels posts de resume en issue
+
+jobs:
+  # ═══════════════════════════════════════════════════════════
+  # Heavy tests — E2E + mutation (lents, pas dans la boucle dev)
+  # ═══════════════════════════════════════════════════════════
+
+  mutation-api:
+    name: mutation-api
+    runs-on: ubuntu-latest
+    continue-on-error: true # tolerant tant qu'on affine le seuil 60%
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: mutmut run (cible app/core + app/shared + app/health)
+        working-directory: apps/api
+        run: uv run poe test:mutation
+
+  mutation-web:
+    name: mutation-web
+    runs-on: ubuntu-latest
+    continue-on-error: true # tolerant tant que Stryker est pas valide
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: stryker run
+        working-directory: apps/web
+        run: npm run test:mutation
+
+  e2e-api:
+    name: e2e-api
+    runs-on: ubuntu-latest
+    continue-on-error: true # tolerant tant qu'il n'y a pas de tests .e2e.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: pytest -m e2e (testcontainers si besoin)
+        working-directory: apps/api
+        run: uv run poe e2e
+
+  e2e-web:
+    name: e2e-web
+    runs-on: ubuntu-latest
+    continue-on-error: true # tolerant tant que Playwright n'a pas de tests reels
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: npx playwright install --with-deps
+      - name: Playwright E2E
+        working-directory: apps/web
+        run: npm run e2e
+
+  # ═══════════════════════════════════════════════════════════
+  # Deep security — scans complets (lents, CVE DB refresh inclus)
+  # ═══════════════════════════════════════════════════════════
+
+  pip-audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: pip-audit (full CVE scan)
+        working-directory: apps/api
+        run: |
+          uv run --with pip-audit pip-audit --strict --disable-pip \
+            --requirement <(uv export --frozen --format requirements-txt --no-dev --no-hashes)
+
+  npm-audit:
+    name: npm-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: npm audit (high+critical)
+        working-directory: apps/web
+        run: npm audit --audit-level=high
+
+  trivy-api:
+    name: trivy-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image (load local)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/api
+          push: false
+          load: true
+          tags: stacknest-api:nightly
+          cache-from: type=gha,scope=api
+      - name: Trivy scan API image
+        uses: aquasecurity/trivy-action@0.33.0
+        with:
+          image-ref: stacknest-api:nightly
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+  trivy-web:
+    name: trivy-web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Web image (load local)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          push: false
+          load: true
+          tags: stacknest-web:nightly
+          cache-from: type=gha,scope=web
+      - name: Trivy scan Web image
+        uses: aquasecurity/trivy-action@0.33.0
+        with:
+          image-ref: stacknest-web:nightly
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+  # ═══════════════════════════════════════════════════════════
+  # Review reports — verifie qu'un rapport d'etonnement existe
+  # pour chaque PR mergee dans les dernieres 24h.
+  # Regle projet : docs/reviews/YYYY-MM-DD-STN-XX-rapport.md
+  # ═══════════════════════════════════════════════════════════
+
+  review-reports-check:
+    name: review-reports-check
+    runs-on: ubuntu-latest
+    continue-on-error: true # signale, ne bloque pas — l'objectif est d'alerter
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check rapport d'etonnement for PRs merged in last 24h
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          since="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Checking PRs merged since: $since"
+
+          # Liste des PR mergees dans la fenetre, extrait le numero STN-XX
+          # depuis le titre (format "STN-XX — [Domaine] ...").
+          prs=$(gh pr list --state merged --search "merged:>${since}" \
+                  --json number,title,mergedAt,headRefName \
+                  --jq '.[] | "\(.number)\t\(.title)\t\(.headRefName)"')
+
+          if [[ -z "$prs" ]]; then
+            echo "Aucune PR mergee dans les dernieres 24h."
+            exit 0
+          fi
+
+          missing=0
+          while IFS=$'\t' read -r number title branch; do
+            stn=$(echo "$title $branch" | grep -oE 'STN-[0-9]+' | head -n1 || true)
+            if [[ -z "$stn" ]]; then
+              echo "⚠️  PR #${number} : impossible d'extraire STN-XX (titre='$title')"
+              continue
+            fi
+            if ls docs/reviews/*-"${stn}"-*.md >/dev/null 2>&1; then
+              echo "✅  PR #${number} ($stn) : rapport trouve"
+            else
+              echo "❌  PR #${number} ($stn) : rapport MANQUANT dans docs/reviews/"
+              missing=$((missing+1))
+            fi
+          done <<<"$prs"
+
+          if [[ "$missing" -gt 0 ]]; then
+            echo "::warning::$missing rapport(s) d'etonnement manquant(s) pour les PR mergees ce jour."
+            exit 1
+          fi
+
+  # ═══════════════════════════════════════════════════════════
+  # Summary — rapport final visible sur la page du run
+  # ═══════════════════════════════════════════════════════════
+
+  nightly-summary:
+    name: nightly-summary
+    needs:
+      - mutation-api
+      - mutation-web
+      - e2e-api
+      - e2e-web
+      - pip-audit
+      - npm-audit
+      - trivy-api
+      - trivy-web
+      - review-reports-check
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build step summary
+        env:
+          R_MUT_API: ${{ needs.mutation-api.result }}
+          R_MUT_WEB: ${{ needs.mutation-web.result }}
+          R_E2E_API: ${{ needs.e2e-api.result }}
+          R_E2E_WEB: ${{ needs.e2e-web.result }}
+          R_PIP: ${{ needs.pip-audit.result }}
+          R_NPM: ${{ needs.npm-audit.result }}
+          R_TRIVY_API: ${{ needs.trivy-api.result }}
+          R_TRIVY_WEB: ${{ needs.trivy-web.result }}
+          R_REPORTS: ${{ needs.review-reports-check.result }}
+        run: |
+          {
+            echo "# Nightly $(date -u +%Y-%m-%d)"
+            echo ""
+            echo "| Category | Job | Result |"
+            echo "| --- | --- | --- |"
+            echo "| Mutation | mutation-api | $R_MUT_API |"
+            echo "| Mutation | mutation-web | $R_MUT_WEB |"
+            echo "| E2E | e2e-api | $R_E2E_API |"
+            echo "| E2E | e2e-web | $R_E2E_WEB |"
+            echo "| Security | pip-audit | $R_PIP |"
+            echo "| Security | npm-audit | $R_NPM |"
+            echo "| Security | trivy-api | $R_TRIVY_API |"
+            echo "| Security | trivy-web | $R_TRIVY_WEB |"
+            echo "| Review | reports-check | $R_REPORTS |"
+            echo ""
+            echo "**Note** : mutation/e2e ont \`continue-on-error: true\` tant que les tests sont incomplets. Les vraies valeurs arriveront au fil des features."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if any hard-required job failed
+        env:
+          R_PIP: ${{ needs.pip-audit.result }}
+          R_NPM: ${{ needs.npm-audit.result }}
+          R_TRIVY_API: ${{ needs.trivy-api.result }}
+          R_TRIVY_WEB: ${{ needs.trivy-web.result }}
+        run: |
+          # Seuls les scans CVE sont hard-required en nightly. Les autres jobs
+          # ont continue-on-error et remontent via le step summary sans bloquer.
+          for r in "$R_PIP" "$R_NPM" "$R_TRIVY_API" "$R_TRIVY_WEB"; do
+            if [[ "$r" != "success" ]]; then
+              echo "::error::A hard-required security scan failed (result=$r)"
+              exit 1
+            fi
+          done
+          echo "✅ Nightly hard checks green"
