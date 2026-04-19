@@ -45,7 +45,7 @@ content = open(sys.argv[1], encoding="utf-8").read()
 if "creation_rules" not in content:
     print("  [FAIL] CA3 — .sops.yaml n'a pas de creation_rules"); sys.exit(1)
 required_envs = ["dev", "test", "preview", "prod"]
-missing = [env for env in required_envs if not re.search(rf"secrets\.{env}\b|{env}/secrets|{env}\.", content)]
+missing = [env for env in required_envs if not re.search(rf"path_regex:.*{env}.*sops", content)]
 if missing:
     print(f"  [FAIL] CA3 — creation_rules ne couvre pas les envs : {missing}"); sys.exit(1)
 print("  [OK] CA3 — .sops.yaml couvre les 4 envs (creation_rules présentes)")

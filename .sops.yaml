@@ -1,0 +1,56 @@
+# Configuration SOPS — StackNest
+# Définit qui (quelles clés publiques age) peut chiffrer/déchiffrer quels fichiers secrets.
+#
+# ⚠️ Les clés publiques ci-dessous sont des PLACEHOLDERS.
+# Chaque membre doit générer sa propre clé via `bash scripts/cyber/generate-age-key.sh`
+# et partager sa clé publique à Samuel via Slack #stacknest-keys.
+#
+# Cf. docs/cyber/sops-setup.md pour le workflow complet.
+
+# Raccourcis vers les groupes de destinataires (évite de dupliquer les clés).
+keys:
+  # Équipe cyber + dev lead : accès à tous les environnements.
+  - &samuel     age1PLACEHOLDER_SAMUEL_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+  - &antony     age1PLACEHOLDER_ANTONY_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+  - &remi       age1PLACEHOLDER_REMI_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+  - &thomas     age1PLACEHOLDER_THOMAS_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+  # Devs avec accès limité à dev uniquement.
+  - &yassine    age1PLACEHOLDER_YASSINE_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+
+creation_rules:
+  # Secrets dev — tous les devs habilités + cyber
+  - path_regex: secrets\.dev\.sops\..*$
+    key_groups:
+      - age:
+          - *samuel
+          - *antony
+          - *remi
+          - *thomas
+          - *yassine
+
+  # Secrets test (pentest cyber) — cyber + dev lead uniquement
+  - path_regex: secrets\.test\.sops\..*$
+    key_groups:
+      - age:
+          - *samuel
+          - *antony
+          - *remi
+          - *thomas
+
+  # Secrets preview (recette QA) — cyber + dev lead uniquement
+  - path_regex: secrets\.preview\.sops\..*$
+    key_groups:
+      - age:
+          - *samuel
+          - *antony
+          - *remi
+          - *thomas
+
+  # Secrets prod — cyber + dev lead uniquement
+  - path_regex: secrets\.prod\.sops\..*$
+    key_groups:
+      - age:
+          - *samuel
+          - *antony
+          - *remi
+          - *thomas
