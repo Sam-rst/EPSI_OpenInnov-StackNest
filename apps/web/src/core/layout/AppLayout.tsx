@@ -20,6 +20,10 @@ export function AppLayout() {
   const { isOpen, toggle, close } = useSidebarToggle()
   const location = useLocation()
 
+  // Ferme au changement de route uniquement. Appel de close() sans garde
+  // `if (isOpen)` volontaire : ajouter isOpen aux deps ferait re-declencher
+  // cet effet a chaque toggle, annulant l'ouverture. setIsOpen(false) est
+  // un no-op par bail-out React quand isOpen est deja false.
   useEffect(() => {
     close()
   }, [location.pathname, close])
@@ -33,9 +37,9 @@ export function AppLayout() {
         close()
       }
     }
-    window.addEventListener('keydown', handleKey)
+    globalThis.addEventListener('keydown', handleKey)
     return () => {
-      window.removeEventListener('keydown', handleKey)
+      globalThis.removeEventListener('keydown', handleKey)
     }
   }, [isOpen, close])
 

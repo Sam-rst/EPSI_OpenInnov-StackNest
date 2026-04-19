@@ -1,7 +1,7 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AppLayout } from '../AppLayout'
 
 function renderWithRoute(initialPath = '/') {
@@ -84,20 +84,21 @@ describe('AppLayout', () => {
     await user.click(screen.getByRole('button', { name: /basculer la navigation/i }))
     expect(screen.getByRole('navigation')).toHaveAttribute('data-open', 'true')
 
-    act(() => {
-      fireEvent.keyDown(window, { key: 'Escape' })
-    })
+    // window en jsdom satisfait l'API Window attendue par fireEvent/vi.spyOn
+    // (globalThis cote prod dans AppLayout.tsx, window ici pour le typage test).
+    fireEvent.keyDown(window, { key: 'Escape' })
 
     expect(screen.getByRole('navigation')).toHaveAttribute('data-open', 'false')
   })
 
-  it("n'ecoute pas Escape quand le drawer est ferme", () => {
+  it("n'attache pas de listener keydown quand le drawer est ferme", () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+
     renderWithRoute()
 
-    act(() => {
-      fireEvent.keyDown(window, { key: 'Escape' })
-    })
+    const keydownListeners = addSpy.mock.calls.filter(([event]) => event === 'keydown')
+    expect(keydownListeners).toHaveLength(0)
 
-    expect(screen.getByRole('navigation')).toHaveAttribute('data-open', 'false')
+    addSpy.mockRestore()
   })
 })

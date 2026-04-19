@@ -21,6 +21,34 @@ test.describe('AppLayout — drawer mobile', () => {
     await expect(burger).toHaveAttribute('aria-expanded', 'false')
     await expect(sidebar).toHaveAttribute('data-open', 'false')
   })
+
+  test('ferme le drawer au clic sur un lien de navigation', async ({ page }) => {
+    await page.goto('/')
+
+    const burger = page.getByRole('button', { name: /basculer la navigation/i })
+    const sidebar = page.getByRole('navigation', { name: /navigation principale/i })
+
+    await burger.click()
+    await expect(sidebar).toHaveAttribute('data-open', 'true')
+
+    await sidebar.getByRole('link', { name: /accueil/i }).click()
+
+    await expect(sidebar).toHaveAttribute('data-open', 'false')
+  })
+
+  test('ferme le drawer sur touche Escape', async ({ page }) => {
+    await page.goto('/')
+
+    const burger = page.getByRole('button', { name: /basculer la navigation/i })
+    const sidebar = page.getByRole('navigation', { name: /navigation principale/i })
+
+    await burger.click()
+    await expect(sidebar).toHaveAttribute('data-open', 'true')
+
+    await page.keyboard.press('Escape')
+
+    await expect(sidebar).toHaveAttribute('data-open', 'false')
+  })
 })
 
 test.describe('AppLayout — desktop', () => {

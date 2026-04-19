@@ -31,7 +31,11 @@ export function Sidebar({ isOpen, onDismiss }: SidebarProps) {
       >
         <ul className="flex flex-col gap-1 p-4 text-sm">
           <li>
-            <Link to="/" className="hover:bg-night/10 block rounded-md px-3 py-2 font-medium">
+            <Link
+              to="/"
+              onClick={onDismiss}
+              className="hover:bg-night/10 block rounded-md px-3 py-2 font-medium"
+            >
               Accueil
             </Link>
           </li>
