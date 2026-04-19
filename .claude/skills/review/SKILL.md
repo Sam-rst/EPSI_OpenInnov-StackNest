@@ -175,12 +175,61 @@ Créer le dossier `docs/reviews/` s'il n'existe pas (avec un `README.md` expliqu
 
 ## Severity levels
 
-| Level | Meaning | Action |
-|---|---|---|
-| ✅ **Praise** | Well done | Reinforce |
-| 💡 **Suggestion** | Could be better | Optional improvement |
-| ⚠️ **Important** | Should fix | Fix in this PR or next |
-| 🚫 **Blocking** | Must fix | Cannot merge without fix |
+| Level | Meaning | Action | Bloque le merge ? |
+|---|---|---|---|
+| ✅ **Praise** | Well done | Reinforce | Non |
+| 💡 **Suggestion** | Could be better | Optional improvement | Non — accepter tel quel ou fixer dans la PR |
+| ⚠️ **Important** | Should fix | Fix in this PR | **Oui** — doit être traité avant merge |
+| 🚫 **Blocking** | Must fix | Cannot merge without fix | **Oui** — obligatoire |
+
+## Cycle de review (règle stricte)
+
+Une review ne valide **jamais** directement une PR qui contient au moins 1 item ⚠️ Important ou 🚫 Blocking. Le reviewer (humain ou Claude) doit itérer jusqu'à convergence :
+
+```
+┌─────────────────┐
+│  1. Review PR   │
+└────────┬────────┘
+         ↓
+  ┌──────────────┐
+  │ Items ⚠️/🚫 ? │
+  └──────┬───────┘
+    ┌────┴────┐
+    │ OUI     │ NON
+    ↓         ↓
+┌────────┐  ┌──────────────┐
+│ 2. Fix │  │ ✅ Mergeable │
+└────┬───┘  └──────────────┘
+     ↓
+┌────────────────────┐
+│ 3. MAJ rapport     │
+│    (section        │
+│    Re-review)      │
+└─────────┬──────────┘
+          ↓
+     [retour 1.]
+```
+
+### Règles du cycle
+
+1. **La décision reste `⏸️ en attente` tant qu'il reste des items ⚠️ Important ou 🚫 Blocking non traités.**
+2. **Après chaque passe de fixes**, le reviewer **doit** :
+   - Re-run les tests et checks locaux
+   - Ajouter une section **`## Re-review (commit <sha>)`** au rapport d'étonnement existant (ne pas créer un nouveau fichier, ne pas écraser l'historique)
+   - Marquer les items fixés comme `[x] ~~texte~~` (stricken) avec la mention "**fixé dans cette PR**"
+   - Identifier d'éventuelles nouvelles observations introduites par les fixes
+3. **Boucle** : étapes 1→3 répétées autant de fois que nécessaire (2, 3, 4 re-reviews possibles).
+4. **La décision ne passe à `✅ mergeable`** que quand il ne reste **aucun** item ⚠️/🚫 non traité. Les 💡 Suggestions résiduelles sont OK (acceptables par convention).
+5. **Aucun merge si décision ≠ ✅** — même en utilisant `--admin`. C'est une règle d'équipe, pas une contrainte technique GitHub.
+6. **Items de dette résiduelle trackés dans le rapport** (pas bloquants pour le merge) sont soit :
+   - Transformés en tickets Jira via `/ba` en fin de cycle
+   - Laissés "à surveiller" dans le rapport pour future rétro
+
+### Exemple d'itération
+
+- **Review 1** : 3 💡 + 1 ⚠️ → Décision ⏸️ en attente. Le dev fixe.
+- **Review 2** : 2 💡 résiduelles + 1 nouvelle 💡 introduite par le fix → Décision ⏸️ (le ⚠️ a disparu, mais nouvelle 💡 à considérer).
+- **Review 3** : 2 💡 acceptées comme dette → Décision ✅ mergeable.
 
 ## Educational principles
 

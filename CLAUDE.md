@@ -164,6 +164,20 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 - **Plan de test actionnable** : chaque étape DOIT contenir les commandes exactes à copier-coller (pas juste une description). Inclure : prérequis, récupération de la branche, checks locaux, étapes de validation UI avec URL, tests E2E/mutation si applicable, build Docker si applicable, nettoyage. But : le reviewer ne doit pas avoir à deviner comment tester.
 - Utiliser `gh pr create --base main` (gh.exe dans `/c/Program Files/GitHub CLI/`, préfixer PATH si bash). Ne jamais ajouter `Co-Authored-By`.
 
+### Review cycle (règle stricte)
+
+Toute review de PR (humaine ou via skill `/review`) produit un **rapport d'étonnement** dans `docs/reviews/YYYY-MM-DD-STN-XX-rapport.md` (commité dans la branche feature).
+
+Une PR n'est **jamais** mergeable tant qu'elle contient au moins un item ⚠️ **Important** ou 🚫 **Blocking** non traité. Cycle à itérer :
+
+1. Review → liste items (✅ Praise / 💡 Suggestion / ⚠️ Important / 🚫 Blocking)
+2. Si ⚠️ ou 🚫 présents → décision `⏸️ en attente`, le dev fixe
+3. Après fixes → **re-review** (ajoute section `## Re-review (commit <sha>)` au rapport existant, **jamais** nouveau fichier)
+4. Boucle 1→3 jusqu'à ne plus avoir que des 💡 résiduelles acceptables
+5. Décision `✅ mergeable` uniquement quand 0 item ⚠️/🚫 non traité → merge squash
+
+Les 💡 Suggestions résiduelles et items de dette non-bloquants restent tracés dans le rapport, convertibles en tickets Jira via `/ba` en fin de cycle.
+
 ### Environments (1 active at a time)
 
 | Env | Usage | Deploy trigger |
