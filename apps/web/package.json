@@ -14,6 +14,8 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
+    "test:unit": "vitest run --passWithNoTests unit.test",
+    "test:integ": "vitest run --passWithNoTests integ.test",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",

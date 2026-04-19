@@ -138,7 +138,7 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 
 **Strict lint** : `eslint --max-warnings 0` (tout warning casse la CI). Frontend utilise `typescript-eslint/strict` + `typescript-eslint/stylistic`. Prettier `--check` fait autorité sur le format (CRLF interdit, endOfLine=lf).
 
-**Scripts npm standardisés (frontend)** : `lint` / `lint:fix` / `format:check` / `format:write` (alias de `format`) / `typecheck` / `test` / `test:watch` / `test:coverage` / `e2e` / `test:mutation` / `build`.
+**Scripts npm standardisés (frontend)** : `lint` / `lint:fix` / `format:check` / `format:write` (alias de `format`) / `typecheck` / `test` / `test:unit` / `test:integ` / `test:watch` / `test:coverage` / `e2e` / `test:mutation` / `build`. `test:unit` et `test:integ` filtrent via suffixe du nom de fichier (`*.unit.test.{ts,tsx}` / `*.integ.test.{ts,tsx}`), pattern déjà configuré dans `vitest.config.ts` (`include`).
 
 ### Test coverage
 
