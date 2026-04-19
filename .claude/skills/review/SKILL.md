@@ -165,7 +165,7 @@ Créer le dossier `docs/reviews/` s'il n'existe pas (avec un `README.md` expliqu
 - Chaque item actionnable dans "Dette technique" → proposer un ticket Jira via `/ba` en fin de review
 - Le rapport ne remplace **pas** les commentaires inline de la PR (commentaires = bloquants / questions ; rapport = observations durables)
 - Ne jamais mettre de secrets, tokens, infos sensibles — le rapport est commité dans le repo
-- Le rapport est committé sur `main` **après merge de la PR** (pas dans la branche feature, pour éviter la pollution du diff)
+- Le rapport est committé **dans la branche feature de la PR reviewée** (atomicité : la review vit avec son code). Marquer "⏸️ en attente" dans le champ Décision tant que la PR n'est pas mergée — pas besoin de mettre à jour post-merge, le statut Jira/PR fait foi.
 
 ### Automatisation (en lien avec les autres agents/skills)
 
