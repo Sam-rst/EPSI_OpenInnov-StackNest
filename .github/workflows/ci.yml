@@ -66,9 +66,20 @@ jobs:
         working-directory: apps/api
         run: uv run poe typecheck
 
+  security-api:
+    name: security-api
+    needs: [typecheck-api]
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: semgrep (rules python + security-audit, ERROR only)
+        run: semgrep scan --config=p/python --config=p/security-audit --error --severity=ERROR apps/api
+
   test-unit-api:
     name: test-unit-api
-    needs: [typecheck-api]
+    needs: [security-api]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -140,9 +151,20 @@ jobs:
         working-directory: apps/web
         run: npm run typecheck
 
+  security-web:
+    name: security-web
+    needs: [typecheck-web]
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: semgrep (rules typescript + security-audit, ERROR only)
+        run: semgrep scan --config=p/typescript --config=p/security-audit --error --severity=ERROR apps/web
+
   test-unit-web:
     name: test-unit-web
-    needs: [typecheck-web]
+    needs: [security-web]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -224,9 +246,24 @@ jobs:
             echo "::endgroup::"
           done
 
+  security-infra:
+    name: security-infra
+    needs: [typecheck-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkov (Terraform + Dockerfile policy)
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform,dockerfile
+          quiet: true
+          soft_fail: true # mode baseline : on logge les findings sans bloquer.
+            # A durcir (soft_fail: false) quand on aura fait le tri sur l'existant.
+
   test-infra:
     name: test-infra
-    needs: [typecheck-infra]
+    needs: [security-infra]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -255,10 +292,8 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.dev.yml config > /dev/null
 
   # ═══════════════════════════════════════════════════════════
-  # Security — 4 jobs independants en parallele des lanes code.
-  # Ne bloquent pas les lanes api/web/infra, mais ci-ok attend leur succes.
-  # Les scans lourds (Trivy containers, pip-audit/npm audit full CVE,
-  # Semgrep full rules) vivent dans ci-nightly.yml.
+  # Security globale — job independant, pas dans une lane car scan
+  # transverse (historique git complet, tous les fichiers).
   # ═══════════════════════════════════════════════════════════
 
   secrets-scan:
@@ -277,73 +312,32 @@ jobs:
       - name: gitleaks detect (secrets dans le code + historique)
         run: gitleaks detect --source=. --verbose --redact --no-banner
 
-  semgrep-api:
-    name: semgrep-api
-    runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep:latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: semgrep (rules python + security-audit)
-        run: semgrep scan --config=p/python --config=p/security-audit --error --severity=ERROR apps/api
-
-  semgrep-web:
-    name: semgrep-web
-    runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep:latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: semgrep (rules typescript + security-audit)
-        run: semgrep scan --config=p/typescript --config=p/security-audit --error --severity=ERROR apps/web
-
-  checkov-infra:
-    name: checkov-infra
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Checkov (Terraform + Dockerfile policy)
-        uses: bridgecrewio/checkov-action@master
-        with:
-          directory: .
-          framework: terraform,dockerfile
-          quiet: true
-          soft_fail: true # mode baseline : on logge les findings sans bloquer.
-            # A durcir (soft_fail: false) quand on aura fait le tri sur l'existant.
-
   # ═══════════════════════════════════════════════════════════
   # Sentinelle finale — seul required check pour branch protection
   # ═══════════════════════════════════════════════════════════
 
   ci-ok:
     name: ci-ok
-    needs:
-      - build-api
-      - build-web
-      - build-stack
-      - secrets-scan
-      - semgrep-api
-      - semgrep-web
-      - checkov-infra
+    # Les security-{api,web,infra} sont dans les lanes (chainees avant
+    # les tests), donc couvertes transitively par les builds. Pas besoin
+    # de les lister explicitement ici.
+    needs: [build-api, build-web, build-stack, secrets-scan]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Verify all lane builds + security scans succeeded
+      - name: Verify all lane builds + global secrets-scan succeeded
         env:
           RESULT_API: ${{ needs.build-api.result }}
           RESULT_WEB: ${{ needs.build-web.result }}
           RESULT_STACK: ${{ needs.build-stack.result }}
           RESULT_SECRETS: ${{ needs.secrets-scan.result }}
-          RESULT_SEMGREP_API: ${{ needs.semgrep-api.result }}
-          RESULT_SEMGREP_WEB: ${{ needs.semgrep-web.result }}
-          RESULT_CHECKOV: ${{ needs.checkov-infra.result }}
         run: |
-          echo "build    | api=$RESULT_API | web=$RESULT_WEB | stack=$RESULT_STACK"
-          echo "security | secrets=$RESULT_SECRETS | semgrep-api=$RESULT_SEMGREP_API | semgrep-web=$RESULT_SEMGREP_WEB | checkov=$RESULT_CHECKOV"
-          for r in "$RESULT_API" "$RESULT_WEB" "$RESULT_STACK" "$RESULT_SECRETS" "$RESULT_SEMGREP_API" "$RESULT_SEMGREP_WEB" "$RESULT_CHECKOV"; do
+          echo "lane builds | api=$RESULT_API | web=$RESULT_WEB | stack=$RESULT_STACK"
+          echo "global      | secrets-scan=$RESULT_SECRETS"
+          for r in "$RESULT_API" "$RESULT_WEB" "$RESULT_STACK" "$RESULT_SECRETS"; do
             if [[ "$r" != "success" ]]; then
               echo "::error::At least one required job failed (result=$r)"
               exit 1
             fi
           done
-          echo "✅ All CI lanes + security scans green"
+          echo "✅ All CI lanes green (security-* et builds inclus)"
