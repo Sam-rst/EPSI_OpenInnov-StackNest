@@ -150,6 +150,39 @@ jobs:
           ignore-unfixed: true
 
   # ═══════════════════════════════════════════════════════════
+  # SonarCloud — analyse statique continue (code smells, duplications,
+  # security hotspots, coverage). Config dans sonar-project.properties
+  # a la racine du repo.
+  # ═══════════════════════════════════════════════════════════
+
+  sonar:
+    name: sonar
+    runs-on: ubuntu-latest
+    continue-on-error: true # tolerant : SonarCloud peut rate-limit ou casser independemment
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # requis par SonarCloud pour git blame / new code detection
+
+      # Generation coverage report backend
+      - uses: ./.github/actions/setup-api
+      - name: pytest --cov-report=xml (coverage Python pour Sonar)
+        working-directory: apps/api
+        run: uv run pytest --cov-report=xml
+
+      # Generation coverage report frontend
+      - uses: ./.github/actions/setup-web
+      - name: vitest --coverage (lcov pour Sonar)
+        working-directory: apps/web
+        run: npm run test:coverage
+
+      - name: SonarCloud scan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+  # ═══════════════════════════════════════════════════════════
   # Review reports — verifie qu'un rapport d'etonnement existe
   # pour chaque PR mergee dans les dernieres 24h.
   # Regle projet : docs/reviews/YYYY-MM-DD-STN-XX-rapport.md
@@ -218,6 +251,7 @@ jobs:
       - npm-audit
       - trivy-api
       - trivy-web
+      - sonar
       - review-reports-check
     if: always()
     runs-on: ubuntu-latest
@@ -232,6 +266,7 @@ jobs:
           R_NPM: ${{ needs.npm-audit.result }}
           R_TRIVY_API: ${{ needs.trivy-api.result }}
           R_TRIVY_WEB: ${{ needs.trivy-web.result }}
+          R_SONAR: ${{ needs.sonar.result }}
           R_REPORTS: ${{ needs.review-reports-check.result }}
         run: |
           {
@@ -247,6 +282,7 @@ jobs:
             echo "| Security | npm-audit | $R_NPM |"
             echo "| Security | trivy-api | $R_TRIVY_API |"
             echo "| Security | trivy-web | $R_TRIVY_WEB |"
+            echo "| Quality | sonar | $R_SONAR |"
             echo "| Review | reports-check | $R_REPORTS |"
             echo ""
             echo "**Note** : mutation/e2e ont \`continue-on-error: true\` tant que les tests sont incomplets. Les vraies valeurs arriveront au fil des features."
