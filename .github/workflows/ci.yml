@@ -1,0 +1,372 @@
+name: CI
+
+# Workflow rapide (~2-3 min cible) declenche sur chaque push / PR.
+# Les taches lentes (e2e, mutation testing, deep security) vivent dans
+# ci-nightly.yml et s'executent a 20h via schedule.
+#
+# Topologie : 3 lanes parallèles et indépendantes (api / web / infra).
+# Chaque lane chaine ses etapes en sequentiel via `needs:` — si lint-api
+# casse, format-api / typecheck-api / test-*-api / build-api ne tournent
+# pas. Les lanes ne s'attendent pas entre elles (pas de gate global par
+# stage) : l'api avance meme si web echoue au lint.
+#
+# Sentinelle finale `ci-ok` attend les 3 builds. C'est le seul required
+# check a configurer cote branch protection.
+#
+# Le setup repete (checkout + setup-uv + uv sync pour la lane api,
+# checkout + setup-node + npm ci pour la lane web) est factorise dans
+# des composite actions sous .github/actions/setup-{api,web}/action.yml.
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ═══════════════════════════════════════════════════════════
+  # Lane API — apps/api (Python 3.13, uv, FastAPI)
+  # ═══════════════════════════════════════════════════════════
+
+  lint-api:
+    name: lint-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: ruff check
+        working-directory: apps/api
+        run: uv run poe lint
+
+  format-api:
+    name: format-api
+    needs: [lint-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: ruff format --check
+        working-directory: apps/api
+        run: uv run poe format:check
+
+  typecheck-api:
+    name: typecheck-api
+    needs: [format-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: mypy strict
+        working-directory: apps/api
+        run: uv run poe typecheck
+
+  security-api:
+    name: security-api
+    needs: [typecheck-api]
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: semgrep (rules python + security-audit, ERROR only)
+        run: semgrep scan --config=p/python --config=p/security-audit --error --severity=ERROR apps/api
+
+  test-unit-api:
+    name: test-unit-api
+    needs: [security-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: pytest -m unit
+        working-directory: apps/api
+        run: uv run poe test:unit
+
+  test-integ-api:
+    name: test-integ-api
+    needs: [test-unit-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: pytest -m integ
+        working-directory: apps/api
+        run: uv run poe test:integ
+
+  build-api:
+    name: build-api
+    needs: [test-integ-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image (load local pour Syft)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/api
+          push: false
+          load: true
+          tags: stacknest-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+      - name: Generate SBOM (Syft) pour tracabilite supply-chain
+        uses: anchore/sbom-action@v0
+        with:
+          image: stacknest-api:ci
+          format: spdx-json
+          artifact-name: sbom-api.spdx.json
+          output-file: sbom-api.spdx.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-api
+          path: sbom-api.spdx.json
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════
+  # Lane WEB — apps/web (Node 22, Vite, React)
+  # ═══════════════════════════════════════════════════════════
+
+  lint-web:
+    name: lint-web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: eslint
+        working-directory: apps/web
+        run: npm run lint
+
+  format-web:
+    name: format-web
+    needs: [lint-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: prettier --check
+        working-directory: apps/web
+        run: npm run format:check
+
+  typecheck-web:
+    name: typecheck-web
+    needs: [format-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: tsc --noEmit
+        working-directory: apps/web
+        run: npm run typecheck
+
+  security-web:
+    name: security-web
+    needs: [typecheck-web]
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: semgrep (rules typescript + security-audit, ERROR only)
+        run: semgrep scan --config=p/typescript --config=p/security-audit --error --severity=ERROR apps/web
+
+  test-unit-web:
+    name: test-unit-web
+    needs: [security-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: vitest unit
+        working-directory: apps/web
+        run: npm run test:unit
+
+  test-integ-web:
+    name: test-integ-web
+    needs: [test-unit-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: vitest integ
+        working-directory: apps/web
+        run: npm run test:integ
+
+  build-web:
+    name: build-web
+    needs: [test-integ-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Web image (load local pour Syft)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          push: false
+          load: true
+          tags: stacknest-web:ci
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+      - name: Generate SBOM (Syft) pour tracabilite supply-chain
+        uses: anchore/sbom-action@v0
+        with:
+          image: stacknest-web:ci
+          format: spdx-json
+          artifact-name: sbom-web.spdx.json
+          output-file: sbom-web.spdx.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-web
+          path: sbom-web.spdx.json
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════
+  # Lane INFRA — infra/ (Terraform, Docker Compose, GitHub Actions)
+  # ═══════════════════════════════════════════════════════════
+  # Pas de composite action factorisable : chaque job infra utilise un
+  # sous-ensemble d'outils different (actionlint seul, terraform seul,
+  # terraform+uv pour test-infra, docker CLI pour build-stack).
+
+  lint-infra:
+    name: lint-infra
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint (GitHub workflows)
+        uses: raven-actions/actionlint@v2
+
+  format-infra:
+    name: format-infra
+    needs: [lint-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9"
+      - name: terraform fmt -check
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+
+  typecheck-infra:
+    name: typecheck-infra
+    needs: [format-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9"
+      - name: terraform validate (tous les environnements)
+        run: |
+          set -euo pipefail
+          for env_dir in infra/terraform/environments/*/; do
+            echo "::group::$env_dir"
+            (cd "$env_dir" && terraform init -backend=false -input=false -no-color && terraform validate -no-color)
+            echo "::endgroup::"
+          done
+
+  security-infra:
+    name: security-infra
+    needs: [typecheck-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkov (Terraform + Dockerfile policy)
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform,dockerfile
+          quiet: true
+          # soft_fail: false (defaut). Si des findings LOW/MEDIUM apparaissent
+          # sur l'existant, whitelister via un .checkov.yaml plutot que relacher
+          # soft_fail. Objectif : zero finding non-explique.
+
+  test-infra:
+    name: test-infra
+    needs: [security-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9"
+      - uses: ./.github/actions/setup-api
+      - name: Run shell tests
+        run: |
+          set -euo pipefail
+          for script in tests/infra/test_*.sh; do
+            echo "::group::$script"
+            bash "$script"
+            echo "::endgroup::"
+          done
+
+  build-stack:
+    name: build-stack
+    needs: [test-infra]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate docker compose config (base + dev override)
+        run: |
+          docker compose -f docker-compose.yml config > /dev/null
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config > /dev/null
+
+  # ═══════════════════════════════════════════════════════════
+  # Security globale — job independant, pas dans une lane car scan
+  # transverse (historique git complet, tous les fichiers).
+  # ═══════════════════════════════════════════════════════════
+
+  secrets-scan:
+    name: secrets-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # requis : gitleaks scanne l'historique git complet
+      - name: Install gitleaks
+        run: |
+          VERSION=8.27.2
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp
+          sudo mv /tmp/gitleaks /usr/local/bin/
+      - name: gitleaks detect (secrets dans le code + historique)
+        run: gitleaks detect --source=. --verbose --redact --no-banner
+
+  # ═══════════════════════════════════════════════════════════
+  # Sentinelle finale — seul required check pour branch protection
+  # ═══════════════════════════════════════════════════════════
+
+  ci-ok:
+    name: ci-ok
+    # Les security-{api,web,infra} sont dans les lanes (chainees avant
+    # les tests), donc couvertes transitively par les builds. Pas besoin
+    # de les lister explicitement ici.
+    needs: [build-api, build-web, build-stack, secrets-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all lane builds + global secrets-scan succeeded
+        env:
+          RESULT_API: ${{ needs.build-api.result }}
+          RESULT_WEB: ${{ needs.build-web.result }}
+          RESULT_STACK: ${{ needs.build-stack.result }}
+          RESULT_SECRETS: ${{ needs.secrets-scan.result }}
+        run: |
+          echo "lane builds | api=$RESULT_API | web=$RESULT_WEB | stack=$RESULT_STACK"
+          echo "global      | secrets-scan=$RESULT_SECRETS"
+          for r in "$RESULT_API" "$RESULT_WEB" "$RESULT_STACK" "$RESULT_SECRETS"; do
+            if [[ "$r" != "success" ]]; then
+              echo "::error::At least one required job failed (result=$r)"
+              exit 1
+            fi
+          done
+          echo "✅ All CI lanes green (security-* et builds inclus)"

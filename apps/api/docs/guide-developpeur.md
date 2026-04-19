@@ -339,6 +339,24 @@ Mutation testing est **lent** (1 fichier modifie = N runs de la suite). Ne le
 lance pas dans la boucle TDD — reserve-le aux relectures de fin de feature
 ou a la CI.
 
+## CI / CD
+
+Le projet utilise **GitHub Actions** avec deux workflows :
+
+- **`ci.yml`** (fast, ~3 min) — declenche sur chaque push/PR. Pattern "3 lanes
+  paralleles" : api / web / infra, chacune avec son pipeline sequentiel
+  `lint -> format -> typecheck -> security -> test-unit -> test-integ -> build`.
+  Un job global `secrets-scan` (gitleaks) tourne en parallele.
+  Le seul required check sur la branch protection : **`ci-ok`** (sentinelle finale).
+- **`ci-nightly.yml`** (slow, ~15-30 min) — cron `0 20 * * *`. Mutation testing
+  (mutmut, Stryker), E2E (pytest -m e2e, Playwright), deep security
+  (pip-audit, npm audit, Trivy), verification des rapports d'etonnement.
+
+**Avant de push, toujours lancer `uv run poe check`** en local pour prevalider
+lint + format + typecheck + tests. La CI fera le meme boulot + build + security.
+
+Doc complete : `.github/workflows/README.md`.
+
 ## Comment creer une nouvelle feature
 
 1. **Lire le ticket Jira** (STN-XX) — perimetre, criteres d'acceptation, scenarios de test.
