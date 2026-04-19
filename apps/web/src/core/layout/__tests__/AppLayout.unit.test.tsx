@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { AppLayout } from '../AppLayout'
 
@@ -53,5 +54,50 @@ describe('AppLayout', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect(screen.getByRole('banner')).toBeInTheDocument()
     expect(screen.getByRole('navigation')).toBeInTheDocument()
+  })
+
+  it('ferme le drawer au changement de route', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route index element={<Link to="/autre">aller ailleurs</Link>} />
+            <Route path="/autre" element={<p>autre page</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /basculer la navigation/i }))
+    expect(screen.getByRole('navigation')).toHaveAttribute('data-open', 'true')
+
+    await user.click(screen.getByRole('link', { name: /aller ailleurs/i }))
+
+    expect(screen.getByRole('navigation')).toHaveAttribute('data-open', 'false')
+  })
+
+  it('ferme le drawer quand on appuie sur Escape', async () => {
+    const user = userEvent.setup()
+    renderWithRoute()
+
+    await user.click(screen.getByRole('button', { name: /basculer la navigation/i }))
+    expect(screen.getByRole('navigation')).toHaveAttribute('data-open', 'true')
+
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Escape' })
+    })
+
+    expect(screen.getByRole('navigation')).toHaveAttribute('data-open', 'false')
+  })
+
+  it("n'ecoute pas Escape quand le drawer est ferme", () => {
+    renderWithRoute()
+
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Escape' })
+    })
+
+    expect(screen.getByRole('navigation')).toHaveAttribute('data-open', 'false')
   })
 })

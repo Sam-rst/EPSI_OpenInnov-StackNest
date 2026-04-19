@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 interface SidebarProps {
   isOpen: boolean
   onDismiss: () => void
@@ -29,9 +31,9 @@ export function Sidebar({ isOpen, onDismiss }: SidebarProps) {
       >
         <ul className="flex flex-col gap-1 p-4 text-sm">
           <li>
-            <a href="/" className="hover:bg-night/10 block rounded-md px-3 py-2 font-medium">
+            <Link to="/" className="hover:bg-night/10 block rounded-md px-3 py-2 font-medium">
               Accueil
-            </a>
+            </Link>
           </li>
         </ul>
       </nav>
