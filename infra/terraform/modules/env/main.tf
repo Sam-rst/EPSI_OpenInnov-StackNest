@@ -40,6 +40,10 @@ resource "docker_volume" "db" {
       value = labels.value
     }
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "docker_volume" "redis" {
@@ -51,5 +55,9 @@ resource "docker_volume" "redis" {
       label = labels.key
       value = labels.value
     }
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }

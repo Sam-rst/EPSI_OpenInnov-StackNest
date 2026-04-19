@@ -39,6 +39,8 @@ Thumbs.db
 .terraform/
 *.tfvars
 !*.tfvars.example
+# Whitelist des tfvars d'environnement (pas de secrets ; secrets via SOPS — STN-31).
+!infra/terraform/environments/*/*.tfvars
 
 # Coverage
 htmlcov/

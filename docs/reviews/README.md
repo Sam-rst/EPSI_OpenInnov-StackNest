@@ -30,7 +30,7 @@ Cf. skill `/review` étape 6 pour le template complet. Les 6 sections :
 ## Règles
 
 - **Pas de secrets** dans les rapports (tokens, credentials, infos sensibles) — commité dans le repo public
-- **Commit sur `main`** après merge de la PR (pas dans la branche feature, pour éviter la pollution du diff)
+- **Commit dans la branche feature de la PR reviewée** (atomicité : review livrée avec son code). Statut "⏸️ en attente" tant que non mergé, pas besoin d'update post-merge.
 - **Chaque item "Dette technique"** actionnable doit déclencher la création d'un ticket Jira via `/ba` (référencé dans le rapport)
 - **Relecture en début de sprint** : point dédié en rétro pour traiter la dette accumulée
 
