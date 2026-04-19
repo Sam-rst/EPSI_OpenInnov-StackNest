@@ -19,13 +19,19 @@ elif command -v terraform.exe >/dev/null 2>&1; then TF=terraform.exe
 else red "terraform CLI introuvable"; exit 1
 fi
 
-# CA3 — prevent_destroy statique dans le module
+# CA3 — chaque docker_volume du module a son propre lifecycle { prevent_destroy = true }
 MODULE_MAIN="${TF_DIR}/modules/env/main.tf"
-if ! grep -q "prevent_destroy *= *true" "${MODULE_MAIN}"; then
-    red "CA3: prevent_destroy = true absent de ${MODULE_MAIN}"
-    exit 1
-fi
-green "  [OK] CA3 — prevent_destroy présent dans le module"
+PYTHONIOENCODING=utf-8 uv run python - "${MODULE_MAIN}" <<'PY' || exit 1
+import re, sys
+content = open(sys.argv[1], encoding="utf-8").read()
+volumes = re.findall(r'resource "docker_volume" "(\w+)"\s*\{(.*?)\n\}', content, re.DOTALL)
+if len(volumes) < 2:
+    print(f"  [FAIL] CA3: moins de 2 docker_volume trouvés ({len(volumes)})"); sys.exit(1)
+for name, body in volumes:
+    if not re.search(r'lifecycle\s*\{[^}]*prevent_destroy\s*=\s*true', body, re.DOTALL):
+        print(f"  [FAIL] CA3: docker_volume.{name} n'a pas lifecycle {{ prevent_destroy = true }}"); sys.exit(1)
+print(f"  [OK] CA3 — {len(volumes)} volumes protégés par prevent_destroy")
+PY
 
 # CA1 + CA2 — plan sur chaque env avec son tfvars
 FAIL=0

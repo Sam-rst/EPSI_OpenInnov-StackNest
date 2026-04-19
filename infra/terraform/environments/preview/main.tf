@@ -1,6 +1,11 @@
 variable "env_name" {
   type        = string
-  description = "Nom de l'environnement (dev, test, preview, prod)."
+  description = "Nom de l'environnement (doit correspondre au dossier courant)."
+
+  validation {
+    condition     = var.env_name == "preview"
+    error_message = "env_name doit valoir \"preview\" (dossier environments/preview). Vérifie que tu utilises le bon -var-file."
+  }
 }
 
 module "env" {
