@@ -103,20 +103,98 @@ jobs:
           fi
 
   # ────────────────────────────────────────────────────────────
+  # Stage 2 — Tests rapides (fan-out, needs: lint-gate)
+  # ────────────────────────────────────────────────────────────
+
+  test-api:
+    name: Tests · API
+    needs: [lint-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+      - name: Install dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+      - name: Unit + integration tests (cov seuil 80%)
+        working-directory: apps/api
+        run: uv run poe test
+
+  test-web:
+    name: Tests · Web
+    needs: [lint-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Unit + integration tests with coverage
+        working-directory: apps/web
+        run: npm run test:coverage
+
+  test-infra:
+    name: Tests · Infra
+    needs: [lint-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9"
+      - name: Run shell tests
+        run: |
+          set -euo pipefail
+          for script in tests/infra/test_*.sh; do
+            echo "::group::$script"
+            bash "$script"
+            echo "::endgroup::"
+          done
+
+  test-gate:
+    name: Tests · Gate
+    needs: [test-api, test-web, test-infra]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all test jobs succeeded
+        env:
+          RESULT_API: ${{ needs.test-api.result }}
+          RESULT_WEB: ${{ needs.test-web.result }}
+          RESULT_INFRA: ${{ needs.test-infra.result }}
+        run: |
+          echo "api=$RESULT_API | web=$RESULT_WEB | infra=$RESULT_INFRA"
+          if [[ "$RESULT_API" != "success" || "$RESULT_WEB" != "success" || "$RESULT_INFRA" != "success" ]]; then
+            echo "::error::At least one test job failed"
+            exit 1
+          fi
+
+  # ────────────────────────────────────────────────────────────
   # Sentinelle finale — seul required check pour branch protection
   # ────────────────────────────────────────────────────────────
 
   ci-ok:
     name: CI · OK
-    needs: [lint-gate]
+    needs: [lint-gate, test-gate]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Verify all gates succeeded
         env:
           RESULT_LINT: ${{ needs.lint-gate.result }}
+          RESULT_TEST: ${{ needs.test-gate.result }}
         run: |
-          if [[ "$RESULT_LINT" != "success" ]]; then
+          echo "lint=$RESULT_LINT | test=$RESULT_TEST"
+          if [[ "$RESULT_LINT" != "success" || "$RESULT_TEST" != "success" ]]; then
             echo "::error::At least one stage gate failed"
             exit 1
           fi
