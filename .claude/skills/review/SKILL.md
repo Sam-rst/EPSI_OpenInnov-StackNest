@@ -1,6 +1,6 @@
 ---
 name: review
-description: Educational MR/PR review acting as a bienveillant tech lead. Use for every merge request and pull request review. Triggers on "review", "MR", "PR", "code review", "review my code", "check my PR", or when code is ready for review. This skill orchestrates /craft, /clean-archi checks while teaching developers WHY changes are needed. It's a knowledge transfer tool, not a gatekeeping tool.
+description: Educational MR/PR review acting as a bienveillant tech lead. Use for every merge request and pull request review. Triggers on "review", "MR", "PR", "code review", "review my code", "check my PR", or when code is ready for review. This skill orchestrates /craft, /clean-archi checks while teaching developers WHY changes are needed. It's a knowledge transfer tool, not a gatekeeping tool. MUST produce a rapport d'étonnement in `docs/reviews/` at the end of every review.
 ---
 
 # Review — Educational MR/PR Review
@@ -107,6 +107,71 @@ Only flag as blocking if it:
 
 Ask questions when something is unclear:
 - "I see you chose to put this in infrastructure/ — was that intentional? I would have expected it in domain/. Can you explain your reasoning?"
+
+## Step 6 — Rapport d'étonnement (OBLIGATOIRE)
+
+**À chaque review, écrire un rapport d'étonnement** dans `docs/reviews/YYYY-MM-DD-STN-XX-rapport.md`. Ce fichier capture la dette technique et les observations qui se perdraient sinon dans les commentaires GitHub.
+
+### Objectif
+
+- Tracer durablement la dette technique identifiée pendant la review
+- Séparer **bloquants** (commentaires PR) de **observations** (rapport)
+- Fournir matière pour les rétros sprint et l'onboarding
+- Créer des tickets Jira de follow-up quand nécessaire (référencés dans le rapport)
+
+### Emplacement
+
+`docs/reviews/YYYY-MM-DD-STN-XX-rapport.md`
+
+- `YYYY-MM-DD` = date de la review (tri chronologique)
+- `STN-XX` = ticket Jira de la PR reviewée
+- 1 fichier par PR, jamais de fusion ou écrasement
+
+Créer le dossier `docs/reviews/` s'il n'existe pas (avec un `README.md` expliquant la convention).
+
+### Template (copier-coller + adapter)
+
+```markdown
+# Rapport d'étonnement — STN-XX [Titre du ticket]
+
+- **PR** : [#N](https://github.com/Sam-rst/EPSI_OpenInnov-StackNest/pull/N)
+- **Reviewer** : [nom humain ou "Claude /review"]
+- **Date** : YYYY-MM-DD
+- **Décision** : ✅ mergé / 🔄 revu / ❌ rejeté / ⏸️ en attente
+
+## Ce qui m'a surpris
+- [observations inattendues, bonnes ou mauvaises]
+
+## Dette technique identifiée
+- [ ] [description] — *ticket proposé : à créer via /ba* ou *ticket lié : STN-YY*
+- [ ] [description] — *à surveiller, pas encore bloquant*
+
+## Décisions à revisiter
+- [choix pragmatiques pris par le dev, qui méritent re-discussion plus tard avec l'équipe]
+
+## Patterns à surveiller
+- [trucs à ne pas reproduire ou au contraire à généraliser dans d'autres tickets]
+
+## Questions ouvertes
+- [points à trancher en équipe, en rétro ou en 1:1]
+
+## Points positifs notables
+- [ce qui mérite d'être répliqué ailleurs — renforcement positif à l'échelle du repo]
+```
+
+### Règles
+
+- **Toujours écrire le rapport**, même si la PR est parfaite (juste 1-2 lignes par section, ou "RAS")
+- Chaque item actionnable dans "Dette technique" → proposer un ticket Jira via `/ba` en fin de review
+- Le rapport ne remplace **pas** les commentaires inline de la PR (commentaires = bloquants / questions ; rapport = observations durables)
+- Ne jamais mettre de secrets, tokens, infos sensibles — le rapport est commité dans le repo
+- Le rapport est committé sur `main` **après merge de la PR** (pas dans la branche feature, pour éviter la pollution du diff)
+
+### Automatisation (en lien avec les autres agents/skills)
+
+- Le skill `/ba` peut être invoqué en sortie de `/review` pour créer les tickets Jira de follow-up
+- Dans un futur workflow CI (STN-12), on peut ajouter un job qui vérifie qu'un rapport existe pour chaque PR mergée (via convention de nommage)
+- Lecture recommandée des rapports en début de sprint (rétro dette)
 
 ## Severity levels
 
