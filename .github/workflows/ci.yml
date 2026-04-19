@@ -106,14 +106,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Build API image
+      - name: Build API image (load local pour Syft)
         uses: docker/build-push-action@v6
         with:
           context: apps/api
           push: false
+          load: true
           tags: stacknest-api:ci
           cache-from: type=gha,scope=api
           cache-to: type=gha,scope=api,mode=max
+      - name: Generate SBOM (Syft) pour tracabilite supply-chain
+        uses: anchore/sbom-action@v0
+        with:
+          image: stacknest-api:ci
+          format: spdx-json
+          artifact-name: sbom-api.spdx.json
+          output-file: sbom-api.spdx.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-api
+          path: sbom-api.spdx.json
+          retention-days: 30
 
   # ═══════════════════════════════════════════════════════════
   # Lane WEB — apps/web (Node 22, Vite, React)
@@ -191,14 +205,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Build Web image
+      - name: Build Web image (load local pour Syft)
         uses: docker/build-push-action@v6
         with:
           context: apps/web
           push: false
+          load: true
           tags: stacknest-web:ci
           cache-from: type=gha,scope=web
           cache-to: type=gha,scope=web,mode=max
+      - name: Generate SBOM (Syft) pour tracabilite supply-chain
+        uses: anchore/sbom-action@v0
+        with:
+          image: stacknest-web:ci
+          format: spdx-json
+          artifact-name: sbom-web.spdx.json
+          output-file: sbom-web.spdx.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-web
+          path: sbom-web.spdx.json
+          retention-days: 30
 
   # ═══════════════════════════════════════════════════════════
   # Lane INFRA — infra/ (Terraform, Docker Compose, GitHub Actions)
