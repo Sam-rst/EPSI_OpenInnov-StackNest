@@ -1,9 +1,12 @@
-# Configuration SOPS — StackNest
-# Définit qui (quelles clés publiques age) peut chiffrer/déchiffrer quels fichiers secrets.
+# Configuration SOPS — StackNest (TEMPLATE non fonctionnel)
+# Les clés publiques ci-dessous sont des PLACEHOLDERS invalides — SOPS échouera
+# si on tente de l'utiliser tel quel. C'est volontaire : ce fichier sert de modèle.
 #
-# ⚠️ Les clés publiques ci-dessous sont des PLACEHOLDERS.
-# Chaque membre doit générer sa propre clé via `bash scripts/cyber/generate-age-key.sh`
-# et partager sa clé publique à Samuel via Slack #stacknest-keys.
+# Workflow de passage en .sops.yaml réel (ticket de suivi post-STN-30) :
+#   1. Chaque membre génère sa clé : `bash scripts/cyber/generate-age-key.sh`
+#   2. Partage sa clé publique (age1...) sur Slack canal privé #stacknest-keys
+#   3. Samuel : `cp .sops.yaml.example .sops.yaml`, remplace les placeholders par les vraies clés, commit
+#   4. Le test `tests/infra/test_sops_setup.sh` validera strictement le format age1 bech32
 #
 # Cf. docs/cyber/sops-setup.md pour le workflow complet.
 

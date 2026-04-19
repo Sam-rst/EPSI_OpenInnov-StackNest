@@ -88,7 +88,7 @@ Partage uniquement ta **clé publique** (format `age1xxxxxxxx...`) à Samuel via
 - **Slack canal privé #stacknest-keys** (préféré — historique, vérifiable)
 - Ou email chiffré / signal / canal sécurisé équivalent
 
-Samuel ajoute ta clé publique dans `.sops.yaml` puis commit + PR.
+Samuel crée le `.sops.yaml` réel en partant du template `.sops.yaml.example` : `cp .sops.yaml.example .sops.yaml`, puis remplace chaque `age1PLACEHOLDER_*` par la vraie clé publique du membre concerné, et commit. Le test `tests/infra/test_sops_setup.sh` validera strictement le format age une fois `.sops.yaml` présent.
 
 ## Sauvegarde de ta clé privée
 

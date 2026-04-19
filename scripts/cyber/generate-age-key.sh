@@ -27,9 +27,9 @@ fi
 if [[ -f "${KEY_FILE}" ]]; then
     yellow "⚠️  Une clé existe déjà : ${KEY_FILE}"
     yellow "   La régénérer rendra ILLISIBLES tous les secrets chiffrés avec l'ancienne clé."
-    yellow "   Annule (Ctrl+C) si tu n'es pas sûr. Tape 'oui' pour régénérer :"
+    yellow "   Annule (Ctrl+C) si tu n'es pas sûr. Tape 'oui' / 'yes' / 'y' / 'o' pour régénérer :"
     read -r confirm
-    if [[ "${confirm}" != "oui" ]]; then
+    if [[ ! "${confirm,,}" =~ ^(oui|yes|y|o)$ ]]; then
         yellow "Annulé."
         exit 0
     fi
@@ -42,8 +42,8 @@ fi
 mkdir -p "${KEY_DIR}"
 chmod 700 "${KEY_DIR}"
 
-# 4. Générer la clé
-age-keygen -o "${KEY_FILE}" 2>/dev/null
+# 4. Générer la clé (stderr d'age-keygen laissé visible pour faciliter le troubleshooting)
+age-keygen -o "${KEY_FILE}"
 chmod 600 "${KEY_FILE}"
 
 # 5. Extraire la clé publique
