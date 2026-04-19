@@ -3,6 +3,17 @@
 .env.*
 !.env.example
 
+# SOPS / age — clés privées (filet de sécurité si quelqu'un les copie dans le repo).
+# Emplacement standard des clés : ~/.sops/age/key.txt (hors repo par défaut).
+.sops/
+*.age
+key.txt
+# Fichiers secrets déchiffrés (toujours chiffrés via SOPS, ne jamais commit en clair).
+secrets.*.env
+!secrets.*.sops.env
+!secrets.*.sops.yaml
+!secrets.*.sops.json
+
 # Dependencies
 node_modules/
 __pycache__/

@@ -1,0 +1,59 @@
+# Configuration SOPS — StackNest (TEMPLATE non fonctionnel)
+# Les clés publiques ci-dessous sont des PLACEHOLDERS invalides — SOPS échouera
+# si on tente de l'utiliser tel quel. C'est volontaire : ce fichier sert de modèle.
+#
+# Workflow de passage en .sops.yaml réel (ticket de suivi post-STN-30) :
+#   1. Chaque membre génère sa clé : `bash scripts/cyber/generate-age-key.sh`
+#   2. Partage sa clé publique (age1...) sur Slack canal privé #stacknest-keys
+#   3. Samuel : `cp .sops.yaml.example .sops.yaml`, remplace les placeholders par les vraies clés, commit
+#   4. Le test `tests/infra/test_sops_setup.sh` validera strictement le format age1 bech32
+#
+# Cf. docs/cyber/sops-setup.md pour le workflow complet.
+
+# Raccourcis vers les groupes de destinataires (évite de dupliquer les clés).
+keys:
+  # Équipe cyber + dev lead : accès à tous les environnements.
+  - &samuel     age1PLACEHOLDER_SAMUEL_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+  - &antony     age1PLACEHOLDER_ANTONY_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+  - &remi       age1PLACEHOLDER_REMI_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+  - &thomas     age1PLACEHOLDER_THOMAS_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+  # Devs avec accès limité à dev uniquement.
+  - &yassine    age1PLACEHOLDER_YASSINE_TO_BE_REPLACED_BY_REAL_PUBLIC_KEY_AGE1XXX
+
+creation_rules:
+  # Secrets dev — tous les devs habilités + cyber
+  - path_regex: secrets\.dev\.sops\..*$
+    key_groups:
+      - age:
+          - *samuel
+          - *antony
+          - *remi
+          - *thomas
+          - *yassine
+
+  # Secrets test (pentest cyber) — cyber + dev lead uniquement
+  - path_regex: secrets\.test\.sops\..*$
+    key_groups:
+      - age:
+          - *samuel
+          - *antony
+          - *remi
+          - *thomas
+
+  # Secrets preview (recette QA) — cyber + dev lead uniquement
+  - path_regex: secrets\.preview\.sops\..*$
+    key_groups:
+      - age:
+          - *samuel
+          - *antony
+          - *remi
+          - *thomas
+
+  # Secrets prod — cyber + dev lead uniquement
+  - path_regex: secrets\.prod\.sops\..*$
+    key_groups:
+      - age:
+          - *samuel
+          - *antony
+          - *remi
+          - *thomas
