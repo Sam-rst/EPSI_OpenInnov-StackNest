@@ -1,6 +1,6 @@
 name: CI
 
-# Workflow rapide (~3-5 min cible) declenche sur chaque push / PR.
+# Workflow rapide (~2-3 min cible) declenche sur chaque push / PR.
 # Les taches lentes (e2e, mutation testing, deep security) vivent dans
 # ci-nightly.yml et s'executent a 20h via schedule.
 #
@@ -12,6 +12,10 @@ name: CI
 #
 # Sentinelle finale `ci-ok` attend les 3 builds. C'est le seul required
 # check a configurer cote branch protection.
+#
+# Le setup repete (checkout + setup-uv + uv sync pour la lane api,
+# checkout + setup-node + npm ci pour la lane web) est factorise dans
+# des composite actions sous .github/actions/setup-{api,web}/action.yml.
 
 on:
   push:
@@ -35,13 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "apps/api/uv.lock"
-      - name: Install dependencies
-        working-directory: apps/api
-        run: uv sync --frozen
+      - uses: ./.github/actions/setup-api
       - name: ruff check
         working-directory: apps/api
         run: uv run poe lint
@@ -52,13 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "apps/api/uv.lock"
-      - name: Install dependencies
-        working-directory: apps/api
-        run: uv sync --frozen
+      - uses: ./.github/actions/setup-api
       - name: ruff format --check
         working-directory: apps/api
         run: uv run poe format:check
@@ -69,13 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "apps/api/uv.lock"
-      - name: Install dependencies
-        working-directory: apps/api
-        run: uv sync --frozen
+      - uses: ./.github/actions/setup-api
       - name: mypy strict
         working-directory: apps/api
         run: uv run poe typecheck
@@ -86,13 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "apps/api/uv.lock"
-      - name: Install dependencies
-        working-directory: apps/api
-        run: uv sync --frozen
+      - uses: ./.github/actions/setup-api
       - name: pytest -m unit
         working-directory: apps/api
         run: uv run poe test:unit
@@ -103,13 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "apps/api/uv.lock"
-      - name: Install dependencies
-        working-directory: apps/api
-        run: uv sync --frozen
+      - uses: ./.github/actions/setup-api
       - name: pytest -m integ
         working-directory: apps/api
         run: uv run poe test:integ
@@ -139,14 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: eslint
         working-directory: apps/web
         run: npm run lint
@@ -157,14 +124,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: prettier --check
         working-directory: apps/web
         run: npm run format:check
@@ -175,14 +135,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: tsc --noEmit
         working-directory: apps/web
         run: npm run typecheck
@@ -193,14 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: vitest unit
         working-directory: apps/web
         run: npm run test:unit
@@ -211,14 +157,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: vitest integ
         working-directory: apps/web
         run: npm run test:integ
@@ -242,6 +181,9 @@ jobs:
   # ═══════════════════════════════════════════════════════════
   # Lane INFRA — infra/ (Terraform, Docker Compose, GitHub Actions)
   # ═══════════════════════════════════════════════════════════
+  # Pas de composite action factorisable : chaque job infra utilise un
+  # sous-ensemble d'outils different (actionlint seul, terraform seul,
+  # terraform+uv pour test-infra, docker CLI pour build-stack).
 
   lint-infra:
     name: lint-infra
@@ -291,13 +233,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9"
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "apps/api/uv.lock"
-      - name: Install API dependencies (pour les scripts qui utilisent uv run python)
-        working-directory: apps/api
-        run: uv sync --frozen
+      - uses: ./.github/actions/setup-api
       - name: Run shell tests
         run: |
           set -euo pipefail

@@ -1,0 +1,19 @@
+name: Setup Web
+description: Checkout + Node 22 + install apps/web dependencies (npm ci). DRY le
+  setup repete dans chaque job de la lane web (6 jobs × 3 etapes identiques).
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+        cache: npm
+        cache-dependency-path: apps/web/package-lock.json
+
+    - name: Install dependencies (npm ci)
+      shell: bash
+      working-directory: apps/web
+      run: npm ci
