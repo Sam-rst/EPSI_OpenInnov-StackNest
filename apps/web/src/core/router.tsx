@@ -9,7 +9,7 @@ import { DeploymentsPage } from './pages/DeploymentsPage'
 import { ChatPage } from './pages/ChatPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
-function protect(element: ReactElement): ReactElement {
+function requireAuth(element: ReactElement): ReactElement {
   return <ProtectedRoute>{element}</ProtectedRoute>
 }
 
@@ -20,10 +20,10 @@ export const routes: RouteObject[] = [
     element: <AppLayout />,
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'dashboard', element: protect(<DashboardPage />) },
-      { path: 'catalog', element: protect(<CatalogPage />) },
-      { path: 'deployments', element: protect(<DeploymentsPage />) },
-      { path: 'chat', element: protect(<ChatPage />) },
+      { path: 'dashboard', element: requireAuth(<DashboardPage />) },
+      { path: 'catalog', element: requireAuth(<CatalogPage />) },
+      { path: 'deployments', element: requireAuth(<DeploymentsPage />) },
+      { path: 'chat', element: requireAuth(<ChatPage />) },
     ],
   },
   { path: '*', element: <NotFoundPage /> },
