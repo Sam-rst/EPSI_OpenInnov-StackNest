@@ -18,12 +18,14 @@ class EmailDeliveryException(DomainException):
     par le handler global. Le use case appelant ne doit pas l'attraper
     (policy try/catch sur infrastructure uniquement) — sauf s'il souhaite
     implementer un fallback (retry, queue, provider alternatif).
+
+    La cause originale est preservee via `raise ... from err` au site d'appel,
+    pas via un parametre de cette classe (Python standard).
     """
 
-    def __init__(self, message: str, *, cause: Exception | None = None) -> None:
+    def __init__(self, message: str) -> None:
         super().__init__(
             code="EMAIL_DELIVERY_FAILED",
             message=message,
             http_status=502,
         )
-        self.__cause__ = cause

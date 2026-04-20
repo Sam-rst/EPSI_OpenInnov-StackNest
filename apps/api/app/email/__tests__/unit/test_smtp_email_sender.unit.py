@@ -140,3 +140,33 @@ class TestSmtpEmailSenderFailure:
                 await sender.send(message)
 
             smtp_instance.quit.assert_awaited_once()
+
+    async def test_exception_send_prime_sur_erreur_de_quit(self) -> None:
+        """Si connect echoue ET quit echoue aussi, l'EmailDeliveryException
+        originale doit continuer de se propager (pas masquee par le finally).
+        """
+        sender = SmtpEmailSender(
+            host="smtp.example.com",
+            port=587,
+            username="u",
+            password="p",
+            from_address="noreply@example.com",
+        )
+        message = EmailMessage(
+            to="user@example.com",
+            subject="s",
+            body_html="h",
+            body_text="t",
+        )
+
+        with patch("app.email.infrastructure.smtp_email_sender.SMTP") as smtp_class:
+            smtp_instance = AsyncMock()
+            smtp_instance.connect.side_effect = TimeoutError("connect timed out")
+            smtp_instance.quit.side_effect = RuntimeError("quit on unconnected socket")
+            smtp_class.return_value = smtp_instance
+
+            with pytest.raises(EmailDeliveryException) as exc_info:
+                await sender.send(message)
+
+        # La cause doit etre l'erreur connect, pas l'erreur quit.
+        assert isinstance(exc_info.value.__cause__, TimeoutError)

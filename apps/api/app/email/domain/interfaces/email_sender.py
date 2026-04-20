@@ -1,11 +1,10 @@
 """Interface (Protocol) pour l'envoi d'emails."""
 
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 
 from app.email.domain.value_objects.email_message import EmailMessage
 
 
-@runtime_checkable
 class EmailSender(Protocol):
     """Contrat qu'un service d'envoi d'emails doit implementer.
 

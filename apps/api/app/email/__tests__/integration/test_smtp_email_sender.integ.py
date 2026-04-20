@@ -53,8 +53,8 @@ class TestSmtpEmailSenderIntegration:
         sender = SmtpEmailSender(
             host=host,
             port=smtp_port,
-            username="",  # MailHog accepte sans auth
-            password="",
+            # MailHog accepte sans auth -> username/password laisses a None,
+            # l'adapter skip l'etape login() dans ce cas.
             from_address="stacknest@test.local",
             use_starttls=False,  # MailHog ne supporte pas STARTTLS
         )
@@ -78,6 +78,10 @@ class TestSmtpEmailSenderIntegration:
             else:
                 pytest.fail("MailHog n'a recu aucun message apres 4s")
 
+        # Schema reponse MailHog v1 : items[].Content.Headers.<Name> renvoie
+        # toujours une liste (meme pour un seul Subject). Couplage assume a
+        # cette version — si on passe a Mailpit/MailHog v2 la structure
+        # change, il faudra adapter l'assertion ici.
         items = payload["items"]
         assert len(items) == 1
         received = items[0]

@@ -1,5 +1,6 @@
 """Implementation SMTP du port EmailSender via aiosmtplib."""
 
+import contextlib
 import hashlib
 from email.message import EmailMessage as StdlibEmailMessage
 
@@ -20,7 +21,7 @@ class SmtpEmailSender:
 
     Releve de la politique `try/except sur infrastructure uniquement` :
     toute erreur aiosmtplib / reseau est convertie en `EmailDeliveryException`
-    avec la cause originale preservee via `__cause__`.
+    avec la cause originale preservee via `raise ... from err`.
     """
 
     def __init__(
@@ -28,9 +29,9 @@ class SmtpEmailSender:
         *,
         host: str,
         port: int,
-        username: str,
-        password: str,
         from_address: str,
+        username: str | None = None,
+        password: str | None = None,
         use_starttls: bool = True,
     ) -> None:
         self._host = host
@@ -51,16 +52,18 @@ class SmtpEmailSender:
 
         try:
             await smtp.connect()
-            if self._username:
-                await smtp.login(self._username, self._password)
+            if self._username is not None:
+                await smtp.login(self._username, self._password or "")
             await smtp.send_message(mime_message)
         except Exception as err:
-            raise EmailDeliveryException(
-                f"SMTP delivery failed for {message.to}: {err}",
-                cause=err,
-            ) from err
+            raise EmailDeliveryException(f"SMTP delivery failed for {message.to}: {err}") from err
         finally:
-            await smtp.quit()
+            # Un quit() sur un socket jamais connecte (connect() a echoue)
+            # peut lever. On supprime l'erreur pour ne pas masquer
+            # l'EmailDeliveryException en cours de propagation (Python
+            # remplace l'exception si un finally leve).
+            with contextlib.suppress(Exception):
+                await smtp.quit()
 
         _logger.info(
             "email.sent",
