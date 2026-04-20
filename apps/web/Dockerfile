@@ -15,7 +15,17 @@ RUN npm run build
 # pour tourner avec USER 101 (non-root). Bind sur port 8080 (pas 80, requis
 # pour un user sans capabilities reseau privilegiees). Derriere le reverse
 # proxy, le mapping est fait au niveau docker-compose / Traefik.
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+
+# apk upgrade : applique les patches de securite Alpine au build (defense
+# en profondeur, complete le bump 1.27 -> 1.29). Closes les CVE Trivy sur
+# libcrypto3, libpng, libexpat (~24 findings HIGH+CRITICAL revelees au
+# 1er run nightly post-merge STN-12).
+# Le switch USER root / 101 est necessaire car apk demande root et l'image
+# parente positionne deja USER 101 ; on remet USER 101 apres le upgrade.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
