@@ -5,7 +5,7 @@ import { ProtectedRoute } from '../ProtectedRoute'
 import { AuthProvider } from '../../providers/AuthProvider'
 
 describe('ProtectedRoute', () => {
-  it('redirige vers /login quand l\'utilisateur n\'est pas authentifié', () => {
+  it("redirige vers /login quand l'utilisateur n'est pas authentifié", () => {
     render(
       <AuthProvider value={{ isAuthenticated: false }}>
         <MemoryRouter initialEntries={['/dashboard']}>
