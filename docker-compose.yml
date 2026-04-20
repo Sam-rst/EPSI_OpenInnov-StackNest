@@ -108,3 +108,15 @@ services:
     ports:
       - "${OLLAMA_PORT:-11434}:11434"
     restart: unless-stopped
+
+  # Serveur SMTP de dev (optionnel) — capture tous les mails sortants et expose
+  # une inbox web sur /mailhog. Active via `docker compose --profile smtp up`.
+  # En preview/prod on utilisera un vrai SMTP configure via SOPS (STN-35).
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    profiles: ["smtp"]
+    networks: [stacknest]
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+    restart: unless-stopped
