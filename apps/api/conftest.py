@@ -13,7 +13,15 @@ Le hook ci-dessous applique automatiquement le marker correspondant au
 suffixe, ce qui permet `pytest -m unit` / `-m integ` / `-m e2e` partout.
 """
 
+import os
+
 import pytest
+
+# Desactive Ryuk (le container de cleanup testcontainers) — sur Windows
+# Docker Desktop, Ryuk a du mal a obtenir son port mapping 8080 ce qui
+# fait planter les containers metiers. Les containers sont tues par
+# `.stop()` explicite dans les fixtures de toute facon.
+os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 _LEVEL_BY_SUFFIX = {".unit.py": "unit", ".integ.py": "integ", ".e2e.py": "e2e"}
 
