@@ -96,18 +96,26 @@ Each feature has its own domain/application/infrastructure/presentation layers. 
 
 **1 fichier = 1 classe.** Domain: entities/, value_objects/, enums/, interfaces/, exceptions/, factories/. Infrastructure: models/, repositories/, mappers/. Presentation: schemas/.
 
-### Frontend — Clean Architecture + Vertical Slicing
+### Frontend — Feature-Sliced + Clean Architecture par feature
 
 ```
 apps/web/src/
-├── core/                    # Config, client API, auth context, layout, router
-├── <feature>/               # types/ mappers/ services/ hooks/ components/ pages/
+├── core/                    # Coeur du projet : bootstrap, router, config, layout shell, client API, sentry
+├── shared/                  # Code utilise par >=2 features (clean archi : components/, hooks/, services/, types/, pages/...)
+├── <feature>/               # Feature isolee (clean archi : contexts/, providers/, hooks/, pages/, services/, types/, mappers/, components/...)
 └── main.tsx
 ```
 
+**Regles de placement :**
+- **Feature-specifique** → `<feature>/` (ex: `auth/contexts/AuthContext.ts`, `auth/pages/LoginPage.tsx`, `catalog/services/templateService.ts`)
+- **Commun a >=2 features** → `shared/` (ex: `shared/components/ProtectedRoute.tsx` consomme par toutes les routes protegees, `shared/pages/NotFoundPage.tsx` fallback generique)
+- **Bootstrap/shell du projet** → `core/` (ex: `core/router.tsx`, `core/layout/AppLayout.tsx`, `core/api/axios-instance.ts`, `core/sentry.ts`)
+
 **1 fichier = 1 composant.** Types: dto/ + models/ + enums/ + guards/. Separation DTO (miroir API) / Model (UI enrichi) avec mappers. Compound components quand > 100 lignes.
 
-**Ne pas pre-creer les dossiers de features** (auth/, catalog/, chat/, dashboard/, deployment/, etc.). Les features sont creees une par une au fil des sprints, a partir du ticket qui les porte. Idem cote backend dans `apps/api/app/`.
+**Ne pas pre-creer les dossiers de features vides** — mais il est legitime de creer `<feature>/pages/PlaceholderPage.tsx` depuis le ticket qui pose le routing (ex: STN-21). Le dossier grossit au fil des tickets feature suivants. Idem cote backend dans `apps/api/app/`.
+
+**Anti-pattern : mettre la logique d'une feature dans `core/`.** L'AuthContext appartient a `auth/`, pas a `core/`. Le core ne contient que le bootstrap du projet.
 
 ## Skills
 
