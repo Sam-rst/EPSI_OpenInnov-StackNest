@@ -1,13 +1,13 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom'
 import type { ReactElement } from 'react'
 import { AppLayout } from './layout/AppLayout'
-import { ProtectedRoute } from './components/ProtectedRoute'
-import { LoginPage } from './pages/LoginPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { CatalogPage } from './pages/CatalogPage'
-import { DeploymentsPage } from './pages/DeploymentsPage'
-import { ChatPage } from './pages/ChatPage'
-import { NotFoundPage } from './pages/NotFoundPage'
+import { ProtectedRoute } from '../shared/components/ProtectedRoute'
+import { NotFoundPage } from '../shared/pages/NotFoundPage'
+import { LoginPage } from '../auth/pages/LoginPage'
+import { DashboardPage } from '../dashboard/pages/DashboardPage'
+import { CatalogPage } from '../catalog/pages/CatalogPage'
+import { DeploymentsPage } from '../deployment/pages/DeploymentsPage'
+import { ChatPage } from '../chat/pages/ChatPage'
 
 function requireAuth(element: ReactElement): ReactElement {
   return <ProtectedRoute>{element}</ProtectedRoute>

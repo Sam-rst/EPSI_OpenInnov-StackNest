@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AuthContext, defaultAuthValue, type AuthContextValue } from './AuthContext'
+import { AuthContext, defaultAuthValue, type AuthContextValue } from '../contexts/AuthContext'
 
 interface AuthProviderProps {
   value?: AuthContextValue

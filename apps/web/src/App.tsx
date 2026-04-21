@@ -1,7 +1,7 @@
 import { RouterProvider } from 'react-router-dom'
 import { EnvironmentBanner } from './core/components/EnvironmentBanner'
 import { ErrorBoundary } from './core/components/ErrorBoundary'
-import { AuthProvider } from './core/providers/AuthProvider'
+import { AuthProvider } from './auth/providers/AuthProvider'
 import { router } from './core/router'
 
 function App() {

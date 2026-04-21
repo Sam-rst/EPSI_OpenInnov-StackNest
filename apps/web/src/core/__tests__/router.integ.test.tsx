@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { routes } from '../router'
-import { AuthProvider } from '../providers/AuthProvider'
+import { AuthProvider } from '../../auth/providers/AuthProvider'
 
 function renderAt(path: string, isAuthenticated = false) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
