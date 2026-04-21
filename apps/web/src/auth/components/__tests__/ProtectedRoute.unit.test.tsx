@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from '../ProtectedRoute'
-import { AuthProvider } from '../../../auth/providers/AuthProvider'
+import { AuthProvider } from '../../providers/AuthProvider'
 
 describe('ProtectedRoute', () => {
   it("redirige vers /login quand l'utilisateur n'est pas authentifié", () => {

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { routes } from '../router'
@@ -13,14 +13,21 @@ function renderAt(path: string, isAuthenticated = false) {
   )
 }
 
-describe('Router — CA1 : routes publiques accessibles', () => {
-  it('rend la page Login sur /login', () => {
-    renderAt('/login')
-    expect(screen.getByRole('heading', { name: /connexion/i })).toBeInTheDocument()
-  })
-})
+function expectLoginRendered() {
+  expect(screen.getByRole('heading', { name: /connexion/i })).toBeInTheDocument()
+}
 
-describe('Router — CA1/CA2 : pages protégées accessibles authentifié, redirigées sinon', () => {
+function expectPageHeadingInMain(expected: RegExp) {
+  const main = screen.getByRole('main')
+  expect(within(main).getByRole('heading', { name: expected })).toBeInTheDocument()
+}
+
+describe('Router — CA1 : routes accessibles selon auth', () => {
+  it('rend la page Login sur /login (route publique)', () => {
+    renderAt('/login')
+    expectLoginRendered()
+  })
+
   const protectedRoutes: [string, RegExp][] = [
     ['/dashboard', /dashboard/i],
     ['/catalog', /catalogue/i],
@@ -28,28 +35,32 @@ describe('Router — CA1/CA2 : pages protégées accessibles authentifié, redir
     ['/chat', /chat/i],
   ]
 
-  it.each(protectedRoutes)('redirige %s vers /login quand non authentifié', (path) => {
-    renderAt(path, false)
-    expect(screen.getByRole('heading', { name: /connexion/i })).toBeInTheDocument()
-  })
-
   it.each(protectedRoutes)(
     'rend la page attendue sur %s quand authentifié',
     (path, expectedHeading) => {
       renderAt(path, true)
-      expect(screen.getByRole('heading', { name: expectedHeading })).toBeInTheDocument()
+      expectPageHeadingInMain(expectedHeading)
       expect(screen.queryByRole('heading', { name: /connexion/i })).not.toBeInTheDocument()
     },
   )
+})
+
+describe('Router — CA2 : redirection vers /login pour routes protégées', () => {
+  const protectedPaths = ['/dashboard', '/catalog', '/deployments', '/chat']
+
+  it.each(protectedPaths)('redirige %s vers /login quand non authentifié', (path) => {
+    renderAt(path, false)
+    expectLoginRendered()
+  })
 
   it('redirige / vers /login quand non authentifié (via /dashboard)', () => {
     renderAt('/', false)
-    expect(screen.getByRole('heading', { name: /connexion/i })).toBeInTheDocument()
+    expectLoginRendered()
   })
 
   it('redirige / vers /dashboard quand authentifié', () => {
     renderAt('/', true)
-    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
+    expectPageHeadingInMain(/dashboard/i)
   })
 })
 
