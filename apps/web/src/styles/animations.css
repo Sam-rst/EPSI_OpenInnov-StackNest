@@ -1,0 +1,37 @@
+/* Animations partagées (curseur typing, keyframes). */
+
+.typing-caret::after {
+  content: '▍';
+  color: var(--brand-cyan);
+  animation: typing-blink 1s steps(1) infinite;
+  margin-left: 2px;
+}
+
+@keyframes typing-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
