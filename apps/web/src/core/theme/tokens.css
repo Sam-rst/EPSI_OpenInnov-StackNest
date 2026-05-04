@@ -1,0 +1,42 @@
+/**
+ * Tokens design system StackNest — source de vérité pour la charte graphique.
+ * Référence : StackNest — Charte graphique.pdf à la racine du repo.
+ */
+
+:root {
+  --brand-night: #032233;
+  --brand-cyan: #0d9297;
+  --brand-yellow: #fea21f;
+  --brand-error: #c42b1c;
+  --brand-success: #22c55e;
+
+  --cyan-500: #15979d;
+  --cyan-600: #0d9297;
+  --cyan-700: #017b86;
+
+  --surface: #f7f5f0;
+  --surface-elevated: #ffffff;
+  --surface-sunken: #ebe7dc;
+  --border: #d9d4c5;
+  --border-strong: #b9b29d;
+  --text-primary: #032233;
+  --text-secondary: #4a5e6e;
+  --text-muted: #7d8a96;
+  --text-inverse: #fffefa;
+  --code-bg: #f1ede1;
+  --hairline: #e8e2d2;
+}
+
+html.dark {
+  --surface: #032233;
+  --surface-elevated: #073047;
+  --surface-sunken: #021824;
+  --border: #0d3e57;
+  --border-strong: #15979d;
+  --text-primary: #fffefa;
+  --text-secondary: #c7d4dd;
+  --text-muted: #94aabb;
+  --text-inverse: #021824;
+  --code-bg: #021824;
+  --hairline: #0a334a;
+}
