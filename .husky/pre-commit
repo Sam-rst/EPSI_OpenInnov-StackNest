@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# StackNest — pre-commit hook (BLOQUANT, rapide)
+# Ne lance que les checks rapides sur les fichiers stagés (lint + format auto-fix).
+# Les checks lourds (typecheck + tests) sont délégués au pre-push.
+# Voir CLAUDE.md "Règles non-négociables" + "Definition of Done"
+
+npx lint-staged
