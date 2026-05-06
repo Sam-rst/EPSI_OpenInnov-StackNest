@@ -1,0 +1,50 @@
+#!/usr/bin/env sh
+# StackNest — pre-push hook (BLOQUANT, complet)
+# Délègue à `npm run check` (racine) qui orchestre :
+#   - Backend  : uv run poe check  (lint + format:check + typecheck + test + coverage 80%)
+#   - Frontend : npm run check     (typecheck + lint + format:check + test)
+# Voir CLAUDE.md "Definition of Done"
+
+set -e
+
+echo ""
+echo "🛡️  StackNest pre-push — quality gates complets"
+echo "------------------------------------------------"
+
+# Détection du scope changé (skip silencieux si rien dans apps/api ou apps/web)
+RANGE=$(git rev-parse --abbrev-ref HEAD)@{u}..HEAD 2>/dev/null || RANGE="HEAD~1..HEAD"
+CHANGED=$(git diff --name-only "$RANGE" 2>/dev/null || git diff --name-only HEAD)
+
+API_CHANGED=$(echo "$CHANGED" | grep -E '^apps/api/' || true)
+WEB_CHANGED=$(echo "$CHANGED" | grep -E '^apps/web/' || true)
+
+if [ -z "$API_CHANGED" ] && [ -z "$WEB_CHANGED" ]; then
+  echo "✓ Aucun changement code dans apps/api/ ou apps/web/ — skip quality gates."
+  exit 0
+fi
+
+if [ -n "$API_CHANGED" ]; then
+  echo ""
+  echo "🐍 Backend (apps/api) — npm run check:api"
+  npm run check:api || {
+    echo ""
+    echo "❌ Backend check rouge. Push refusé. Fix puis recommit + push."
+    exit 1
+  }
+  echo "✅ Backend OK"
+fi
+
+if [ -n "$WEB_CHANGED" ]; then
+  echo ""
+  echo "⚛️  Frontend (apps/web) — npm run check:web"
+  npm run check:web || {
+    echo ""
+    echo "❌ Frontend check rouge. Push refusé. Fix puis recommit + push."
+    exit 1
+  }
+  echo "✅ Frontend OK"
+fi
+
+echo ""
+echo "🎉 Quality gates complètes — push autorisé."
+echo ""

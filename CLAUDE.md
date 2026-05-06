@@ -19,6 +19,56 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Le skill `/next-task` est committé dans `.claude/skills/next-task/` donc il voyage avec le repo — dispo dans chaque clone.
 
+## 🛡️ Règles non-négociables (BLOQUANTES)
+
+Ces règles s'appliquent à **tous les contributeurs** (Samuel, Yassine, équipe cyber, B1) **sans exception**. Claude doit refuser proactivement tout écart et rediriger vers le bon skill.
+
+| Interdit                                                                  | Pourquoi                                              |
+| ------------------------------------------------------------------------- | ----------------------------------------------------- |
+| ❌ Coder sans test (Red avant Green)                                      | TDD strict — voir skill `/TDD`                        |
+| ❌ Fichier frontend > 150 lignes                                          | Lisibilité, force l'extraction de compound components |
+| ❌ Plusieurs classes par fichier (backend)                                | 1 fichier = 1 classe (Clean Archi)                    |
+| ❌ Commit hors `feat\|fix\|refactor\|test\|docs(STN-XX): ...` en français | Traçabilité Jira                                      |
+| ❌ Feature qui importe une autre feature                                  | Vertical slicing — passer par `core/` ou `shared/`    |
+| ❌ Claim "fait/done/terminé" sans Definition of Done verte                | Quality gates obligatoires                            |
+| ❌ Push direct sur `main` (sauf hotfix CI/CD)                             | TBD via PRs uniquement                                |
+| ❌ `Co-Authored-By` dans les commits                                      | Convention projet                                     |
+| ❌ Code sans ticket Jira en `En développement`                            | Toujours partir d'un ticket → `/next-task` ou `/BA`   |
+
+**Comportement attendu de Claude** :
+
+- Refuser proactivement si user demande "code-moi X" sans ticket → rediriger vers `/next-task` ou `/BA`
+- Refuser de commit si phase Blue (DoD) pas verte → exiger la checklist
+- Si user insiste → rappeler poliment la règle bloquante (le user a demandé d'être ferme là-dessus)
+
+## ✅ Definition of Done (checklist obligatoire phase Blue)
+
+Avant tout commit final / claim "ticket fait", **chaque case** doit être cochée et vérifiée :
+
+```
+☐ Tests Red passent (Given/When/Then conformes au DOR du ticket)
+☐ Tests Green passent (couverture ≥ 80% global / 90% domain)
+☐ Backend  : uv run ruff check .       → 0 erreur
+☐ Backend  : uv run mypy .             → 0 erreur
+☐ Backend  : uv run pytest             → 100% pass
+☐ Frontend : npm run typecheck         → 0 erreur (TS strict)
+☐ Frontend : npm run lint              → 0 warning (max-lines 150)
+☐ Frontend : npm run test              → 100% pass
+☐ Doc à jour : README, guide-developpeur.md, CLAUDE.md si archi change
+☐ Commit final : feat(STN-XX): ... en français
+☐ PR créée vers main avec sections Résumé / Changements / Validation / CA / Plan de test
+```
+
+**Garde-fous techniques en place** :
+
+- **Pre-commit Husky** (`package.json` racine) : bloque le commit si lint/typecheck/tests rouges
+- **Hooks Claude Code** (`.claude/settings.json`) :
+  - `UserPromptSubmit` : rappel workflow à chaque message
+  - `PostToolUse` (Edit/Write) : typecheck/lint silencieux, alerte visible si rouge
+  - `Stop` : empêche de terminer un tour si DoD non vérifiée
+
+Si un garde-fou bloque, **investiguer la cause** plutôt que bypasser. `--no-verify` strictement interdit sauf demande explicite Samuel.
+
 ## Project Overview
 
 StackNest is an Internal Developer Platform (IDP) that enables technical teams to provision IT resources (VMs, databases, environments) autonomously via a web UI or an AI chatbot, using Terraform and Docker.
@@ -69,14 +119,14 @@ stacknest/
 
 ### Docker Compose Services
 
-| Service | Role |
-|---|---|
-| **ui** (Nginx) | SPA React, reverse-proxy `/api/` vers API |
-| **api** (FastAPI) | Logique metier, auth, catalogue, orchestration |
-| **worker** (Python + Terraform) | Execute les plans Terraform, isole du web |
-| **db** (PostgreSQL 16) | Users, catalogue, deploiements, conversations |
-| **redis** (Redis 7) | Queue jobs API→Worker + pub/sub SSE |
-| **ollama** (optionnel) | LLM local |
+| Service                         | Role                                           |
+| ------------------------------- | ---------------------------------------------- |
+| **ui** (Nginx)                  | SPA React, reverse-proxy `/api/` vers API      |
+| **api** (FastAPI)               | Logique metier, auth, catalogue, orchestration |
+| **worker** (Python + Terraform) | Execute les plans Terraform, isole du web      |
+| **db** (PostgreSQL 16)          | Users, catalogue, deploiements, conversations  |
+| **redis** (Redis 7)             | Queue jobs API→Worker + pub/sub SSE            |
+| **ollama** (optionnel)          | LLM local                                      |
 
 ### Backend — Clean Architecture + Vertical Slicing
 
@@ -107,6 +157,7 @@ apps/web/src/
 ```
 
 **Regles de placement :**
+
 - **Feature-specifique** → `<feature>/` (ex: `auth/contexts/AuthContext.ts`, `auth/pages/LoginPage.tsx`, `catalog/services/templateService.ts`)
 - **Commun a >=2 features** → `shared/` (ex: `shared/components/ProtectedRoute.tsx` consomme par toutes les routes protegees, `shared/pages/NotFoundPage.tsx` fallback generique)
 - **Bootstrap/shell du projet** → `core/` (ex: `core/router.tsx`, `core/layout/AppLayout.tsx`, `core/api/axios-instance.ts`, `core/sentry.ts`)
@@ -137,7 +188,7 @@ apps/web/src/
 - Custom typed exceptions (DomainException with code + message)
 - Try/catch on infrastructure only (network, DB, timers). Handler global DomainException → HTTP.
 - Value Objects (frozen dataclass) for types with business validation
-- Guard clauses in entities (__post_init__)
+- Guard clauses in entities (**post_init**)
 - Factories for complex entity creation
 
 ### Validation order
@@ -188,12 +239,12 @@ Les 💡 Suggestions résiduelles et items de dette non-bloquants restent tracé
 
 ### Environments (1 active at a time)
 
-| Env | Usage | Deploy trigger |
-|---|---|---|
-| **dev** | Development | Manual — main (latest commit) |
-| **test** | Pentest security | Manual — tag rc (frozen version) |
-| **preview** | QA / acceptance | Manual — tag rc (after pentest) |
-| **prod** | Production / jury demo | Manual — tag release |
+| Env         | Usage                  | Deploy trigger                   |
+| ----------- | ---------------------- | -------------------------------- |
+| **dev**     | Development            | Manual — main (latest commit)    |
+| **test**    | Pentest security       | Manual — tag rc (frozen version) |
+| **preview** | QA / acceptance        | Manual — tag rc (after pentest)  |
+| **prod**    | Production / jury demo | Manual — tag release             |
 
 ### Versioning (SemVer)
 

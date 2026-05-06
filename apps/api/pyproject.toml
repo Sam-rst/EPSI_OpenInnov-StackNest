@@ -123,6 +123,11 @@ e2e            = "pytest -m e2e"
 # --- Build ---
 build          = "docker build -t stacknest-api:local ."
 
+# --- Lint-staged (appele depuis .husky/pre-commit, accepte des chemins en args) ---
+# Sans `.` pour que les chemins de fichiers de lint-staged soient transmis correctement.
+"staged:lint"   = "ruff check --fix --no-cache"
+"staged:format" = "ruff format"
+
 # --- Composites ---
-check          = ["lint", "format:check", "typecheck", "test"]  # gate CI complet
-fix            = ["lint:fix", "format"]                          # auto-fix tout
+check          = ["lint", "format:check", "typecheck", "test"]      # gate pre-push + CI (avec coverage 80%)
+fix            = ["lint:fix", "format"]                              # auto-fix global local

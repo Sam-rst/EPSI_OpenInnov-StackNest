@@ -1,0 +1,34 @@
+{
+  "name": "stacknest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StackNest — Internal Developer Platform (IDP). Provisionnement de ressources via UI ou chatbot IA.",
+  "scripts": {
+    "prepare": "husky",
+    "check:api": "cd apps/api && uv run poe check",
+    "check:web": "cd apps/web && npm run check",
+    "check": "npm run check:api && npm run check:web"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "lint-staged": {
+    "apps/api/**/*.py": [
+      "uv --directory apps/api run poe staged:lint",
+      "uv --directory apps/api run poe staged:format"
+    ],
+    "apps/web/**/*.{ts,tsx,js,jsx,json,css,md,html}": [
+      "npm --prefix apps/web run staged:format --"
+    ],
+    "*.{json,md,yaml,yml}": [
+      "npm --prefix apps/web run staged:format --"
+    ]
+  },
+  "stacknest": {
+    "doc": "Voir CLAUDE.md pour les Règles non-négociables et la Definition of Done."
+  }
+}
