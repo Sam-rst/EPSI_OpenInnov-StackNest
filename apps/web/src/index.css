@@ -1,18 +1,74 @@
 @import 'tailwindcss';
 
 /*
- * Charte graphique StackNest (CA3 / STN-10)
- * Configuration en CSS (Tailwind v4) — pas de tailwind.config.ts nécessaire.
+ * Charte graphique StackNest — socle design system runtime (STN-159).
+ * Source de vérité : docs/brand/README.md. Tailwind v4 CSS-first (pas de tailwind.config).
  */
+
+/* Dark mode par classe sur <html> (et non prefers-color-scheme par défaut de Tailwind v4). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
+  /* Couleurs de marque (STN-10) */
   --color-night: #032233;
   --color-cyan: #0d9297;
   --color-yellow: #fea21f;
   --color-error: #c42b1c;
   --color-success: #22c55e;
 
+  /* Nuances cyan (charte §3) */
+  --color-cyan-500: #15979d;
+  --color-cyan-600: #0d9297;
+  --color-cyan-700: #017b86;
+
   --font-sans: 'Inter', 'Roboto', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/*
+ * Tokens sémantiques : variables brutes (clair par défaut, surchargées en .dark)
+ * mappées en utilitaires Tailwind via @theme inline pour réagir au runtime.
+ */
+:root {
+  --surface: #f7f5f0;
+  --surface-elevated: #ffffff;
+  --surface-sunken: #ebe7dc;
+  --border: #d9d4c5;
+  --border-strong: #b9b29d;
+  --text-primary: #032233;
+  --text-secondary: #4a5e6e;
+  --text-muted: #7d8a96;
+  --text-inverse: #fffefa;
+  --code-bg: #f1ede1;
+  --hairline: #e8e2d2;
+}
+
+.dark {
+  --surface: #032233;
+  --surface-elevated: #073047;
+  --surface-sunken: #021824;
+  --border: #0d3e57;
+  --border-strong: #15979d;
+  --text-primary: #fffefa;
+  --text-secondary: #c7d4dd;
+  --text-muted: #94aabb;
+  --text-inverse: #021824;
+  --code-bg: #021824;
+  --hairline: #0a334a;
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+  --color-code-bg: var(--code-bg);
+  --color-hairline: var(--hairline);
 }
 
 html,
@@ -23,9 +79,12 @@ body,
 
 body {
   margin: 0;
+  background-color: var(--surface);
+  color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 code,

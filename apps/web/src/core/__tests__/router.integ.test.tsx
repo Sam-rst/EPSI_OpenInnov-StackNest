@@ -2,14 +2,17 @@ import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { routes } from '../router'
+import { ThemeProvider } from '../theme/ThemeProvider'
 import { AuthProvider } from '../../auth/providers/AuthProvider'
 
 function renderAt(path: string, isAuthenticated = false) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   return render(
-    <AuthProvider value={{ isAuthenticated }}>
-      <RouterProvider router={router} />
-    </AuthProvider>,
+    <ThemeProvider>
+      <AuthProvider value={{ isAuthenticated }}>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </ThemeProvider>,
   )
 }
 
