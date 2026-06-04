@@ -1,0 +1,31 @@
+.stn-mq-track {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  will-change: transform;
+}
+
+.stn-mq-l {
+  animation: marquee-left 42s linear infinite;
+}
+
+.stn-mq-r {
+  animation: marquee-right 48s linear infinite;
+}
+
+.stn-mq-mask {
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+.stn-mq-pause:hover .stn-mq-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stn-mq-l,
+  .stn-mq-r {
+    animation-duration: 0.001ms;
+    animation-iteration-count: 1;
+  }
+}

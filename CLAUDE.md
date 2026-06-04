@@ -54,7 +54,8 @@ Commits must be in **French** and reference the Jira ticket (**STN-XX**, pas `EO
 stacknest/
 ├── apps/
 │   ├── api/          # FastAPI backend
-│   ├── web/          # React + Vite (web app)
+│   ├── web/          # React + Vite (web app) — SEUL front de production
+│   ├── web-mockup/   # Référence design (mockups Yassine) — HORS CI/quality gate
 │   └── worker/       # Worker Terraform
 ├── infra/
 │   ├── docker/       # docker-compose.{yml,dev,test,preview,prod}.yml
@@ -116,6 +117,24 @@ apps/web/src/
 **Ne pas pre-creer les dossiers de features vides** — mais il est legitime de creer `<feature>/pages/PlaceholderPage.tsx` depuis le ticket qui pose le routing (ex: STN-21). Le dossier grossit au fil des tickets feature suivants. Idem cote backend dans `apps/api/app/`.
 
 **Anti-pattern : mettre la logique d'une feature dans `core/`.** L'AuthContext appartient a `auth/`, pas a `core/`. Le core ne contient que le bootstrap du projet.
+
+### Référence design — `apps/web-mockup` (hors quality gate)
+
+`apps/web-mockup/` est une **archive de design vivante** : le travail front prototypé par Yassine
+(branche `mockups`), copié **tel quel** (React 18 / Tailwind 3 / Vite 5, aucune migration). Sert de
+référence visuelle/UX pour redévelopper chaque feature **proprement en TDD strict dans `apps/web`**.
+
+**Règles non-négociables :**
+- ❌ **N'est PAS du code de production.** Ne jamais l'importer depuis `apps/web` ni le merger dedans.
+- ❌ **Hors CI / quality gate par construction** : aucun `package.json` racine (pas de workspaces),
+  les lanes CI ciblent `apps/web`, Sonar exclut `apps/web-mockup/**`. Ne pas l'y rattacher.
+- ✅ **App autonome** : `cd apps/web-mockup && npm install && npm run dev` (Vite, port 5173).
+  Note : `npm run build` (`tsc -b`) échoue en l'état (`@types/node` absent côté mockup) — connu et
+  accepté, on ne « répare » pas le prototype. Le chemin de lancement supporté est `npm run dev`.
+- ✅ **Toute évolution UI réelle** se fait dans `apps/web` ticket par ticket (Clean Archi + TDD),
+  en s'inspirant du mockup. La branche `mockups` reste conservée comme archive d'origine.
+
+Détails : `docs/superpowers/specs/2026-06-04-integration-mockup-reference.md`.
 
 ## Skills
 
