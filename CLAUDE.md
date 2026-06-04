@@ -251,5 +251,7 @@ Script bash → exécution via WSL/Git Bash (Windows natif hors scope).
 
 ## Design System
 
+- **Charte complète (source de vérité)** : `docs/brand/` — charte vivante (`docs/brand/README.md` :
+  palette + tokens clair/sombre, typo, logos, ton), PDF d'origine, logos SVG dans `docs/brand/assets/`.
 - **Fonts** : Inter/Roboto (UI), JetBrains Mono (code)
 - **Colors** : Bleu nuit `#032233`, Cyan `#0d9297`, Jaune `#fea21f`, Error `#c42b1c`, Success `#22c55e`
