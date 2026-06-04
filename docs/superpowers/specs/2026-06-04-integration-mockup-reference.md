@@ -61,7 +61,7 @@ Besoin : conserver ce travail **accessible et lançable** dans `main`, comme ré
 | --- | --- |
 | Pas de workspaces | Aucun `package.json` à la racine du dépôt → aucun outil racine ne traverse `apps/web-mockup` |
 | Lanes CI (`ci.yml`) | `lint/format/typecheck/test/build-web` utilisent `working-directory: apps/web` / `context: apps/web` ; semgrep scanne `apps/web`. Aucun job ne référence `apps/web-mockup` |
-| Sonar (`sonar-project.properties`) | `sonar.sources=apps/api/app,apps/web/src` ; on ajoute en plus `sonar.exclusions=apps/web-mockup/**` (explicite) |
+| Sonar | **Deux modes, deux fichiers.** Scanner CI (`ci-nightly.yml`) → `sonar-project.properties` (`sonar.sources=apps/api/app,apps/web/src` + `sonar.exclusions=apps/web-mockup/**`). **Automatic Analysis** (check « SonarCloud Code Analysis » sur chaque PR) → `.sonarcloud.properties` (qui **ignore** `sonar-project.properties`) ; on y réplique `sonar.exclusions=apps/web-mockup/**`, sinon les hotspots du prototype (ex. `Math.random()` dans `useStreamingLogs.ts`) feraient échouer le quality gate des PR |
 | Docker | `build-stack` ne construit que les images `apps/api` et `apps/web` ; le mockup n'a pas de service Compose |
 
 `secrets-scan` (gitleaks) scanne tout le dépôt, **y compris `apps/web-mockup`** — c'est voulu (on veut

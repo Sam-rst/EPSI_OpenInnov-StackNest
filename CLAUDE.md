@@ -127,7 +127,9 @@ référence visuelle/UX pour redévelopper chaque feature **proprement en TDD st
 **Règles non-négociables :**
 - ❌ **N'est PAS du code de production.** Ne jamais l'importer depuis `apps/web` ni le merger dedans.
 - ❌ **Hors CI / quality gate par construction** : aucun `package.json` racine (pas de workspaces),
-  les lanes CI ciblent `apps/web`, Sonar exclut `apps/web-mockup/**`. Ne pas l'y rattacher.
+  les lanes CI ciblent `apps/web`. Sonar exclut `apps/web-mockup/**` dans les **deux** fichiers de
+  config — `sonar-project.properties` (scanner CI nocturne) **et** `.sonarcloud.properties`
+  (Automatic Analysis, le check « SonarCloud Code Analysis » des PR). Ne pas l'y rattacher.
 - ✅ **App autonome** : `cd apps/web-mockup && npm install && npm run dev` (Vite, port 5173).
   Note : `npm run build` (`tsc -b`) échoue en l'état (`@types/node` absent côté mockup) — connu et
   accepté, on ne « répare » pas le prototype. Le chemin de lancement supporté est `npm run dev`.
