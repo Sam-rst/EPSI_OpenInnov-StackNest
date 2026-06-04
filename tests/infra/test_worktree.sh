@@ -38,6 +38,10 @@ TEST_WT_DIR="${ROOT_DIR}/.worktrees/${TEST_SLUG}"
 TEST_BRANCHES=("${TEST_BRANCH}" "${TEST_BRANCH}-b")
 
 export WORKTREE_SKIP_INSTALL=1
+# Base les worktrees jetables sur HEAD (toujours présent) plutôt que sur `main` :
+# en CI les PR sont checkout en detached HEAD sans branche `main` locale, donc
+# le défaut `main` du script ferait échouer `git worktree add` (CA1).
+export WORKTREE_BASE_REF="HEAD"
 
 cleanup() {
     blue "[cleanup] suppression worktrees + branches de test"
