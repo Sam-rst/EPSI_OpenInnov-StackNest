@@ -1,12 +1,14 @@
+import { LogoLockup } from '../../shared/components/Logo'
+import { ThemeToggle } from '../../shared/components/ThemeToggle'
+
 interface TopBarProps {
   onMenuClick: () => void
   menuExpanded: boolean
 }
 
 /**
- * Stub visuel de la TopBar — la version complete (logo, nav, status) arrive
- * avec STN-23. Ici on ne garde que ce dont l'AppLayout a besoin : le bouton
- * burger qui commande la Sidebar en mobile.
+ * TopBar du shell applicatif : burger (mobile) + logo de marque + bascule de
+ * thème. La nav complète (recherche, statut, profil) arrive avec STN-23.
  */
 export function TopBar({ onMenuClick, menuExpanded }: TopBarProps) {
   return (
@@ -33,7 +35,10 @@ export function TopBar({ onMenuClick, menuExpanded }: TopBarProps) {
           <path d="M3 6h14M3 10h14M3 14h14" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </button>
-      <span className="font-semibold tracking-tight">StackNest</span>
+      <LogoLockup size={28} variant="mono-white" />
+      <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle />
+      </div>
     </header>
   )
 }
