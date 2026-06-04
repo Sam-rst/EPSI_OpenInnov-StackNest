@@ -203,6 +203,27 @@ Les 💡 Suggestions résiduelles et items de dette non-bloquants restent tracé
 - Version centralized in `version.json`
 - `GET /version` endpoint returns version + commit + env + deploy date
 
+## Worktrees multi-agents (dev parallèle)
+
+Plusieurs agents/devs peuvent travailler en parallèle sur le même dépôt via des git worktrees
+isolés, chacun avec **sa propre stack Docker** (nom de projet Compose unique + ports décalés),
+sans collision. Outillé par `scripts/worktree.sh` (skill `/worktree`).
+
+- **Slot** : chaque worktree obtient un slot ≥ 1 ; slot 0 = dépôt principal (ports par défaut).
+- **Ports** : `port = base + slot×100` sur 7 services (API, UI, Postgres, Redis, Mailhog SMTP/UI, Ollama).
+- **Projet Docker** : `stacknest-wt<slot>`, exporté via `COMPOSE_PROJECT_NAME` dans le `.env` du worktree.
+- **Registre** : `.worktrees/registry.json` (gitignored).
+
+```bash
+scripts/worktree.sh new feature/STN-XX-slug   # crée le worktree (slot + .env + deps)
+scripts/worktree.sh list                       # liste les worktrees
+scripts/worktree.sh ports feature/STN-XX-slug  # affiche les 7 ports
+scripts/worktree.sh rm feature/STN-XX-slug     # supprime + libère le slot
+```
+
+Détails : `docs/superpowers/specs/2026-06-04-worktree-convention.md` et skill `/worktree`.
+Script bash → exécution via WSL/Git Bash (Windows natif hors scope).
+
 ## Key Documents
 
 - **Spec technique** : `docs/superpowers/specs/2026-04-14-stacknest-architecture-design.md`

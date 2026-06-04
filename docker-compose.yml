@@ -2,7 +2,10 @@
 # Les overrides (docker-compose.dev.yml, preview, prod) ajustent volumes,
 # commandes et ports exposes sans dupliquer la topologie.
 
-name: stacknest
+# Nom de projet variabilisé pour isoler les stacks multi-worktrees (STN-156).
+# Chaque worktree exporte COMPOSE_PROJECT_NAME via son .env (généré par
+# scripts/worktree.sh). Défaut = stacknest (dépôt principal / slot 0).
+name: ${COMPOSE_PROJECT_NAME:-stacknest}
 
 networks:
   stacknest:
