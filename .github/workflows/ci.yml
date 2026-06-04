@@ -132,6 +132,13 @@ jobs:
   # ═══════════════════════════════════════════════════════════
   # Lane WEB — apps/web (Node 22, Vite, React)
   # ═══════════════════════════════════════════════════════════
+  # NB : la lane cible exclusivement `apps/web` (working-directory /
+  # context). `apps/web-mockup/` (référence design issue de la branche
+  # `mockups`, STN-157) est volontairement HORS quality gate : pas de
+  # workspaces root, aucun job ne le référence. C'est une archive de
+  # design vivante, non production. Chaque feature qu'elle illustre est
+  # redéveloppée en TDD strict dans `apps/web`. Voir
+  # docs/superpowers/specs/2026-06-04-integration-mockup-reference.md.
 
   lint-web:
     name: lint-web
