@@ -1,9 +1,9 @@
 import { Icon } from '../../../shared/components/ui'
 
 interface WorkspaceSwitcherProps {
-  /** Nom de l'espace de travail (ex. « StackNest Lab »). */
+  /** Nom de l'espace de travail (ex. « StackNest »). */
   name: string
-  /** Plan de facturation affiché (ex. « Team »). */
+  /** Plan affiché (ex. « local »). */
   plan: string
   /** Initiales de la pastille (ex. « SN »). */
   initials: string

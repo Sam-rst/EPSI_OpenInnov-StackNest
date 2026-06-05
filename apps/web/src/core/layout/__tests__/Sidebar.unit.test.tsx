@@ -33,11 +33,14 @@ describe('Sidebar', () => {
     )
   })
 
-  it('compose en-tête, navigation, espace de travail et carte de coût', () => {
+  it('compose en-tête, navigation, espace de travail neutre et carte de coût', () => {
     renderSidebar()
 
-    expect(screen.getByText('StackNest')).toBeInTheDocument()
-    expect(screen.getByText('StackNest Lab')).toBeInTheDocument()
+    // Marque (en-tête) + espace de travail neutre affichent « StackNest » ; aucun
+    // workspace fictif (« StackNest Lab ») ni plan facturé (« Team ») n'est rendu.
+    expect(screen.getAllByText('StackNest').length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('StackNest Lab')).toBeNull()
+    expect(screen.queryByText(/plan Team/i)).toBeNull()
     expect(screen.getByText('Coût ce mois')).toBeInTheDocument()
     expect(screen.getAllByRole('link')).toHaveLength(6)
   })

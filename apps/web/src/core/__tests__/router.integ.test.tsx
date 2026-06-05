@@ -32,7 +32,7 @@ describe('Router — CA1 : routes accessibles selon auth', () => {
   })
 
   const protectedRoutes: [string, RegExp][] = [
-    ['/dashboard', /dashboard/i],
+    ['/dashboard', /tableau de bord/i],
     ['/catalog', /catalogue/i],
     ['/deployments', /déploiements/i],
     ['/deployments/config', /configurer/i],
@@ -74,7 +74,7 @@ describe('Router — CA2 : redirection vers /login pour routes protégées', () 
 
   it('redirige / vers /dashboard quand authentifié', () => {
     renderAt('/', true)
-    expectPageHeadingInMain(/dashboard/i)
+    expectPageHeadingInMain(/tableau de bord/i)
   })
 })
 

@@ -4,16 +4,16 @@ import { describe, expect, it } from 'vitest'
 import { useMonthlyCost } from '../useMonthlyCost'
 
 describe('useMonthlyCost', () => {
-  it('renvoie le coût de démo du mois (487 €)', () => {
+  it('renvoie un coût honnête à zéro (aucun montant inventé)', () => {
     const { result } = renderHook(() => useMonthlyCost())
 
-    expect(result.current.amount).toBe(487)
+    expect(result.current.amount).toBe(0)
   })
 
-  it('expose la variation et la part de budget consommée', () => {
+  it('expose une variation et une part de budget à zéro tant qu’il n’y a pas de données', () => {
     const { result } = renderHook(() => useMonthlyCost())
 
-    expect(result.current.changePercent).toBe(8)
-    expect(result.current.budgetPercent).toBe(64)
+    expect(result.current.changePercent).toBe(0)
+    expect(result.current.budgetPercent).toBe(0)
   })
 })
