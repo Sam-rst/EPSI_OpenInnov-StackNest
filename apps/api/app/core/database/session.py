@@ -12,7 +12,7 @@ parametre (defaut : le sessionmaker global memoize) pour permettre aux
 tests d'injecter un faux sessionmaker sans toucher a une vraie base.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -21,7 +21,7 @@ from app.core.database.engine import get_sessionmaker
 
 async def get_session(
     session_factory: async_sessionmaker[AsyncSession] | None = None,
-) -> AsyncIterator[AsyncSession]:
+) -> AsyncGenerator[AsyncSession]:
     """Yield une `AsyncSession` avec gestion commit/rollback/close.
 
     Le `close()` final est assure par le `async with` (le sessionmaker ferme

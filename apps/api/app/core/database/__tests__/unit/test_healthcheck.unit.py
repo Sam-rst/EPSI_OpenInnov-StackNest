@@ -6,8 +6,9 @@ check_database execute `SELECT 1` sur une session et :
   (politique try/except sur infra uniquement, cause preservee via `from`).
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from app.core.database.exceptions.database_unavailable_exception import (
     DatabaseUnavailableException,

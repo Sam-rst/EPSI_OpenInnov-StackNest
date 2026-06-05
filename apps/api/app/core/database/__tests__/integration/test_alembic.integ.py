@@ -15,7 +15,6 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
@@ -23,6 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import Mapped, mapped_column
 from testcontainers.postgres import PostgresContainer
 
+from alembic import command
 from app.core.database.base import Base
 
 # Racine apps/api (4 niveaux au-dessus de ce fichier de test :
@@ -43,9 +43,7 @@ def _wait_for_port(container: PostgresContainer, port: int, timeout: float = 60.
 
 @pytest.fixture(scope="module")
 def postgres_container() -> Iterator[PostgresContainer]:
-    container = PostgresContainer(
-        "postgres:16-alpine", driver="asyncpg"
-    )
+    container = PostgresContainer("postgres:16-alpine", driver="asyncpg")
     container.start()
     try:
         _wait_for_port(container, 5432)
@@ -73,9 +71,7 @@ class TestAlembicUpgrade:
         engine = create_async_engine(url)
         async with engine.connect() as connection:
             result = await connection.execute(
-                text(
-                    "SELECT to_regclass('public.alembic_version') IS NOT NULL"
-                )
+                text("SELECT to_regclass('public.alembic_version') IS NOT NULL")
             )
             assert result.scalar() is True
         await engine.dispose()
@@ -131,4 +127,4 @@ class TestAlembicAutogenerate:
             # La naming convention de Base s'applique : PK nommee via op.f().
             assert "pk_stn160_autogen_probe" in content
         finally:
-            Base.metadata.remove(_AutogenProbe.__table__)
+            Base.metadata.remove(_AutogenProbe.__table__)  # type: ignore[arg-type]

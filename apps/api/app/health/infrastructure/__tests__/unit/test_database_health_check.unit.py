@@ -55,9 +55,7 @@ class TestDatabaseHealthCheck:
 
     async def test_erreur_infra_renvoie_down_sans_propager(self) -> None:
         session = AsyncMock()
-        session.execute = AsyncMock(
-            side_effect=DatabaseUnavailableException("connexion refusee")
-        )
+        session.execute = AsyncMock(side_effect=DatabaseUnavailableException("connexion refusee"))
         check = DatabaseHealthCheck(session_factory=_sessionmaker_yielding(session))
 
         result = await check.check()

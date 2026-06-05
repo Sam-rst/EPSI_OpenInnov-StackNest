@@ -15,7 +15,5 @@ class TestDeclarativeBase:
         assert convention["ix"] == "ix_%(column_0_label)s"
         assert convention["uq"] == "uq_%(table_name)s_%(column_0_name)s"
         assert convention["ck"] == "ck_%(table_name)s_%(constraint_name)s"
-        assert convention["fk"] == (
-            "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s"
-        )
+        assert convention["fk"] == ("fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s")
         assert convention["pk"] == "pk_%(table_name)s"

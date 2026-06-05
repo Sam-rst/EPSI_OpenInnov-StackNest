@@ -5,7 +5,7 @@ sans toucher a une vraie base : commit sur succes, rollback sur exception,
 close systematique (finally).
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import AbstractAsyncContextManager, suppress
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -32,7 +32,7 @@ def _sessionmaker_yielding(session: AsyncMock) -> MagicMock:
     return maker
 
 
-async def _drain(iterator: AsyncIterator[Any]) -> AsyncMock:
+async def _drain(iterator: AsyncGenerator[Any]) -> AsyncMock:
     return await anext(iterator)
 
 

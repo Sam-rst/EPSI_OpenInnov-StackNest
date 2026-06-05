@@ -11,10 +11,10 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
+from alembic import context
 from app.core.config import get_settings
 from app.core.database.base import Base
 
@@ -98,7 +98,7 @@ def _run_in_dedicated_loop() -> None:
     def _worker() -> None:
         try:
             asyncio.run(_run_async_migrations())
-        except BaseException as err:  # noqa: BLE001 — remonte fidelement au thread parent
+        except BaseException as err:
             error.append(err)
 
     thread = Thread(target=_worker)
