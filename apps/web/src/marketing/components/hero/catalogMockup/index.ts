@@ -1,0 +1,1 @@
+export { CatalogMockup } from './CatalogMockup'
