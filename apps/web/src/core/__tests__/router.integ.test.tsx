@@ -35,7 +35,10 @@ describe('Router — CA1 : routes accessibles selon auth', () => {
     ['/dashboard', /dashboard/i],
     ['/catalog', /catalogue/i],
     ['/deployments', /déploiements/i],
+    ['/deployments/config', /configurer/i],
     ['/chat', /chat/i],
+    ['/team', /équipe/i],
+    ['/settings', /paramètres/i],
   ]
 
   it.each(protectedRoutes)(
@@ -49,7 +52,15 @@ describe('Router — CA1 : routes accessibles selon auth', () => {
 })
 
 describe('Router — CA2 : redirection vers /login pour routes protégées', () => {
-  const protectedPaths = ['/dashboard', '/catalog', '/deployments', '/chat']
+  const protectedPaths = [
+    '/dashboard',
+    '/catalog',
+    '/deployments',
+    '/deployments/config',
+    '/chat',
+    '/team',
+    '/settings',
+  ]
 
   it.each(protectedPaths)('redirige %s vers /login quand non authentifié', (path) => {
     renderAt(path, false)

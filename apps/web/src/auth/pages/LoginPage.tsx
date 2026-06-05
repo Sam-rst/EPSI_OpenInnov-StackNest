@@ -1,6 +1,6 @@
 export function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
+    <main className="flex flex-1 items-center justify-center">
       <div className="w-full max-w-sm space-y-4 p-8">
         <h1 className="text-2xl font-semibold">Connexion</h1>
         <p className="text-sm text-gray-600">

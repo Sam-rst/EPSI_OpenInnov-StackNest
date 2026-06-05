@@ -9,10 +9,12 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <EnvironmentBanner environment={import.meta.env.VITE_ENVIRONMENT} />
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
+        <div className="flex h-dvh flex-col overflow-hidden">
+          <EnvironmentBanner environment={import.meta.env.VITE_ENVIRONMENT} />
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </div>
       </ThemeProvider>
     </ErrorBoundary>
   )
