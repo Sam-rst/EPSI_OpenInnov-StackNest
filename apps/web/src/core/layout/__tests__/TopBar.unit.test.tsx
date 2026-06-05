@@ -47,11 +47,13 @@ describe('TopBar', () => {
     expect(screen.getByRole('button', { name: /basculer la navigation/i })).toBeInTheDocument()
   })
 
-  it('expose la recherche, les actions et le bloc utilisateur', () => {
+  it('expose la recherche, les actions et le bloc utilisateur neutre', () => {
     renderTopBar()
 
     expect(screen.getByPlaceholderText(/rechercher/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /thème (clair|sombre)/i })).toBeInTheDocument()
-    expect(screen.getByText('John Doe')).toBeInTheDocument()
+    // Libellé neutre/anonyme : aucune identité fictive (« John Doe ») rendue.
+    expect(screen.getByText('Utilisateur')).toBeInTheDocument()
+    expect(screen.queryByText('John Doe')).toBeNull()
   })
 })
