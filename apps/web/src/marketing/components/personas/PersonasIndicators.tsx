@@ -1,7 +1,7 @@
 import type { Persona } from '../../data/personas.data'
 
 interface PersonasIndicatorsProps {
-  personas: ReadonlyArray<Persona>
+  personas: readonly Persona[]
   active: number
   onSelect: (index: number) => void
 }

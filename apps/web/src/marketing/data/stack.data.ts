@@ -3,7 +3,7 @@ export interface StackItem {
   icon: string
 }
 
-export const STACK_TOP: ReadonlyArray<StackItem> = [
+export const STACK_TOP: readonly StackItem[] = [
   { name: 'Terraform', icon: 'mountain' },
   { name: 'Docker', icon: 'box' },
   { name: 'FastAPI', icon: 'zap' },
@@ -16,7 +16,7 @@ export const STACK_TOP: ReadonlyArray<StackItem> = [
   { name: 'structlog', icon: 'list' },
 ]
 
-export const STACK_BOTTOM: ReadonlyArray<StackItem> = [
+export const STACK_BOTTOM: readonly StackItem[] = [
   { name: 'React 19', icon: 'atom' },
   { name: 'Vite', icon: 'zap' },
   { name: 'TypeScript', icon: 'file-code-2' },

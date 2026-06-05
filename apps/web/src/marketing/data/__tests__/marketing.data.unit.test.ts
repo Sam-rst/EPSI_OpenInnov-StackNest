@@ -45,7 +45,7 @@ describe('Marketing data — structure', () => {
 describe('Marketing data — honnêteté (CA5)', () => {
   it("n'invente aucune métrique sociale chiffrée (ex. nombre d'entreprises / déploiements)", () => {
     const corpus = JSON.stringify({ FEATURES, HOW_STEPS, PERSONAS, STACK_TOP, STACK_BOTTOM })
-    expect(corpus).not.toMatch(/\d[\d\s .,]*\s*(entreprises|clients|utilisateurs|déploiements)/i)
+    expect(corpus).not.toMatch(/\d[\d\s.,]*\s*(entreprises|clients|utilisateurs|déploiements)/i)
     expect(corpus).not.toMatch(/utilisé par/i)
   })
 

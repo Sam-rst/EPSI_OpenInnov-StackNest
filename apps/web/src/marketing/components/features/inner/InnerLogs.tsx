@@ -8,7 +8,12 @@ export function InnerLogs() {
     <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         {STEPS.map((label, index) => (
-          <InnerLogsStep key={label} label={label} index={index} isLast={index === STEPS.length - 1} />
+          <InnerLogsStep
+            key={label}
+            label={label}
+            index={index}
+            isLast={index === STEPS.length - 1}
+          />
         ))}
       </div>
       <div className="bg-code-bg border-border text-text-secondary space-y-0.5 rounded-md border p-2.5 font-mono text-[10.5px]">

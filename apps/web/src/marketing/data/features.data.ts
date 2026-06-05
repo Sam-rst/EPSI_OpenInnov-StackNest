@@ -6,10 +6,11 @@ export interface Feature {
   kind: FeatureKind
 }
 
-export const FEATURES: ReadonlyArray<Feature> = [
+export const FEATURES: readonly Feature[] = [
   {
     title: 'Catalogue de ressources',
-    description: 'Des ressources prêtes à déployer, du Postgres au Vault, du LLM local au reverse proxy.',
+    description:
+      'Des ressources prêtes à déployer, du Postgres au Vault, du LLM local au reverse proxy.',
     kind: 'catalog',
   },
   {

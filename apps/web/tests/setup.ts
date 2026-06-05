@@ -28,13 +28,19 @@ if (typeof window.matchMedia !== 'function') {
 // stub no-op qui ne déclenche jamais d'intersection (suffisant pour les tests
 // de rendu — l'élément reste dans son état initial).
 if (typeof globalThis.IntersectionObserver === 'undefined') {
-  class IntersectionObserverStub implements IntersectionObserver {
+  class IntersectionObserverStub {
     readonly root: Element | null = null
     readonly rootMargin: string = ''
-    readonly thresholds: ReadonlyArray<number> = []
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
+    readonly thresholds: readonly number[] = []
+    observe(): void {
+      // no-op : le stub ne déclenche jamais d'intersection
+    }
+    unobserve(): void {
+      // no-op
+    }
+    disconnect(): void {
+      // no-op
+    }
     takeRecords(): IntersectionObserverEntry[] {
       return []
     }

@@ -6,7 +6,7 @@ import { PersonaMockup } from './PersonaMockup'
 import { PersonasProgressBar } from './PersonasProgressBar'
 
 interface PersonasStageProps {
-  personas: ReadonlyArray<Persona>
+  personas: readonly Persona[]
   active: number
   paused: boolean
   durationMs: number

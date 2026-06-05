@@ -12,7 +12,9 @@ import { useSmoothAnchorScroll } from '../hooks/useSmoothAnchorScroll'
 /** Landing marketing publique : enchaîne les sections et route les CTA vers la connexion. */
 export function LandingPage() {
   const navigate = useNavigate()
-  const handleCta = (): void => navigate('/login')
+  const handleCta = (): void => {
+    void navigate('/login')
+  }
   useSmoothAnchorScroll()
 
   return (

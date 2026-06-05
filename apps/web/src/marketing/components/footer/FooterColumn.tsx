@@ -8,7 +8,7 @@ interface FooterColumnProps {
 export function FooterColumn({ column }: FooterColumnProps) {
   return (
     <div>
-      <div className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-[#94aabb]">
+      <div className="mb-4 font-mono text-[11px] tracking-[0.14em] text-[#94aabb] uppercase">
         {column.title}
       </div>
       <ul className="space-y-2.5">

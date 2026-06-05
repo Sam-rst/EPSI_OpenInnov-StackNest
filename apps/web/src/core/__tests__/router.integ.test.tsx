@@ -66,7 +66,6 @@ describe('Router — CA2 : redirection vers /login pour routes protégées', () 
     renderAt(path, false)
     expectLoginRendered()
   })
-
 })
 
 describe('Router — / : landing marketing publique (STN-162)', () => {

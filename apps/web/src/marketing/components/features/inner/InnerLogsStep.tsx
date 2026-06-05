@@ -33,7 +33,7 @@ export function InnerLogsStep({ label, index, isLast }: InnerLogsStepProps) {
         </div>
         <div className="text-text-secondary text-[10px] font-medium">{label}</div>
       </div>
-      {!isLast && <div className="bg-border mt-[-14px] mx-1 h-px flex-1" />}
+      {!isLast && <div className="bg-border mx-1 mt-[-14px] h-px flex-1" />}
     </div>
   )
 }

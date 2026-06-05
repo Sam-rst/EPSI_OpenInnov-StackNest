@@ -13,7 +13,7 @@ export interface Persona {
   name: string
   headline: string
   story: string
-  bullets: ReadonlyArray<PersonaBullet>
+  bullets: readonly PersonaBullet[]
   mockup: PersonaMockupKey
 }
 
@@ -21,7 +21,7 @@ export interface Persona {
  * Personas illustratifs (CA5) — usages représentatifs, pas des clients réels.
  * Aucune métrique sociale chiffrée ni témoignage nominatif.
  */
-export const PERSONAS: ReadonlyArray<Persona> = [
+export const PERSONAS: readonly Persona[] = [
   {
     tag: 'Persona 01',
     icon: 'graduation-cap',

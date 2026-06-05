@@ -29,19 +29,33 @@ function renderLanding(initialPath = '/') {
   return router
 }
 
-describe('LandingPage', () => {
-  it('compose les sections marketing de la landing', () => {
-    renderLanding()
-    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
-    expect(screen.getByText(/sous le capot, du solide/i)).toBeInTheDocument()
-    expect(screen.getByText(/démarre ton premier déploiement/i)).toBeInTheDocument()
-    expect(screen.getByRole('contentinfo')).toBeInTheDocument()
-  })
+// La landing monte ~7 sections riches en composants framer-motion : son rendu
+// synchrone peut dépasser le timeout par défaut (5 s) sur un worker chargé en
+// exécution parallèle. On laisse une marge confortable, le test reste rapide
+// quand la machine n'est pas saturée.
+const HEAVY_RENDER_TIMEOUT_MS = 20_000
 
-  it('redirige vers /login au clic sur un CTA', async () => {
-    const user = userEvent.setup()
-    const router = renderLanding()
-    await user.click(screen.getByRole('button', { name: /voir une démo/i }))
-    expect(router.state.location.pathname).toBe('/login')
-  })
+describe('LandingPage', () => {
+  it(
+    'compose les sections marketing de la landing',
+    () => {
+      renderLanding()
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
+      expect(screen.getByText(/sous le capot, du solide/i)).toBeInTheDocument()
+      expect(screen.getByText(/démarre ton premier déploiement/i)).toBeInTheDocument()
+      expect(screen.getByRole('contentinfo')).toBeInTheDocument()
+    },
+    HEAVY_RENDER_TIMEOUT_MS,
+  )
+
+  it(
+    'redirige vers /login au clic sur un CTA',
+    async () => {
+      const user = userEvent.setup()
+      const router = renderLanding()
+      await user.click(screen.getByRole('button', { name: /voir une démo/i }))
+      expect(router.state.location.pathname).toBe('/login')
+    },
+    HEAVY_RENDER_TIMEOUT_MS,
+  )
 })

@@ -5,7 +5,7 @@ export interface HowStep {
   icon: string
 }
 
-export const HOW_STEPS: ReadonlyArray<HowStep> = [
+export const HOW_STEPS: readonly HowStep[] = [
   {
     number: '01',
     title: 'Choisis dans le catalogue',

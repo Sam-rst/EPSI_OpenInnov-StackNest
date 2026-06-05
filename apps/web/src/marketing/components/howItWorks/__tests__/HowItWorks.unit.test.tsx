@@ -8,7 +8,9 @@ describe('HowItWorks', () => {
     const { container } = render(<HowItWorks />)
 
     expect(container.querySelector('#how')).not.toBeNull()
-    expect(screen.getByRole('heading', { name: /de l'idée à l'infra en 3 étapes/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /de l'idée à l'infra en 3 étapes/i }),
+    ).toBeInTheDocument()
   })
 
   it('liste les 3 étapes numérotées avec leur titre', () => {
