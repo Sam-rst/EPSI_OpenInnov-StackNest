@@ -26,6 +26,25 @@ describe('AppLayout', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument()
   })
 
+  it('habille le shell avec les tokens de surface (suit le thème, aucune couleur en dur)', () => {
+    const { container } = renderWithRoute()
+
+    const shell = container.firstChild as HTMLElement
+    expect(shell).toHaveClass('bg-surface')
+    expect(shell).toHaveClass('text-text-primary')
+    expect(shell).not.toHaveClass('bg-white')
+    expect(shell).not.toHaveClass('text-night')
+  })
+
+  it('habille la sidebar avec les tokens de surface (suit le thème)', () => {
+    renderWithRoute()
+
+    const nav = screen.getByRole('navigation')
+    expect(nav).toHaveClass('bg-surface-elevated')
+    expect(nav).toHaveClass('border-border')
+    expect(nav).not.toHaveClass('bg-night/5')
+  })
+
   it('rend une Sidebar accessible (role navigation)', () => {
     renderWithRoute()
 

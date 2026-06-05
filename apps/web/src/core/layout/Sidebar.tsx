@@ -1,4 +1,10 @@
-import { Link } from 'react-router-dom'
+import { useMonthlyCost } from '../../dashboard/hooks/useMonthlyCost'
+import { useCurrentWorkspace } from '../../workspace/hooks/useCurrentWorkspace'
+import { cn } from '../../shared/lib/cn'
+import { SidebarCostCard } from './sidebar/SidebarCostCard'
+import { SidebarHeader } from './sidebar/SidebarHeader'
+import { SidebarNav } from './sidebar/SidebarNav'
+import { WorkspaceSwitcher } from './sidebar/WorkspaceSwitcher'
 
 interface SidebarProps {
   isOpen: boolean
@@ -6,20 +12,26 @@ interface SidebarProps {
 }
 
 /**
- * Stub visuel de la Sidebar — les items de navigation reels arrivent dans un
- * ticket dedie. Ici on gere surtout la bascule desktop (toujours visible) /
- * mobile (drawer togglable, controle par TopBar burger).
+ * Navigation latérale du shell : en-tête de marque, sélecteur d'espace, items
+ * groupés (Plateforme / Administration) et carte de coût. Colonne pleine hauteur
+ * sur desktop ; drawer glissant contrôlé par le burger de la TopBar sous 768px.
+ *
+ * Le `<nav>` racine est l'unique landmark de navigation du shell (les sections
+ * internes sont de simples groupes), ce qui garde l'arbre a11y lisible.
  */
 export function Sidebar({ isOpen, onDismiss }: SidebarProps) {
+  const workspace = useCurrentWorkspace()
+  const cost = useMonthlyCost()
+
   return (
     <>
-      {/* Overlay mobile derriere le drawer — desactive au-dela de 768px via md:hidden */}
+      {/* Overlay mobile derrière le drawer — masqué au-delà de 768px. */}
       {isOpen && (
         <button
           type="button"
           aria-label="Fermer la navigation"
           onClick={onDismiss}
-          className="fixed inset-0 top-14 z-30 bg-black/30 md:hidden"
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
         />
       )}
       <nav
@@ -27,19 +39,23 @@ export function Sidebar({ isOpen, onDismiss }: SidebarProps) {
         role="navigation"
         aria-label="Navigation principale"
         data-open={isOpen}
-        className="bg-night/5 border-night/10 fixed top-14 bottom-0 left-0 z-40 w-60 -translate-x-full border-r transition-transform duration-200 ease-out data-[open=true]:translate-x-0 md:static md:top-0 md:translate-x-0"
+        className={cn(
+          'bg-surface-elevated border-border fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col border-r transition-transform duration-200 ease-out',
+          'data-[open=true]:translate-x-0 md:static md:translate-x-0',
+        )}
       >
-        <ul className="flex flex-col gap-1 p-4 text-sm">
-          <li>
-            <Link
-              to="/"
-              onClick={onDismiss}
-              className="hover:bg-night/10 block rounded-md px-3 py-2 font-medium"
-            >
-              Accueil
-            </Link>
-          </li>
-        </ul>
+        <SidebarHeader />
+        <WorkspaceSwitcher
+          name={workspace.name}
+          plan={workspace.plan}
+          initials={workspace.initials}
+        />
+        <SidebarNav onNavigate={onDismiss} />
+        <SidebarCostCard
+          amount={cost.amount}
+          changePercent={cost.changePercent}
+          budgetPercent={cost.budgetPercent}
+        />
       </nav>
     </>
   )
