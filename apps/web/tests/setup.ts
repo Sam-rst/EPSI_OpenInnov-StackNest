@@ -23,6 +23,32 @@ if (typeof window.matchMedia !== 'function') {
   window.matchMedia = createMatchMedia
 }
 
+// jsdom n'implémente pas IntersectionObserver. Les animations « whileInView »
+// de framer-motion (landing marketing) l'attendent au montage : on fournit un
+// stub no-op qui ne déclenche jamais d'intersection (suffisant pour les tests
+// de rendu — l'élément reste dans son état initial).
+if (typeof globalThis.IntersectionObserver === 'undefined') {
+  class IntersectionObserverStub {
+    readonly root: Element | null = null
+    readonly rootMargin: string = ''
+    readonly thresholds: readonly number[] = []
+    observe(): void {
+      // no-op : le stub ne déclenche jamais d'intersection
+    }
+    unobserve(): void {
+      // no-op
+    }
+    disconnect(): void {
+      // no-op
+    }
+    takeRecords(): IntersectionObserverEntry[] {
+      return []
+    }
+  }
+  globalThis.IntersectionObserver =
+    IntersectionObserverStub as unknown as typeof IntersectionObserver
+}
+
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' })
 })

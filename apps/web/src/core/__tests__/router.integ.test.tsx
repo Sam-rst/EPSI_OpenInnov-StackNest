@@ -66,15 +66,26 @@ describe('Router — CA2 : redirection vers /login pour routes protégées', () 
     renderAt(path, false)
     expectLoginRendered()
   })
+})
 
-  it('redirige / vers /login quand non authentifié (via /dashboard)', () => {
+describe('Router — / : landing marketing publique (STN-162)', () => {
+  it('rend la landing marketing sur / sans authentification', () => {
     renderAt('/', false)
-    expectLoginRendered()
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
+    expect(screen.getByText(/sous le capot, du solide/i)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /connexion/i })).not.toBeInTheDocument()
   })
 
-  it('redirige / vers /dashboard quand authentifié', () => {
+  it('rend la landing marketing sur / même authentifié (pas de redirection dashboard)', () => {
     renderAt('/', true)
-    expectPageHeadingInMain(/tableau de bord/i)
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
+    expect(screen.getByText(/démarre ton premier déploiement/i)).toBeInTheDocument()
+  })
+
+  it('ne monte pas le shell applicatif (Sidebar/TopBar) sur la landing', () => {
+    renderAt('/', false)
+    expect(screen.queryByRole('main')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: /principale/i })).not.toBeInTheDocument()
   })
 })
 
