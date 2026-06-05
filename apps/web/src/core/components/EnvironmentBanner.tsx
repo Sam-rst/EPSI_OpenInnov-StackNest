@@ -34,7 +34,7 @@ export function EnvironmentBanner({ environment }: EnvironmentBannerProps) {
   return (
     <div
       role="status"
-      className={`fixed top-0 right-0 left-0 z-50 py-1 text-center text-xs font-semibold tracking-wider uppercase ${className}`}
+      className={`w-full shrink-0 py-1 text-center text-xs font-semibold tracking-wider uppercase ${className}`}
     >
       Environnement : {label}
     </div>

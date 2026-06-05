@@ -44,4 +44,15 @@ describe('EnvironmentBanner', () => {
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
+
+  it("s'affiche en flux normal pleine largeur (au-dessus du header, sans superposition)", () => {
+    render(<EnvironmentBanner environment="dev" />)
+
+    const banner = screen.getByRole('status')
+    // Plus de position fixed : la bande pousse le contenu vers le bas au lieu
+    // de flotter par-dessus le header.
+    expect(banner).not.toHaveClass('fixed')
+    expect(banner).toHaveClass('w-full')
+    expect(banner).toHaveClass('shrink-0')
+  })
 })

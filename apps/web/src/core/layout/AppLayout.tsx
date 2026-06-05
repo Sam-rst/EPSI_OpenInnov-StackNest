@@ -6,11 +6,11 @@ import { TopBar } from './TopBar'
 import { useSidebarToggle } from './useSidebarToggle'
 
 /**
- * Shell qui assemble TopBar + Sidebar + zone main + Outlet. Utilise pour
- * toutes les routes applicatives. La Sidebar passe en drawer sous 768px,
- * commande par le burger de la TopBar. L'Outlet est isole dans une
- * ErrorBoundary + Suspense pour ne pas casser la navigation en cas d'erreur
- * ou de chargement async.
+ * Shell applicatif : Sidebar pleine hauteur à gauche + colonne de contenu
+ * (TopBar puis zone main scrollable) à droite. Utilisé pour toutes les routes
+ * applicatives. La Sidebar passe en drawer sous 768px, commandé par le burger
+ * de la TopBar. L'Outlet est isolé dans une ErrorBoundary + Suspense pour ne
+ * pas casser la navigation en cas d'erreur ou de chargement async.
  *
  * Le drawer se ferme automatiquement :
  *   - sur changement de route (UX mobile : cliquer un lien referme le menu)
@@ -44,11 +44,11 @@ export function AppLayout() {
   }, [isOpen, close])
 
   return (
-    <div className="text-night flex min-h-screen flex-col bg-white">
-      <TopBar onMenuClick={toggle} menuExpanded={isOpen} />
-      <div className="flex flex-1">
-        <Sidebar isOpen={isOpen} onDismiss={close} />
-        <main role="main" className="flex-1 px-6 py-8">
+    <div className="bg-surface text-text-primary flex min-h-0 flex-1 overflow-hidden">
+      <Sidebar isOpen={isOpen} onDismiss={close} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar onMenuClick={toggle} menuExpanded={isOpen} />
+        <main role="main" className="flex-1 overflow-y-auto px-6 py-8">
           <ErrorBoundary>
             <Suspense
               fallback={
@@ -56,7 +56,7 @@ export function AppLayout() {
                   role="status"
                   aria-busy="true"
                   aria-live="polite"
-                  className="bg-night/10 h-32 animate-pulse rounded-md"
+                  className="bg-surface-sunken h-32 animate-pulse rounded-md"
                 />
               }
             >

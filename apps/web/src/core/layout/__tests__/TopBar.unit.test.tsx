@@ -1,40 +1,57 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
+
 import { ThemeProvider } from '../../theme/ThemeProvider'
 import { TopBar } from '../TopBar'
 
-function renderTopBar() {
+function renderTopBar(path = '/catalog') {
   return render(
     <ThemeProvider>
-      <TopBar onMenuClick={vi.fn()} menuExpanded={false} />
+      <MemoryRouter initialEntries={[path]}>
+        <TopBar onMenuClick={vi.fn()} menuExpanded={false} />
+      </MemoryRouter>
     </ThemeProvider>,
   )
 }
 
 describe('TopBar', () => {
-  it('affiche le wordmark StackNest (logo lockup)', () => {
+  it('rend un en-tête accessible (role banner)', () => {
     renderTopBar()
+
+    expect(screen.getByRole('banner')).toBeInTheDocument()
+  })
+
+  it('affiche le titre et le sous-titre de la route courante', () => {
+    renderTopBar('/catalog')
+
+    expect(screen.getByText('Catalogue')).toBeInTheDocument()
+    expect(screen.getByText('Choisis une ressource à provisionner')).toBeInTheDocument()
+  })
+
+  it('résout le titre d’une sous-route (Configurer)', () => {
+    renderTopBar('/deployments/config')
+
+    expect(screen.getByText('Configurer')).toBeInTheDocument()
+  })
+
+  it('retombe sur StackNest pour une route inconnue', () => {
+    renderTopBar('/route-inconnue')
 
     expect(screen.getByText('StackNest')).toBeInTheDocument()
-  })
-
-  it('rend le symbole du logo en variante mono blanche sur fond nuit', () => {
-    const { container } = renderTopBar()
-
-    // Le symbole est décoratif (alt="") : pas de rôle a11y, on cible l'élément.
-    const mark = container.querySelector('img')
-    expect(mark).toHaveAttribute('src', '/assets/logo-mono-white.svg')
-  })
-
-  it('expose une bascule de thème accessible', () => {
-    renderTopBar()
-
-    expect(screen.getByRole('button', { name: /thème (clair|sombre)/i })).toBeInTheDocument()
   })
 
   it('conserve le bouton burger de navigation', () => {
     renderTopBar()
 
     expect(screen.getByRole('button', { name: /basculer la navigation/i })).toBeInTheDocument()
+  })
+
+  it('expose la recherche, les actions et le bloc utilisateur', () => {
+    renderTopBar()
+
+    expect(screen.getByPlaceholderText(/rechercher/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /thème (clair|sombre)/i })).toBeInTheDocument()
+    expect(screen.getByText('John Doe')).toBeInTheDocument()
   })
 })
