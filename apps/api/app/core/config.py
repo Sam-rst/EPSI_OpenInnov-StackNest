@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     deployed_at: str = "1970-01-01T00:00:00Z"
     sentry_dsn: str = ""
 
+    # URL SQLAlchemy async (driver asyncpg). Le default pointe sur un Postgres
+    # local (hors Docker) pour permettre un `uv run` sans .env ; en conteneur,
+    # docker-compose injecte l'hote `db`. Source de verite : .env / env vars.
+    database_url: str = "postgresql+asyncpg://stacknest:stacknest@localhost:5432/stacknest"
+
 
 @lru_cache
 def get_settings() -> Settings:
