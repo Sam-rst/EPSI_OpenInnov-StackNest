@@ -18,7 +18,7 @@ export function LandingPage() {
   useSmoothAnchorScroll()
 
   return (
-    <div>
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <Hero onCta={handleCta} />
       <Personas />
       <HowItWorks />

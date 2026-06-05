@@ -21,12 +21,12 @@ function renderLanding(initialPath = '/') {
     ],
     { initialEntries: [initialPath] },
   )
-  render(
+  const { container } = render(
     <ThemeContext.Provider value={themeValue}>
       <RouterProvider router={router} />
     </ThemeContext.Provider>,
   )
-  return router
+  return { router, container }
 }
 
 // La landing monte ~7 sections riches en composants framer-motion : son rendu
@@ -49,10 +49,21 @@ describe('LandingPage', () => {
   )
 
   it(
+    'expose une racine scrollable (sinon clippée par le shell overflow-hidden)',
+    () => {
+      const { container } = renderLanding()
+      const root = container.firstElementChild as HTMLElement
+      expect(root.className).toMatch(/overflow-y-auto/)
+      expect(root.className).toMatch(/(?:^|\s)flex-1(?:\s|$)/)
+    },
+    HEAVY_RENDER_TIMEOUT_MS,
+  )
+
+  it(
     'redirige vers /login au clic sur un CTA',
     async () => {
       const user = userEvent.setup()
-      const router = renderLanding()
+      const { router } = renderLanding()
       await user.click(screen.getByRole('button', { name: /voir une démo/i }))
       expect(router.state.location.pathname).toBe('/login')
     },
