@@ -38,7 +38,7 @@ export function PersonaMockupSenior() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-text-primary text-[12.5px] font-semibold">
-                  pg-yassine-sandbox
+                  pg-john-sandbox
                 </div>
                 <div className="text-text-muted font-mono text-[10.5px]">privé · TTL 24h</div>
               </div>

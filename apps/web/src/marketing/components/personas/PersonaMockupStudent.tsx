@@ -13,7 +13,7 @@ export function PersonaMockupStudent() {
       >
         <div className="border-border bg-surface-sunken flex h-9 items-center gap-2 border-b px-4">
           <span className="bg-success h-2 w-2 animate-pulse rounded-full" />
-          <span className="text-text-secondary font-mono text-[11px]">pg-yassine-dev</span>
+          <span className="text-text-secondary font-mono text-[11px]">pg-john-dev</span>
           <span className="text-text-muted ml-auto font-mono text-[10px]">00:07s</span>
         </div>
         <div className="text-text-secondary space-y-1.5 p-4 font-mono text-[11.5px] leading-[1.7]">
@@ -33,7 +33,7 @@ export function PersonaMockupStudent() {
           <div className="min-w-0 flex-1">
             <div className="text-text-primary text-[13.5px] font-semibold">Ta BDD est prête.</div>
             <div className="text-text-muted mt-0.5 truncate font-mono text-[10.5px]">
-              postgresql://localhost:5432/yassine_dev
+              postgresql://localhost:5432/john_dev
             </div>
           </div>
           <button
