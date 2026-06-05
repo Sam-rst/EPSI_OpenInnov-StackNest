@@ -1,9 +1,10 @@
-import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom'
+import { createBrowserRouter, type RouteObject } from 'react-router-dom'
 import type { ReactElement } from 'react'
 import { AppLayout } from './layout/AppLayout'
 import { NotFoundPage } from '../shared/pages/NotFoundPage'
 import { ProtectedRoute } from '../auth/components/ProtectedRoute'
 import { LoginPage } from '../auth/pages/LoginPage'
+import { LandingPage } from '../marketing/pages'
 import { DashboardPage } from '../dashboard/pages/DashboardPage'
 import { CatalogPage } from '../catalog/pages/CatalogPage'
 import { DeploymentsPage } from '../deployment/pages/DeploymentsPage'
@@ -17,12 +18,13 @@ function requireAuth(element: ReactElement): ReactElement {
 }
 
 export const routes: RouteObject[] = [
+  // Landing marketing publique (display-only) : / ne redirige plus vers /dashboard.
+  { path: '/', element: <LandingPage /> },
   { path: '/login', element: <LoginPage /> },
+  // Routes applicatives : layout sans chemin (pathless), enfants en chemins absolus.
   {
-    path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: requireAuth(<DashboardPage />) },
       { path: 'catalog', element: requireAuth(<CatalogPage />) },
       { path: 'deployments', element: requireAuth(<DeploymentsPage />) },
