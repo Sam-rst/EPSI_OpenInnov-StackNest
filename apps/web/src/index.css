@@ -77,6 +77,37 @@ body,
   height: 100%;
 }
 
+/*
+ * Scrollbars thématiques : suivent le mode jour/nuit via les tokens sémantiques
+ * (--border-strong / --text-muted basculent déjà en .dark) au lieu des couleurs
+ * natives de l'OS. scrollbar-width/color sont hérités → une déclaration sur :root
+ * suffit pour Firefox/standards ; les pseudo-éléments WebKit sont globaux.
+ */
+:root {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  background-color: var(--border-strong);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
+}
+
 body {
   margin: 0;
   background-color: var(--surface);
@@ -90,4 +121,17 @@ body {
 code,
 pre {
   font-family: var(--font-mono);
+}
+
+/*
+ * Curseur main sur les contrôles interactifs. Tailwind v4 (Preflight) ne pose
+ * plus cursor:pointer sur <button> — on le rétablit pour tout le design system
+ * d'un coup (boutons, éléments role=button, summary), sauf état désactivé.
+ */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary {
+    cursor: pointer;
+  }
 }
