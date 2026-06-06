@@ -1,22 +1,12 @@
 import { RouterProvider } from 'react-router-dom'
-import { EnvironmentBanner } from './core/components/EnvironmentBanner'
-import { ErrorBoundary } from './core/components/ErrorBoundary'
-import { ThemeProvider } from './core/theme/ThemeProvider'
-import { AuthProvider } from './auth/providers/AuthProvider'
+import { AppProviders } from './core/AppProviders'
 import { router } from './core/router'
 
 function App() {
   return (
-    <ErrorBoundary>
-      <ThemeProvider>
-        <div className="flex h-dvh flex-col overflow-hidden">
-          <EnvironmentBanner environment={import.meta.env.VITE_ENVIRONMENT} />
-          <AuthProvider>
-            <RouterProvider router={router} />
-          </AuthProvider>
-        </div>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <AppProviders>
+      <RouterProvider router={router} />
+    </AppProviders>
   )
 }
 
