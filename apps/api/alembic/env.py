@@ -18,6 +18,10 @@ from alembic import context
 from app.core.config import get_settings
 from app.core.database.base import Base
 
+# Import a effet de bord : enregistre tous les modeles ORM sur Base.metadata
+# pour que `--autogenerate` les detecte. Source unique : models_registry.
+import app.core.database.models_registry  # noqa: F401  # isort: skip
+
 config = context.config
 
 if config.config_file_name is not None:

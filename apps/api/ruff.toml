@@ -23,6 +23,9 @@ ignore = [
 "__init__.py" = ["F401"]                # unused imports OK pour re-export
 "**/__tests__/**/*.py" = ["S101"]       # assert OK dans les tests co-located
 "tests/**/*.py" = ["S101"]              # assert OK dans les tests E2E
+# Modeles ORM : alias idiomatique `UUID as PgUUID` (distinguer le type colonne
+# Postgres du `uuid.UUID` Python). N811 le voit comme "constante renommee".
+"**/infrastructure/models/*.py" = ["N811"]
 
 [format]
 quote-style = "double"
