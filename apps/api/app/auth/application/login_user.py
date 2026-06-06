@@ -1,5 +1,7 @@
 """Use case LoginUser : authentifie un utilisateur et emet access + refresh."""
 
+from typing import ClassVar
+
 import structlog
 
 from app.auth.application.login_result import LoginResult
@@ -15,11 +17,12 @@ from app.auth.domain.value_objects.password import Password
 
 _logger = structlog.get_logger(__name__)
 
-# Empreinte bcrypt factice (mot de passe "anti-timing-dummy-password-0").
-# Utilisee pour verifier un hash meme quand le compte n'existe pas, afin que le
-# temps de reponse ne revele pas l'absence d'un email (anti-enumeration). Ce
-# n'est le hash d'aucun compte reel.
-_DUMMY_HASH = "$2b$12$C6UzMDM.H6dfI/f/IKcEeO/8Vr0xkE8q8cQ7uVbY2zJ1QwU7m7lqK"
+# Mot de passe factice de l'anti-timing : on verifie toujours un hash, meme quand
+# le compte n'existe pas, pour que le temps de reponse ne revele pas l'absence
+# d'un email (anti-enumeration). L'empreinte bcrypt correspondante est generee
+# UNE fois au runtime (jamais de hash en dur dans le code, cf. S8215) puis
+# memoisee au niveau classe afin de garder un cout de verification constant.
+_DUMMY_PASSWORD = "anti-timing-dummy-password-0"
 
 
 class LoginUser:
@@ -33,6 +36,8 @@ class LoginUser:
       email inconnu et mot de passe errone ;
     - refus si l'email n'est pas verifie quand la politique l'exige.
     """
+
+    _dummy_hash: ClassVar[str | None] = None
 
     def __init__(
         self,
@@ -85,14 +90,22 @@ class LoginUser:
         except ValueError:
             return None
 
+    def _dummy_target_hash(self) -> str:
+        # Empreinte bcrypt factice generee une seule fois au runtime puis memoisee
+        # (niveau classe) : evite tout hash en dur (S8215) tout en conservant un
+        # cout de verification constant pour l'anti-timing.
+        if LoginUser._dummy_hash is None:
+            LoginUser._dummy_hash = self._hasher.hash(Password(_DUMMY_PASSWORD))
+        return LoginUser._dummy_hash
+
     def _password_matches(self, user: User | None, candidate: Password | None) -> bool:
         # Toujours executer une verification bcrypt (cout constant) pour
         # l'anti-timing : si pas de compte ou mot de passe mal forme, on verifie
         # contre une empreinte factice et on renvoie False.
         if candidate is None:
-            self._hasher.verify(Password("anti-timing-dummy-password-0"), _DUMMY_HASH)
+            self._hasher.verify(Password(_DUMMY_PASSWORD), self._dummy_target_hash())
             return False
-        target_hash = user.password_hash if user is not None else _DUMMY_HASH
+        target_hash = user.password_hash if user is not None else self._dummy_target_hash()
         matches = self._hasher.verify(candidate, target_hash)
         return matches and user is not None
 
