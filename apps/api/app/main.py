@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import Settings, get_settings
 from app.core.exception_handlers import register_exception_handlers
@@ -54,6 +55,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ],
     )
     app.add_middleware(LoggingMiddleware)
+    # CORS : autorise le front (origines des settings) a appeler l'API avec
+    # credentials (le refresh token voyage dans un cookie). En dev, le front est
+    # servi par le meme reverse-proxy Nginx (origine identique) -> liste vide.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=effective_settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     register_exception_handlers(app)
     app.include_router(health_router)
 

@@ -6,6 +6,7 @@ permettent de demarrer sans configuration.
 """
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -25,6 +26,45 @@ class Settings(BaseSettings):
     # local (hors Docker) pour permettre un `uv run` sans .env ; en conteneur,
     # docker-compose injecte l'hote `db`. Source de verite : .env / env vars.
     database_url: str = "postgresql+asyncpg://stacknest:stacknest@localhost:5432/stacknest"
+
+    # URL du client Redis (queue de jobs + pub/sub SSE + rate-limit auth). Le
+    # default pointe sur un Redis local hors Docker ; en conteneur docker-compose
+    # injecte l'hote `redis`. Source de verite : .env / env vars.
+    redis_url: str = "redis://localhost:6379/0"
+
+    # ---------- JWT ----------
+    # Secret de signature HS256. Le default est volontairement un secret de DEV
+    # explicite (jamais utilise en preview/prod : la CD injecte JWT_SECRET via
+    # SOPS). Aucun secret reel n'est code en dur dans le repo.
+    jwt_secret: str = "dev-insecure-change-me"
+    jwt_access_ttl_seconds: int = 900  # 15 minutes
+    jwt_refresh_ttl_seconds: int = 604800  # 7 jours
+
+    # ---------- Politique d'authentification ----------
+    # Verification d'email desactivee par defaut : un compte fraichement cree
+    # peut se connecter sans cliquer le lien de verification (MVP). Mettre a
+    # True en preview/prod pour exiger un email verifie a la connexion.
+    auth_require_email_verification: bool = False
+
+    # Rate-limit des endpoints d'auth sensibles (login, register, reset) :
+    # au plus `max` tentatives par fenetre glissante de `window_seconds`.
+    auth_rate_limit_max: int = 5
+    auth_rate_limit_window_seconds: int = 60
+
+    # ---------- Cookie du refresh token ----------
+    # Le refresh token vit dans un cookie HttpOnly+Secure+SameSite=Strict afin
+    # de mitiger XSS (HttpOnly) et CSRF (SameSite=Strict). `secure` reste True
+    # par defaut ; il doit etre desactive explicitement en dev HTTP local.
+    refresh_cookie_name: str = "stacknest_refresh"
+    refresh_cookie_samesite: Literal["strict", "lax", "none"] = "strict"
+    refresh_cookie_secure: bool = True
+
+    # ---------- CORS ----------
+    # Origines autorisees a appeler l'API avec credentials (cookies). Liste
+    # vide par defaut : en dev, le front est servi par le meme reverse-proxy
+    # Nginx (origine identique, pas de CORS). Format env : JSON
+    # `CORS_ORIGINS=["https://app.stacknest.local"]`.
+    cors_origins: list[str] = []
 
 
 @lru_cache
