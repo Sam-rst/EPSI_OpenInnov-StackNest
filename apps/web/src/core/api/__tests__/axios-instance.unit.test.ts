@@ -23,4 +23,16 @@ describe('createApiClient', () => {
 
     await expect(client.get('/boom')).rejects.toThrow()
   })
+
+  it('desactive withCredentials par defaut', () => {
+    const client = createApiClient({ baseUrl: 'https://api.exemple.test' })
+
+    expect(client.defaults.withCredentials).toBe(false)
+  })
+
+  it('active withCredentials quand demande', () => {
+    const client = createApiClient({ baseUrl: 'https://api.exemple.test', withCredentials: true })
+
+    expect(client.defaults.withCredentials).toBe(true)
+  })
 })
