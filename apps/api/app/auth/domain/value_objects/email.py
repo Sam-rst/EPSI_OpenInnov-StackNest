@@ -4,10 +4,12 @@ import re
 from dataclasses import dataclass
 
 # Validation pragmatique (pas la RFC 5322 complete) : une partie locale sans
-# espace, un @, un domaine avec au moins un point. Suffisant pour rejeter les
-# saisies grossierement invalides ; la verification reelle reste l'envoi d'un
-# email de confirmation.
-_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# espace, un @, puis un domaine en labels non vides separes par des points.
+# Les classes de caracteres autour du point sont disjointes ([^@\s.] exclut le
+# point), donc le motif est lineaire : aucun backtracking polynomial (S5852).
+# Suffisant pour rejeter les saisies grossierement invalides ; la verification
+# reelle reste l'envoi d'un email de confirmation.
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
 
 
 @dataclass(frozen=True)

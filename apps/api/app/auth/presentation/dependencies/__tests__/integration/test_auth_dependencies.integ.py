@@ -75,7 +75,7 @@ def _mint(user: User, *, token_version: int | None = None) -> str:
 
 async def _client(app: FastAPI) -> httpx.AsyncClient:
     transport = httpx.ASGITransport(app=app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
+    return httpx.AsyncClient(transport=transport, base_url="https://test")
 
 
 class TestGetCurrentUser:

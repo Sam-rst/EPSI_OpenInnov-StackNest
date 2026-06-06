@@ -1,5 +1,6 @@
 """Tests d'integration du RedisRateLimiter contre un Redis reel (testcontainers)."""
 
+import asyncio
 import time
 from collections.abc import Iterator
 
@@ -59,5 +60,5 @@ class TestRedisRateLimiter:
 
         assert await limiter.is_allowed("login:ip-e") is True
         assert await limiter.is_allowed("login:ip-e") is False
-        time.sleep(1.2)
+        await asyncio.sleep(1.2)
         assert await limiter.is_allowed("login:ip-e") is True

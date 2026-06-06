@@ -1,0 +1,18 @@
+# Fichiers exclus du scan semgrep (lanes security-api / security-web).
+#
+# Les fichiers de TEST utilisent des identifiants / secrets FACTICES (mots de
+# passe et cles JWT de fixtures) : ce ne sont jamais de vrais secrets. Les
+# secrets de production proviennent de l'environnement / SOPS, jamais du code.
+# On exclut donc les tests du scan "credential/secret en dur" pour eviter les
+# faux positifs bloquants. Le code de PRODUCTION reste integralement scanne.
+#
+# Convention projet : tests reperes par suffixe (*.unit.* / *.integ.* / *.e2e.*)
+# et co-localises dans des dossiers __tests__/.
+*.unit.py
+*.integ.py
+*.e2e.py
+*.unit.test.ts
+*.unit.test.tsx
+*.integ.test.ts
+*.integ.test.tsx
+**/__tests__/
