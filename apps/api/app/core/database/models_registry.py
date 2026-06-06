@@ -1,0 +1,28 @@
+"""Registre central des modeles ORM (point d'import unique pour Alembic).
+
+Alembic autogenere les migrations en comparant la base a `Base.metadata`. Or
+un modele n'est enregistre sur ce metadata que lorsque son module est importe.
+Ce registre importe explicitement chaque modele de chaque feature afin qu'ils
+soient tous visibles d'Alembic (cf. `alembic/env.py` qui importe ce module).
+
+Quand une feature ajoute une table, ajouter son import ici (et SEULEMENT ici) :
+c'est l'unique endroit a maintenir pour qu'autogenerate reste exhaustif. Les
+modeles sont re-exportes via `__all__` (effet de bord d'enregistrement + import
+public), ce qui evite un `# noqa: F401`.
+"""
+
+from app.auth.infrastructure.models.user_model import UserModel
+from app.catalog.infrastructure.models.template_model import TemplateModel
+from app.catalog.infrastructure.models.template_param_model import (
+    TemplateParamModel,
+)
+from app.catalog.infrastructure.models.template_version_model import (
+    TemplateVersionModel,
+)
+
+__all__ = [
+    "TemplateModel",
+    "TemplateParamModel",
+    "TemplateVersionModel",
+    "UserModel",
+]
