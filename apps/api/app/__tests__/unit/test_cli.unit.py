@@ -1,9 +1,11 @@
 """Tests unitaires de la logique CLI create-admin (fakes en memoire)."""
 
+import getpass
 from uuid import UUID, uuid4
 
 import pytest
 
+import app.cli as cli
 from app.auth.domain.entities.user import User
 from app.auth.domain.enums.user_role import UserRole
 from app.auth.domain.exceptions.email_already_used import EmailAlreadyUsedException
@@ -86,3 +88,55 @@ class TestCreateAdminAccount:
                 repository=repository,
                 hasher=_FakeHasher(),
             )
+
+
+class TestMainDispatch:
+    def test_create_admin_avec_password_appelle_le_runner(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[tuple[str, str]] = []
+
+        async def _fake_run(email: str, password: str) -> None:
+            calls.append((email, password))
+
+        monkeypatch.setattr(cli, "_run_create_admin", _fake_run)
+
+        cli.main(["create-admin", "--email", "admin@stacknest.local", "--password", "adminpass1"])
+
+        assert calls == [("admin@stacknest.local", "adminpass1")]
+
+    def test_create_admin_sans_password_demande_le_prompt(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: list[str] = []
+
+        async def _fake_run(email: str, password: str) -> None:
+            captured.append(password)
+
+        monkeypatch.setattr(cli, "_run_create_admin", _fake_run)
+        monkeypatch.setattr(cli, "_prompt_password", lambda: "promptedpass1")
+
+        cli.main(["create-admin", "--email", "admin@stacknest.local"])
+
+        assert captured == ["promptedpass1"]
+
+    def test_sans_commande_quitte_avec_erreur(self) -> None:
+        with pytest.raises(SystemExit):
+            cli.main([])
+
+
+class TestPromptPassword:
+    def test_mots_de_passe_concordants_renvoie_le_secret(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        responses = iter(["secret1234", "secret1234"])
+        monkeypatch.setattr(getpass, "getpass", lambda _prompt: next(responses))
+
+        assert cli._prompt_password() == "secret1234"
+
+    def test_mots_de_passe_differents_quitte(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        responses = iter(["secret1234", "autre56789"])
+        monkeypatch.setattr(getpass, "getpass", lambda _prompt: next(responses))
+
+        with pytest.raises(SystemExit):
+            cli._prompt_password()
