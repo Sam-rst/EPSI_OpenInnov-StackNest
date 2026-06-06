@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { routes } from '../router'
 import { ThemeProvider } from '../theme/ThemeProvider'
@@ -7,12 +8,16 @@ import { AuthProvider } from '../../auth/providers/AuthProvider'
 
 function renderAt(path: string, isAuthenticated = false) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
+  // QueryClientProvider requis : les pages d'auth (LoginForm…) consomment React Query.
+  const queryClient = new QueryClient()
   return render(
-    <ThemeProvider>
-      <AuthProvider value={{ isAuthenticated }}>
-        <RouterProvider router={router} />
-      </AuthProvider>
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider value={{ isAuthenticated }}>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
   )
 }
 
@@ -72,14 +77,14 @@ describe('Router — CA2 : redirection vers /login pour routes protégées', () 
 
 describe('Router — routes placeholder publiques (socle gelé)', () => {
   const publicPlaceholders: [string, RegExp][] = [
-    ['/register', /inscription/i],
+    ['/register', /créer un compte/i],
     ['/forgot', /mot de passe oublié/i],
     ['/reset', /réinitialiser le mot de passe/i],
     ['/verify', /vérification de l['’]e-?mail/i],
   ]
 
   it.each(publicPlaceholders)(
-    'rend la page placeholder %s sans authentification',
+    'rend la page réelle %s sans authentification',
     (path, expectedHeading) => {
       renderAt(path, false)
       expect(screen.getByRole('heading', { name: expectedHeading })).toBeInTheDocument()
