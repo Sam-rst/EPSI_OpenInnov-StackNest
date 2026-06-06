@@ -55,7 +55,9 @@ describe('Router — CA2 : redirection vers /login pour routes protégées', () 
   const protectedPaths = [
     '/dashboard',
     '/catalog',
+    '/catalog/tpl-1',
     '/deployments',
+    '/deployments/dep-1',
     '/deployments/config',
     '/chat',
     '/team',
@@ -66,6 +68,39 @@ describe('Router — CA2 : redirection vers /login pour routes protégées', () 
     renderAt(path, false)
     expectLoginRendered()
   })
+})
+
+describe('Router — routes placeholder publiques (socle gelé)', () => {
+  const publicPlaceholders: [string, RegExp][] = [
+    ['/register', /inscription/i],
+    ['/forgot', /mot de passe oublié/i],
+    ['/reset', /réinitialiser le mot de passe/i],
+    ['/verify', /vérification de l['’]e-?mail/i],
+  ]
+
+  it.each(publicPlaceholders)(
+    'rend la page placeholder %s sans authentification',
+    (path, expectedHeading) => {
+      renderAt(path, false)
+      expect(screen.getByRole('heading', { name: expectedHeading })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /connexion/i })).not.toBeInTheDocument()
+    },
+  )
+})
+
+describe('Router — routes placeholder protégées avec paramètre (socle gelé)', () => {
+  const protectedDetailPlaceholders: [string, RegExp][] = [
+    ['/catalog/tpl-1', /détail du template/i],
+    ['/deployments/dep-1', /détail du déploiement/i],
+  ]
+
+  it.each(protectedDetailPlaceholders)(
+    'rend la page placeholder %s quand authentifié',
+    (path, expectedHeading) => {
+      renderAt(path, true)
+      expectPageHeadingInMain(expectedHeading)
+    },
+  )
 })
 
 describe('Router — / : landing marketing publique (STN-162)', () => {
