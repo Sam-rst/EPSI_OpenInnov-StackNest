@@ -2,6 +2,7 @@
 
 from uuid import uuid4
 
+import jwt
 import pytest
 
 from app.auth.domain.enums.token_purpose import TokenPurpose
@@ -85,3 +86,14 @@ class TestDecodeErrors:
 
         with pytest.raises(InvalidTokenException):
             service.decode("pas-un-jwt", expected_purpose=TokenPurpose.ACCESS)
+
+    def test_claims_invalides_levent_invalid_token(self) -> None:
+        # Jeton bien signe et de bonne finalite, mais 'sub' n'est pas un UUID.
+        token = jwt.encode(
+            {"sub": "pas-un-uuid", "purpose": "access", "role": "user", "token_version": 0},
+            _SECRET,
+            algorithm="HS256",
+        )
+
+        with pytest.raises(InvalidTokenException):
+            _service().decode(token, expected_purpose=TokenPurpose.ACCESS)

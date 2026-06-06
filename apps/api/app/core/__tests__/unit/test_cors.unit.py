@@ -4,15 +4,17 @@ Verifie que le middleware CORS est branche avec les origines issues des
 settings et `allow_credentials=True` (le front envoie le cookie refresh).
 """
 
+from fastapi import FastAPI
+from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
 from app.core.config import Settings
 from app.main import create_app
 
 
-def _find_cors_middleware(app: object) -> object | None:
-    for middleware in app.user_middleware:  # type: ignore[attr-defined]
-        if middleware.cls is CORSMiddleware:
+def _find_cors_middleware(app: FastAPI) -> Middleware | None:
+    for middleware in app.user_middleware:
+        if getattr(middleware.cls, "__name__", "") == CORSMiddleware.__name__:
             return middleware
     return None
 

@@ -35,3 +35,7 @@ class TestPasswordValueObject:
     def test_str_ne_divulgue_pas_le_secret(self) -> None:
         # On ne doit jamais logguer le mot de passe en clair.
         assert "motdepasse1" not in str(Password("motdepasse1"))
+
+    def test_repr_ne_divulgue_pas_le_secret(self) -> None:
+        # repr() est utilise dans les traces / debuggers : doit aussi masquer.
+        assert "motdepasse1" not in repr(Password("motdepasse1"))
