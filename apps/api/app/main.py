@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth.presentation.routers.auth_router import router as auth_router
 from app.core.config import Settings, get_settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
@@ -52,6 +53,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "Docker healthchecks, monitoring."
                 ),
             },
+            {
+                "name": "Auth",
+                "description": (
+                    "Authentification et gestion de session : inscription, "
+                    "verification d'email, connexion, rafraichissement, "
+                    "deconnexion, profil et reinitialisation de mot de passe."
+                ),
+            },
         ],
     )
     app.add_middleware(LoggingMiddleware)
@@ -67,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     register_exception_handlers(app)
     app.include_router(health_router)
+    app.include_router(auth_router)
 
     @app.get("/version", tags=["Platform"], summary="Metadonnees de build et de deploiement")
     async def version(settings: SettingsDep) -> VersionResponse:
