@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 
+import type { CatalogItem } from '../domain/models/CatalogItem'
 import { CatalogEmpty } from '../components/CatalogEmpty'
+import { CatalogError } from '../components/CatalogError'
 import { CatalogGrid } from '../components/CatalogGrid'
 import { CatalogHeader } from '../components/CatalogHeader'
 import { CatalogFilters } from '../components/filters'
@@ -9,7 +11,7 @@ import { useCatalogTemplates } from '../hooks/useCatalogTemplates'
 
 export function CatalogPage() {
   const navigate = useNavigate()
-  const { items, loading } = useCatalogTemplates()
+  const { items, loading, isError } = useCatalogTemplates()
   const {
     search,
     setSearch,
@@ -22,8 +24,8 @@ export function CatalogPage() {
     filtered,
   } = useCatalogFilters(items)
 
-  const handleSelect = () => {
-    navigate('/deployments/config')
+  const handleSelect = (item: CatalogItem) => {
+    navigate(`/catalog/${item.id}`)
   }
 
   return (
@@ -42,8 +44,14 @@ export function CatalogPage() {
           allItems={items}
         />
         <div>
-          <CatalogGrid items={filtered} onSelect={handleSelect} />
-          {!loading && filtered.length === 0 && <CatalogEmpty />}
+          {isError ? (
+            <CatalogError />
+          ) : (
+            <>
+              <CatalogGrid items={filtered} onSelect={handleSelect} />
+              {!loading && filtered.length === 0 && <CatalogEmpty />}
+            </>
+          )}
         </div>
       </div>
     </div>
