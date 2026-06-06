@@ -35,7 +35,5 @@ class UserModel(TimestampMixin, Base):
         nullable=False,
         server_default=UserRole.USER.value,
     )
-    is_verified: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
