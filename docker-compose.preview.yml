@@ -1,0 +1,38 @@
+# Override preview de StackNest — ISO-PROD + capture mail (QA / acceptance).
+# Usage : docker compose -f docker-compose.yml -f docker-compose.preview.yml up --build
+#
+# Meme topologie que prod (build nginx + uvicorn + migrate one-shot, PAS de HMR
+# Vite), MAIS on ajoute MailHog pour capturer les mails sortants et on cable le
+# SMTP de l'API dessus. Permet de tester l'iso-prod en local de bout en bout
+# (inscription / verification / reinitialisation) sans vrai serveur SMTP.
+#
+# En prod, l'override `prod` (a venir) cablera un VRAI SMTP via SOPS (STN-35) et
+# n'inclura AUCUN MailHog. Le base reste donc deployable tel quel.
+
+services:
+  api:
+    environment:
+      # SMTP -> MailHog (reseau interne compose). Noms d'env lus par SmtpSettings.
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      # Liens cliquables des mails : pointent vers le front servi par Nginx (:8080).
+      AUTH_VERIFY_URL_BASE: http://localhost:8080/verify
+      AUTH_RESET_URL_BASE: http://localhost:8080/reset
+    depends_on:
+      mailhog:
+        condition: service_healthy
+
+  # Inbox de capture : SMTP sur 1025, UI web sur 8025 (http://localhost:8025).
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    networks: [stacknest]
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8025/api/v2/messages"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
