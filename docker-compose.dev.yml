@@ -37,6 +37,14 @@ services:
       - "${API_PORT:-8000}:8000"
     environment:
       APP_ENV: dev
+      # SMTP -> MailHog (capture des mails en dev). Liens vers le front Vite (:8080).
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      AUTH_VERIFY_URL_BASE: http://localhost:8080/verify
+      AUTH_RESET_URL_BASE: http://localhost:8080/reset
+    depends_on:
+      mailhog:
+        condition: service_healthy
 
   # En dev on remplace l'image Nginx par un conteneur Node qui fait tourner
   # Vite dev server (HMR). Le proxy '/api' -> 'http://api:8000' est configure
@@ -59,3 +67,18 @@ services:
       - /app/node_modules
     ports: !override
       - "${UI_PORT:-8080}:5173"
+
+  # MailHog : capture des mails sortants en dev (inbox web http://localhost:8025).
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    networks: [stacknest]
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8025/api/v2/messages"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
