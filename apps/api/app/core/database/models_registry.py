@@ -19,8 +19,10 @@ from app.catalog.infrastructure.models.template_param_model import (
 from app.catalog.infrastructure.models.template_version_model import (
     TemplateVersionModel,
 )
+from app.deployment.infrastructure.models.deployment_model import DeploymentModel
 
 __all__ = [
+    "DeploymentModel",
     "TemplateModel",
     "TemplateParamModel",
     "TemplateVersionModel",
