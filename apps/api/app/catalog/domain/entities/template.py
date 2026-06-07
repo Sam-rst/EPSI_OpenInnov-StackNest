@@ -6,6 +6,7 @@ from uuid import UUID
 
 from app.catalog.domain.entities.template_param import TemplateParam
 from app.catalog.domain.entities.template_version import TemplateVersion
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.template_category import TemplateCategory
 from app.catalog.domain.value_objects.slug import Slug
 
@@ -21,6 +22,8 @@ class Template:
 
     - `popular`   : mis en avant dans le catalogue.
     - `is_active` : masque un template sans le supprimer (defaut true).
+    - `engine`    : moteur de provisioning (`docker` par defaut, `terraform`
+      pour les ressources sans image — VM, reseau, bucket...).
     - `versions`  : versions disponibles (vide a la creation).
     - `params`    : parametres de provisioning (vide a la creation).
 
@@ -44,6 +47,7 @@ class Template:
     popular: bool = False
     tags: list[str] = field(default_factory=list)
     is_active: bool = True
+    engine: EngineKind = field(default=EngineKind.DOCKER)
     versions: list[TemplateVersion] = field(default_factory=list)
     params: list[TemplateParam] = field(default_factory=list)
     image_repository: str | None = field(default=None)

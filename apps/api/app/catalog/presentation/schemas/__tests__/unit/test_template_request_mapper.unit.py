@@ -1,5 +1,6 @@
 """Tests unitaires du TemplateRequestMapper (requete HTTP -> commande)."""
 
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.template_category import TemplateCategory
 from app.catalog.presentation.schemas.template_request_mapper import TemplateRequestMapper
 from app.catalog.presentation.schemas.template_write_request import TemplateWriteRequest
@@ -43,3 +44,17 @@ class TestRequestMapperProvisioning:
         assert command.image_repository is None
         assert command.internal_port is None
         assert command.secret_env is None
+
+
+class TestRequestMapperEngine:
+    def test_propage_le_moteur_vers_la_commande(self) -> None:
+        request = _request(engine=EngineKind.TERRAFORM)
+
+        command = TemplateRequestMapper.to_command(request)
+
+        assert command.engine is EngineKind.TERRAFORM
+
+    def test_moteur_docker_par_defaut(self) -> None:
+        command = TemplateRequestMapper.to_command(_request())
+
+        assert command.engine is EngineKind.DOCKER

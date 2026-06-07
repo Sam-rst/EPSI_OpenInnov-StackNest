@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.template_category import TemplateCategory
 from app.core.database.base import Base
 from app.core.database.pg_enum import pg_enum
@@ -21,6 +22,8 @@ class TemplateModel(TimestampMixin, Base):
     - `category` : enum Postgres `template_category`.
     - `tags`     : tableau de libelles libres (text[]) pour la recherche.
     - `is_active`: masque un template du catalogue sans le supprimer (defaut true).
+    - `engine`   : enum Postgres `engine_kind` (moteur de provisioning, NOT NULL,
+      defaut `docker`).
 
     Descripteur de provisioning (optionnel, exploite par la feature deploiement) :
 
@@ -50,6 +53,11 @@ class TemplateModel(TimestampMixin, Base):
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    engine: Mapped[EngineKind] = mapped_column(
+        pg_enum(EngineKind, name="engine_kind"),
+        nullable=False,
+        server_default=text("'docker'"),
+    )
     image_repository: Mapped[str | None] = mapped_column(String(255), nullable=True)
     internal_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     secret_env: Mapped[str | None] = mapped_column(String(120), nullable=True)

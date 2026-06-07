@@ -7,6 +7,7 @@ import pytest
 from app.catalog.domain.entities.template import Template
 from app.catalog.domain.entities.template_param import TemplateParam
 from app.catalog.domain.entities.template_version import TemplateVersion
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.param_type import ParamType
 from app.catalog.domain.enums.template_category import TemplateCategory
 from app.catalog.domain.value_objects.slug import Slug
@@ -84,6 +85,18 @@ class TestTemplateProvisioningDescriptor:
         assert template.image_repository == "redis"
         assert template.internal_port == 6379
         assert template.secret_env is None
+
+
+class TestTemplateEngine:
+    def test_engine_docker_par_defaut(self) -> None:
+        template = _template()
+
+        assert template.engine is EngineKind.DOCKER
+
+    def test_engine_terraform_explicite(self) -> None:
+        template = _template(engine=EngineKind.TERRAFORM)
+
+        assert template.engine is EngineKind.TERRAFORM
 
 
 class TestTemplateGuards:

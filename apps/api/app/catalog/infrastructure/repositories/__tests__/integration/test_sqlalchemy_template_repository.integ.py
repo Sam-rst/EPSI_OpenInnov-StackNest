@@ -25,6 +25,7 @@ from alembic import command
 from app.catalog.domain.entities.template import Template
 from app.catalog.domain.entities.template_param import TemplateParam
 from app.catalog.domain.entities.template_version import TemplateVersion
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.param_type import ParamType
 from app.catalog.domain.enums.template_category import TemplateCategory
 from app.catalog.domain.value_objects.slug import Slug
@@ -77,6 +78,7 @@ async def session(postgres_container: PostgresContainer) -> AsyncIterator[AsyncS
 def _template(
     slug: str = "postgresql-16",
     *,
+    engine: EngineKind = EngineKind.DOCKER,
     image_repository: str | None = None,
     internal_port: int | None = None,
     secret_env: str | None = None,
@@ -92,6 +94,7 @@ def _template(
         popular=True,
         tags=["SQL", "Persistant"],
         is_active=True,
+        engine=engine,
         image_repository=image_repository,
         internal_port=internal_port,
         secret_env=secret_env,
@@ -186,6 +189,28 @@ class TestAddAndGet:
         assert reloaded.image_repository is None
         assert reloaded.internal_port is None
         assert reloaded.secret_env is None
+
+
+class TestEngine:
+    async def test_engine_terraform_persiste(self, session: AsyncSession) -> None:
+        repository = SqlAlchemyTemplateRepository(session)
+
+        created = await repository.add(_template(slug="ubuntu-24-04", engine=EngineKind.TERRAFORM))
+        await session.commit()
+
+        reloaded = await repository.get_by_id(created.id)
+        assert reloaded is not None
+        assert reloaded.engine is EngineKind.TERRAFORM
+
+    async def test_engine_docker_par_defaut(self, session: AsyncSession) -> None:
+        repository = SqlAlchemyTemplateRepository(session)
+
+        created = await repository.add(_template(slug="python-3-13"))
+        await session.commit()
+
+        reloaded = await repository.get_by_id(created.id)
+        assert reloaded is not None
+        assert reloaded.engine is EngineKind.DOCKER
 
 
 class TestListAll:

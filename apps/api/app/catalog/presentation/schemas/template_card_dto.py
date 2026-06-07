@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.template_category import TemplateCategory
 
 
@@ -20,6 +21,10 @@ class TemplateCardDTO(BaseModel):
     icon: str = Field(..., description="Nom d'icone lucide (kebab-case).")
     category: TemplateCategory = Field(..., description="Categorie de la ressource.")
     provider: str = Field(..., description="Fournisseur d'execution (Docker, Terraform...).")
+    engine: EngineKind = Field(
+        EngineKind.DOCKER,
+        description="Moteur de provisioning (badge moteur, grise la configuration si terraform).",
+    )
     tags: list[str] = Field(default_factory=list, description="Libelles de recherche.")
     description: str = Field(..., description="Description courte de la ressource.")
     popular: bool = Field(..., description="Mis en avant dans le catalogue.")
