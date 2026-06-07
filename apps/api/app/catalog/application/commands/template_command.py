@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.param_type import ParamType
 from app.catalog.domain.enums.template_category import TemplateCategory
 
@@ -49,6 +50,7 @@ class TemplateCommand:
     popular: bool
     tags: list[str]
     is_active: bool
+    engine: EngineKind = EngineKind.DOCKER
     versions: list[VersionSpec] = field(default_factory=list)
     params: list[ParamSpec] = field(default_factory=list)
     image_repository: str | None = None

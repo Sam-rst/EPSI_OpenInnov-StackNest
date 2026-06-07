@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.param_type import ParamType
 from app.catalog.domain.enums.template_category import TemplateCategory
 
@@ -47,6 +48,7 @@ class TemplateWriteRequest(BaseModel):
     popular: bool = False
     tags: list[str] = Field(default_factory=list)
     is_active: bool = True
+    engine: EngineKind = EngineKind.DOCKER
     versions: list[VersionWriteRequest] = Field(default_factory=list)
     params: list[ParamWriteRequest] = Field(default_factory=list)
     image_repository: str | None = Field(default=None, max_length=255)

@@ -27,6 +27,7 @@ class TestTemplateModel:
             "popular",
             "tags",
             "is_active",
+            "engine",
             "image_repository",
             "internal_port",
             "secret_env",
@@ -39,6 +40,13 @@ class TestTemplateModel:
 
     def test_is_active_defaut_true(self) -> None:
         assert TemplateModel.__table__.columns["is_active"].server_default is not None
+
+    def test_engine_non_nullable_avec_defaut_docker(self) -> None:
+        colonne = TemplateModel.__table__.columns["engine"]
+
+        assert colonne.nullable is False
+        assert colonne.server_default is not None
+        assert str(colonne.server_default.arg) == "'docker'"
 
     def test_colonnes_du_descripteur_de_provisioning_sont_nullables(self) -> None:
         colonnes = TemplateModel.__table__.columns

@@ -12,6 +12,9 @@ Chaque template porte un descripteur de provisioning optionnel (image_repository
 / internal_port / secret_env) renseigne pour les ressources Docker (images
 publiques reelles). Les ressources Terraform (VM, VPC, bucket S3) et les stacks
 multi-conteneurs (ELK) le laissent a None.
+
+Le moteur `engine` est coherent avec ce descripteur : `terraform` pour les
+ressources sans image (VM Ubuntu, ELK, VPC, S3), `docker` (defaut) sinon.
 """
 
 from datetime import date
@@ -21,6 +24,7 @@ from app.catalog.application.commands.template_command import (
     TemplateCommand,
     VersionSpec,
 )
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.param_type import ParamType
 from app.catalog.domain.enums.template_category import TemplateCategory
 
@@ -172,6 +176,7 @@ _UBUNTU = TemplateCommand(
     popular=True,
     tags=["VM", "Linux"],
     is_active=True,
+    engine=EngineKind.TERRAFORM,
     # Provisionnee par Terraform (VM), pas via une image Docker.
     image_repository=None,
     internal_port=None,
@@ -357,6 +362,7 @@ _ELK = TemplateCommand(
     popular=False,
     tags=["Logs", "Search"],
     is_active=True,
+    engine=EngineKind.TERRAFORM,
     # Stack multi-conteneurs : pas une image unique provisionnable telle quelle.
     image_repository=None,
     internal_port=None,
@@ -429,6 +435,7 @@ _VPC = TemplateCommand(
     popular=False,
     tags=["VPC", "Subnet"],
     is_active=True,
+    engine=EngineKind.TERRAFORM,
     # Ressource reseau provisionnee par Terraform, pas un conteneur Docker.
     image_repository=None,
     internal_port=None,
@@ -468,6 +475,7 @@ _S3 = TemplateCommand(
     popular=False,
     tags=["S3", "AWS"],
     is_active=True,
+    engine=EngineKind.TERRAFORM,
     # Bucket d'objet (Terraform), pas une image Docker.
     image_repository=None,
     internal_port=None,

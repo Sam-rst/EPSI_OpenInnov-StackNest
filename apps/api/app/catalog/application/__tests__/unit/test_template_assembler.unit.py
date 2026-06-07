@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from app.catalog.application.commands.template_command import TemplateCommand
 from app.catalog.application.template_assembler import TemplateAssembler
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.template_category import TemplateCategory
 
 
@@ -45,3 +46,19 @@ class TestTemplateAssemblerProvisioning:
         assert entity.image_repository is None
         assert entity.internal_port is None
         assert entity.secret_env is None
+
+
+class TestTemplateAssemblerEngine:
+    def test_propage_le_moteur_terraform(self) -> None:
+        command = _command(engine=EngineKind.TERRAFORM)
+
+        entity = TemplateAssembler.to_entity(uuid4(), command)
+
+        assert entity.engine is EngineKind.TERRAFORM
+
+    def test_propage_le_moteur_docker(self) -> None:
+        command = _command(engine=EngineKind.DOCKER)
+
+        entity = TemplateAssembler.to_entity(uuid4(), command)
+
+        assert entity.engine is EngineKind.DOCKER
