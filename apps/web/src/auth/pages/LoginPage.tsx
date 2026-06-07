@@ -1,12 +1,24 @@
+import { Link } from 'react-router-dom'
+
+import { AuthLayout } from '../components/AuthLayout'
+import { LoginForm } from '../components/LoginForm'
+
+/** Page de connexion : formulaire de login + lien vers la création de compte. */
 export function LoginPage() {
   return (
-    <main className="flex flex-1 items-center justify-center">
-      <div className="w-full max-w-sm space-y-4 p-8">
-        <h1 className="text-2xl font-semibold">Connexion</h1>
-        <p className="text-sm text-gray-600">
-          Page placeholder — la logique d'authentification sera livrée dans un ticket dédié.
-        </p>
-      </div>
-    </main>
+    <AuthLayout
+      title="Connexion"
+      subtitle="Bon retour. Reprenez là où vous vous étiez arrêté."
+      footer={
+        <>
+          Pas encore de compte&nbsp;?{' '}
+          <Link to="/register" className="text-cyan font-medium">
+            Créer un compte
+          </Link>
+        </>
+      }
+    >
+      <LoginForm />
+    </AuthLayout>
   )
 }

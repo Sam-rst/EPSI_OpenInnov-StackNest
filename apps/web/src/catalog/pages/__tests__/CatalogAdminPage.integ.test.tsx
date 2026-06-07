@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { AuthContext } from '../../../auth/contexts/AuthContext'
 import { server } from '../../../../tests/mocks/server'
+import { buildAuthValue } from '../../../../tests/utils/authValue'
 import { createQueryWrapper } from '../../../../tests/utils/queryWrapper'
 import type { TemplateCardDTO } from '../../types/dto/TemplateCardDTO'
 import type { TemplateDetailDTO } from '../../types/dto/TemplateDetailDTO'
@@ -36,11 +37,11 @@ const createdDetail: TemplateDetailDTO = {
   params: [],
 }
 
-function renderAdmin(value: { isAuthenticated: boolean; isAdmin?: boolean }) {
+function renderAdmin(isAdmin: boolean) {
   const Wrapper = createQueryWrapper()
   return render(
     <Wrapper>
-      <AuthContext.Provider value={value}>
+      <AuthContext.Provider value={buildAuthValue({ isAdmin })}>
         <CatalogAdminPage />
       </AuthContext.Provider>
     </Wrapper>,
@@ -49,7 +50,7 @@ function renderAdmin(value: { isAuthenticated: boolean; isAdmin?: boolean }) {
 
 describe('CatalogAdminPage', () => {
   it('refuse l’accès à un utilisateur non admin (403 honnête)', () => {
-    renderAdmin({ isAuthenticated: true, isAdmin: false })
+    renderAdmin(false)
 
     expect(screen.getByText('Accès réservé aux administrateurs')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /Administration du catalogue/ })).toBeNull()
@@ -58,7 +59,7 @@ describe('CatalogAdminPage', () => {
   it('liste les templates existants pour un admin', async () => {
     server.use(http.get('*/catalog/templates', () => HttpResponse.json([pgCard])))
 
-    renderAdmin({ isAuthenticated: true, isAdmin: true })
+    renderAdmin(true)
 
     expect(screen.getByRole('heading', { name: /Administration du catalogue/ })).toBeInTheDocument()
     expect(await screen.findByText('PostgreSQL')).toBeInTheDocument()
@@ -74,7 +75,7 @@ describe('CatalogAdminPage', () => {
       }),
     )
 
-    renderAdmin({ isAuthenticated: true, isAdmin: true })
+    renderAdmin(true)
     await screen.findByText('PostgreSQL')
 
     await userEvent.type(screen.getByLabelText('Slug'), 'redis')
@@ -102,7 +103,7 @@ describe('CatalogAdminPage', () => {
       }),
     )
 
-    renderAdmin({ isAuthenticated: true, isAdmin: true })
+    renderAdmin(true)
     await screen.findByText('PostgreSQL')
 
     await userEvent.click(screen.getByRole('button', { name: 'Créer le template' }))
@@ -122,7 +123,7 @@ describe('CatalogAdminPage', () => {
       }),
     )
 
-    renderAdmin({ isAuthenticated: true, isAdmin: true })
+    renderAdmin(true)
     const row = (await screen.findByText('PostgreSQL')).closest('li') as HTMLElement
 
     await userEvent.click(within(row).getByRole('button', { name: 'Supprimer' }))

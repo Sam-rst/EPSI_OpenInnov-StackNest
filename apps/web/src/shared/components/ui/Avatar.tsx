@@ -1,7 +1,7 @@
 import { cn } from '../../lib/cn'
 
 interface AvatarProps {
-  /** Nom complet — sert au calcul des initiales et au libellé accessible. */
+  /** Nom complet ou email — sert au calcul des initiales et au libellé accessible. */
   name: string
   /** Couleur de fond (par défaut cyan de marque). */
   color?: string
@@ -10,14 +10,21 @@ interface AvatarProps {
   className?: string
 }
 
-const computeInitials = (name: string): string =>
-  name
-    .split(' ')
+// Pour une adresse email (contient « @ »), on dérive les initiales de la partie
+// locale découpée sur . _ - (ex. john.doe@x → « JD », qa-admin@x → « QA »).
+// Sinon, première lettre de chaque mot séparé par des espaces.
+const computeInitials = (name: string): string => {
+  const atIndex = name.indexOf('@')
+  const isEmail = atIndex > 0
+  const source = isEmail ? name.slice(0, atIndex) : name
+  const segments = isEmail ? source.split(/[._-]+/) : source.split(' ')
+  return segments
     .map((part) => part[0])
     .filter(Boolean)
     .slice(0, 2)
     .join('')
     .toUpperCase()
+}
 
 /**
  * Pastille d'initiales pour représenter un utilisateur. Décoratif visuellement
@@ -37,7 +44,10 @@ export function Avatar({ name, color = '#0d9297', size = 28, className }: Avatar
         height: size,
         fontSize: size * 0.36,
         backgroundColor: color,
-        lineHeight: 1,
+        // `normal` (et non `1`) : la line-box naturelle de la police est
+        // symetrique autour de la glyphe -> capitales parfaitement centrees
+        // verticalement dans le cercle (line-height:1 les remontait de ~1px).
+        lineHeight: 'normal',
       }}
     >
       {computeInitials(name)}

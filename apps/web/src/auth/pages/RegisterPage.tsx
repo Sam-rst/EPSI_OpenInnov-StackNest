@@ -1,13 +1,24 @@
+import { Link } from 'react-router-dom'
+
+import { AuthLayout } from '../components/AuthLayout'
+import { RegisterForm } from '../components/RegisterForm'
+
+/** Page d'inscription : formulaire de création de compte + lien vers la connexion. */
 export function RegisterPage() {
   return (
-    <main className="flex flex-1 items-center justify-center">
-      <div className="w-full max-w-sm space-y-4 p-8">
-        <h1 className="text-2xl font-semibold">Inscription</h1>
-        <p className="text-text-secondary text-sm">
-          Page en cours de construction — le formulaire de création de compte sera livré dans un
-          ticket dédié.
-        </p>
-      </div>
-    </main>
+    <AuthLayout
+      title="Créer un compte"
+      subtitle="Quelques secondes suffisent pour démarrer."
+      footer={
+        <>
+          Vous avez déjà un compte&nbsp;?{' '}
+          <Link to="/login" className="text-cyan font-medium">
+            Se connecter
+          </Link>
+        </>
+      }
+    >
+      <RegisterForm />
+    </AuthLayout>
   )
 }

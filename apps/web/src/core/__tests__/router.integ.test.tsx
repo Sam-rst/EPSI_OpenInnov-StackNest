@@ -33,6 +33,8 @@ beforeEach(() => {
 
 function renderAt(path: string, isAuthenticated = false) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
+  // QueryClientProvider requis : pages d'auth (LoginForm…) et catalogue consomment
+  // React Query. retry:false pour que les routes catalogue échouent vite en test.
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -103,14 +105,14 @@ describe('Router — CA2 : redirection vers /login pour routes protégées', () 
 
 describe('Router — routes placeholder publiques (socle gelé)', () => {
   const publicPlaceholders: [string, RegExp][] = [
-    ['/register', /inscription/i],
+    ['/register', /créer un compte/i],
     ['/forgot', /mot de passe oublié/i],
     ['/reset', /réinitialiser le mot de passe/i],
     ['/verify', /vérification de l['’]e-?mail/i],
   ]
 
   it.each(publicPlaceholders)(
-    'rend la page placeholder %s sans authentification',
+    'rend la page réelle %s sans authentification',
     (path, expectedHeading) => {
       renderAt(path, false)
       expect(screen.getByRole('heading', { name: expectedHeading })).toBeInTheDocument()

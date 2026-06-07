@@ -1,13 +1,21 @@
+import { Link } from 'react-router-dom'
+
+import { AuthLayout } from '../components/AuthLayout'
+import { ForgotForm } from '../components/ForgotForm'
+
+/** Page « mot de passe oublié » : demande d'un lien de réinitialisation par e-mail. */
 export function ForgotPasswordPage() {
   return (
-    <main className="flex flex-1 items-center justify-center">
-      <div className="w-full max-w-sm space-y-4 p-8">
-        <h1 className="text-2xl font-semibold">Mot de passe oublié</h1>
-        <p className="text-text-secondary text-sm">
-          Page en cours de construction — la demande de réinitialisation sera livrée dans un ticket
-          dédié.
-        </p>
-      </div>
-    </main>
+    <AuthLayout
+      title="Mot de passe oublié"
+      subtitle="Saisissez votre adresse e-mail pour recevoir un lien de réinitialisation."
+      footer={
+        <Link to="/login" className="text-cyan font-medium">
+          Retour à la connexion
+        </Link>
+      }
+    >
+      <ForgotForm />
+    </AuthLayout>
   )
 }

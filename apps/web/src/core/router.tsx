@@ -12,6 +12,7 @@ import { LandingPage } from '../marketing/pages'
 import { DashboardPage } from '../dashboard/pages/DashboardPage'
 import { CatalogPage } from '../catalog/pages/CatalogPage'
 import { CatalogDetailPage } from '../catalog/pages/CatalogDetailPage'
+import { CatalogAdminPage } from '../catalog/pages/CatalogAdminPage'
 import { DeploymentsPage } from '../deployment/pages/DeploymentsPage'
 import { DeploymentDetailPage } from '../deployment/pages/DeploymentDetailPage'
 import { ConfigPage } from '../deployment/pages/ConfigPage'
@@ -38,6 +39,9 @@ export const routes: RouteObject[] = [
     children: [
       { path: 'dashboard', element: requireAuth(<DashboardPage />) },
       { path: 'catalog', element: requireAuth(<CatalogPage />) },
+      // Écran d'admin du catalogue (gardé `RequireAdmin` côté page). Déclaré avant
+      // `catalog/:id` : le segment statique « admin » prime sur le param dynamique.
+      { path: 'catalog/admin', element: requireAuth(<CatalogAdminPage />) },
       { path: 'catalog/:id', element: requireAuth(<CatalogDetailPage />) },
       { path: 'deployments', element: requireAuth(<DeploymentsPage />) },
       { path: 'deployments/:id', element: requireAuth(<DeploymentDetailPage />) },

@@ -1,13 +1,24 @@
+import { Link, useSearchParams } from 'react-router-dom'
+
+import { AuthLayout } from '../components/AuthLayout'
+import { ResetForm } from '../components/ResetForm'
+
+/** Page de réinitialisation : lit le token du lien e-mail (`?token=…`) et le passe au formulaire. */
 export function ResetPasswordPage() {
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token')
+
   return (
-    <main className="flex flex-1 items-center justify-center">
-      <div className="w-full max-w-sm space-y-4 p-8">
-        <h1 className="text-2xl font-semibold">Réinitialiser le mot de passe</h1>
-        <p className="text-text-secondary text-sm">
-          Page en cours de construction — la définition d'un nouveau mot de passe sera livrée dans
-          un ticket dédié.
-        </p>
-      </div>
-    </main>
+    <AuthLayout
+      title="Réinitialiser le mot de passe"
+      subtitle="Choisissez un nouveau mot de passe pour votre compte."
+      footer={
+        <Link to="/login" className="text-cyan font-medium">
+          Retour à la connexion
+        </Link>
+      }
+    >
+      <ResetForm token={token} />
+    </AuthLayout>
   )
 }

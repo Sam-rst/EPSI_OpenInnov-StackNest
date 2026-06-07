@@ -1,13 +1,22 @@
 import { CURRENT_USER_FIXTURE } from '../data/currentUser.fixtures'
 import type { CurrentUser } from '../domain/models/CurrentUser'
+import { useAuth } from './useAuth'
 
 /**
  * Fournit l'utilisateur courant consommé par le shell (TopBar).
  *
- * Vague 1 (rendu) : renvoie un utilisateur neutre/anonyme (aucune identité inventée).
- * Vague 2 (login) : lira l'utilisateur authentifié depuis l'AuthContext / l'API
- *   sans changer la signature — la TopBar reste inchangée.
+ * Connecté : mappe l'utilisateur authentifié de l'AuthContext (email + rôle).
+ * Non connecté (boot, pages publiques) : renvoie un utilisateur neutre/anonyme
+ * (aucune identité inventée). Signature inchangée — la TopBar reste identique.
  */
 export function useCurrentUser(): CurrentUser {
-  return CURRENT_USER_FIXTURE
+  const { user } = useAuth()
+  if (!user) {
+    return CURRENT_USER_FIXTURE
+  }
+  return {
+    id: user.id,
+    name: user.email,
+    role: user.isAdmin ? 'Administrateur' : 'Membre',
+  }
 }
