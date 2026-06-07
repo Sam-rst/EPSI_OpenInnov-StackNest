@@ -49,3 +49,6 @@ class TemplateWriteRequest(BaseModel):
     is_active: bool = True
     versions: list[VersionWriteRequest] = Field(default_factory=list)
     params: list[ParamWriteRequest] = Field(default_factory=list)
+    image_repository: str | None = Field(default=None, max_length=255)
+    internal_port: int | None = Field(default=None, ge=1, le=65535)
+    secret_env: str | None = Field(default=None, max_length=120)

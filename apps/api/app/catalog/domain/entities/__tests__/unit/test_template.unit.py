@@ -59,6 +59,33 @@ class TestTemplateValide:
         assert template.params == [param]
 
 
+class TestTemplateProvisioningDescriptor:
+    def test_descripteur_absent_par_defaut(self) -> None:
+        template = _template()
+
+        assert template.image_repository is None
+        assert template.internal_port is None
+        assert template.secret_env is None
+
+    def test_descripteur_renseigne(self) -> None:
+        template = _template(
+            image_repository="postgres",
+            internal_port=5432,
+            secret_env="POSTGRES_PASSWORD",
+        )
+
+        assert template.image_repository == "postgres"
+        assert template.internal_port == 5432
+        assert template.secret_env == "POSTGRES_PASSWORD"
+
+    def test_secret_env_optionnel_meme_avec_image(self) -> None:
+        template = _template(image_repository="redis", internal_port=6379, secret_env=None)
+
+        assert template.image_repository == "redis"
+        assert template.internal_port == 6379
+        assert template.secret_env is None
+
+
 class TestTemplateGuards:
     def test_name_vide_leve_value_error(self) -> None:
         with pytest.raises(ValueError):

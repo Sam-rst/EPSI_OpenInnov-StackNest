@@ -74,7 +74,13 @@ async def session(postgres_container: PostgresContainer) -> AsyncIterator[AsyncS
     await engine.dispose()
 
 
-def _template(slug: str = "postgresql-16") -> Template:
+def _template(
+    slug: str = "postgresql-16",
+    *,
+    image_repository: str | None = None,
+    internal_port: int | None = None,
+    secret_env: str | None = None,
+) -> Template:
     return Template(
         id=uuid4(),
         slug=Slug(slug),
@@ -86,6 +92,9 @@ def _template(slug: str = "postgresql-16") -> Template:
         popular=True,
         tags=["SQL", "Persistant"],
         is_active=True,
+        image_repository=image_repository,
+        internal_port=internal_port,
+        secret_env=secret_env,
         versions=[
             TemplateVersion(
                 id=uuid4(), version="16", is_default=True, is_lts=False, eol_date=date(2028, 11, 9)
@@ -146,6 +155,37 @@ class TestAddAndGet:
         repository = SqlAlchemyTemplateRepository(session)
 
         assert await repository.get_by_id(uuid4()) is None
+
+    async def test_descripteur_de_provisioning_persiste(self, session: AsyncSession) -> None:
+        repository = SqlAlchemyTemplateRepository(session)
+
+        created = await repository.add(
+            _template(
+                slug="elk",
+                image_repository="postgres",
+                internal_port=5432,
+                secret_env="POSTGRES_PASSWORD",
+            )
+        )
+        await session.commit()
+
+        reloaded = await repository.get_by_id(created.id)
+        assert reloaded is not None
+        assert reloaded.image_repository == "postgres"
+        assert reloaded.internal_port == 5432
+        assert reloaded.secret_env == "POSTGRES_PASSWORD"
+
+    async def test_descripteur_de_provisioning_nullable(self, session: AsyncSession) -> None:
+        repository = SqlAlchemyTemplateRepository(session)
+
+        created = await repository.add(_template(slug="vpc"))
+        await session.commit()
+
+        reloaded = await repository.get_by_id(created.id)
+        assert reloaded is not None
+        assert reloaded.image_repository is None
+        assert reloaded.internal_port is None
+        assert reloaded.secret_env is None
 
 
 class TestListAll:

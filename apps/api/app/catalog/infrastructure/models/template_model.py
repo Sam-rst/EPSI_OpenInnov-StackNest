@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import Boolean, String, Text, text
+from sqlalchemy import Boolean, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,6 +21,12 @@ class TemplateModel(TimestampMixin, Base):
     - `category` : enum Postgres `template_category`.
     - `tags`     : tableau de libelles libres (text[]) pour la recherche.
     - `is_active`: masque un template du catalogue sans le supprimer (defaut true).
+
+    Descripteur de provisioning (optionnel, exploite par la feature deploiement) :
+
+    - `image_repository` : depot de l'image Docker (ex. `postgres`).
+    - `internal_port`    : port ecoute dans le conteneur (ex. `5432`).
+    - `secret_env`       : nom de la variable d'env recevant le mot de passe genere.
     """
 
     __tablename__ = "templates"
@@ -44,3 +50,6 @@ class TemplateModel(TimestampMixin, Base):
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    image_repository: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    internal_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    secret_env: Mapped[str | None] = mapped_column(String(120), nullable=True)

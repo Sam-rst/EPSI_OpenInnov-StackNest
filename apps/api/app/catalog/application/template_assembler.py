@@ -37,6 +37,9 @@ class TemplateAssembler:
             is_active=command.is_active,
             versions=[TemplateAssembler._to_version(spec) for spec in command.versions],
             params=[TemplateAssembler._to_param(spec) for spec in command.params],
+            image_repository=command.image_repository,
+            internal_port=command.internal_port,
+            secret_env=command.secret_env,
         )
 
     @staticmethod
