@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom'
 
 import { useCurrentUser } from '../../auth/hooks/useCurrentUser'
+import { useLogout } from '../../auth/hooks/useLogout'
 import { TOPBAR_TITLES, type TopBarTitle } from './navigation'
 import { TopBarActions } from './topbar/TopBarActions'
 import { TopBarSearch } from './topbar/TopBarSearch'
@@ -23,6 +24,7 @@ export function TopBar({ onMenuClick, menuExpanded }: TopBarProps) {
   const { pathname } = useLocation()
   const { title, subtitle } = TOPBAR_TITLES[pathname] ?? FALLBACK_TITLE
   const user = useCurrentUser()
+  const logout = useLogout()
 
   return (
     <header
@@ -57,7 +59,7 @@ export function TopBar({ onMenuClick, menuExpanded }: TopBarProps) {
       <TopBarSearch />
       <TopBarActions />
       <div className="bg-border hidden h-6 w-px sm:block" />
-      <TopBarUser name={user.name} role={user.role} />
+      <TopBarUser name={user.name} role={user.role} onLogout={() => logout.mutate()} />
     </header>
   )
 }
