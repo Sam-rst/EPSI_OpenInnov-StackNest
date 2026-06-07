@@ -7,6 +7,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# URL de l'API cote navigateur. Servi en meme origine derriere le reverse-proxy
+# Nginx, donc chemin relatif /api (Nginx strip ce prefixe vers api:8000).
+# Vite inline cette valeur dans le bundle au build (import.meta.env.VITE_API_URL).
+# Sans elle, baseURL serait vide et le front appellerait l'API a la racine ->
+# servie en SPA fallback (index.html) au lieu d'atteindre le backend.
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=${VITE_API_URL}
+
 COPY . .
 RUN npm run build
 
@@ -32,8 +40,11 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 
+# Cible 127.0.0.1 (et non localhost) : dans l'image Alpine, /etc/hosts resout
+# localhost en ::1 (IPv6) en premier, or nginx (listen 8080) ne bind que l'IPv4.
+# busybox wget ne retombe pas sur l'IPv4 -> le healthcheck echouerait a tort.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-  CMD wget -qO- http://localhost:8080/ > /dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:8080/ > /dev/null || exit 1
 
 # USER 101 est deja positionne par l'image parente nginx-unprivileged.
 # Explicit pour satisfaire Checkov CKV_DOCKER_3.

@@ -26,6 +26,10 @@ from app.auth.infrastructure.repositories.sqlalchemy_user_repository import (
     SqlAlchemyUserRepository,
 )
 from app.auth.infrastructure.security.bcrypt_password_hasher import BcryptPasswordHasher
+from app.catalog.infrastructure.repositories.sqlalchemy_template_repository import (
+    SqlAlchemyTemplateRepository,
+)
+from app.catalog.infrastructure.seed.catalog_seeder import CatalogSeeder
 from app.core.database.engine import get_sessionmaker
 
 
@@ -72,6 +76,15 @@ async def _run_create_admin(email: str, password: str) -> None:
     print(f"Administrateur cree : {created.email} (id={created.id})")
 
 
+async def _run_seed_catalog() -> None:
+    session_factory = get_sessionmaker()
+    async with session_factory() as session:
+        seeder = CatalogSeeder(SqlAlchemyTemplateRepository(session))
+        inserted = await seeder.seed()
+        await session.commit()
+    print(f"Seed catalogue : {inserted} templates inseres (idempotent).")
+
+
 def _prompt_password() -> str:
     password = getpass.getpass("Mot de passe administrateur : ")
     confirmation = getpass.getpass("Confirmez le mot de passe : ")
@@ -95,10 +108,17 @@ def main(argv: list[str] | None = None) -> None:
         help="Mot de passe (sinon demande de maniere masquee).",
     )
 
+    subparsers.add_parser(
+        "seed-catalog",
+        help="Seede le catalogue de templates (idempotent, rejouable).",
+    )
+
     args = parser.parse_args(argv)
     if args.command == "create-admin":
         password = args.password or _prompt_password()
         asyncio.run(_run_create_admin(args.email, password))
+    elif args.command == "seed-catalog":
+        asyncio.run(_run_seed_catalog())
 
 
 if __name__ == "__main__":
