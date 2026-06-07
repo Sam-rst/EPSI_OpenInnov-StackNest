@@ -16,5 +16,6 @@ class TestDeploymentStatusValeurs:
         }
 
     def test_serialise_directement_en_chaine(self) -> None:
-        assert DeploymentStatus.RUNNING == "running"
-        assert f"{DeploymentStatus.PENDING}" == "pending"
+        # StrEnum : la valeur se serialise directement en chaine.
+        assert DeploymentStatus.RUNNING.value == "running"
+        assert str(DeploymentStatus.PENDING) == "pending"

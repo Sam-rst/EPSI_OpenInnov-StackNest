@@ -14,5 +14,6 @@ class TestJobKindValeurs:
         }
 
     def test_serialise_directement_en_chaine(self) -> None:
-        assert JobKind.PROVISION == "provision"
-        assert f"{JobKind.REGENERATE}" == "regenerate"
+        # StrEnum : la valeur se serialise directement en chaine.
+        assert JobKind.PROVISION.value == "provision"
+        assert str(JobKind.REGENERATE) == "regenerate"
