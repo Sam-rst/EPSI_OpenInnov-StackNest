@@ -1,15 +1,43 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { HttpResponse, http } from 'msw'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { routes } from '../router'
 import { ThemeProvider } from '../theme/ThemeProvider'
 import { AuthProvider } from '../../auth/providers/AuthProvider'
+import { server } from '../../../tests/mocks/server'
+
+// Le catalogue charge ses données via React Query (GET /catalog/templates[/:id]).
+// On stubbe les contrats pour que les routes /catalog rendent sans erreur réseau.
+beforeEach(() => {
+  server.use(
+    http.get('*/catalog/templates', () => HttpResponse.json([])),
+    http.get('*/catalog/templates/:id', () =>
+      HttpResponse.json({
+        id: 'tpl-1',
+        slug: 'tpl-1',
+        name: 'Template de test',
+        icon: 'box',
+        category: 'database',
+        provider: 'Docker',
+        tags: [],
+        description: 'Fiche de test du routeur.',
+        popular: false,
+        versions: [],
+        params: [],
+      }),
+    ),
+  )
+})
 
 function renderAt(path: string, isAuthenticated = false) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
-  // QueryClientProvider requis : les pages d'auth (LoginForm…) consomment React Query.
-  const queryClient = new QueryClient()
+  // QueryClientProvider requis : pages d'auth (LoginForm…) et catalogue consomment
+  // React Query. retry:false pour que les routes catalogue échouent vite en test.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -95,7 +123,6 @@ describe('Router — routes placeholder publiques (socle gelé)', () => {
 
 describe('Router — routes placeholder protégées avec paramètre (socle gelé)', () => {
   const protectedDetailPlaceholders: [string, RegExp][] = [
-    ['/catalog/tpl-1', /détail du template/i],
     ['/deployments/dep-1', /détail du déploiement/i],
   ]
 
@@ -106,6 +133,17 @@ describe('Router — routes placeholder protégées avec paramètre (socle gelé
       expectPageHeadingInMain(expectedHeading)
     },
   )
+})
+
+describe('Router — fiche détail catalogue (/catalog/:id, branchée API)', () => {
+  it('monte la fiche détail (lien retour catalogue) quand authentifié', async () => {
+    renderAt('/catalog/tpl-1', true)
+
+    const main = screen.getByRole('main')
+    expect(
+      await within(main).findByRole('link', { name: /retour au catalogue/i }),
+    ).toBeInTheDocument()
+  })
 })
 
 describe('Router — / : landing marketing publique (STN-162)', () => {

@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     refresh_cookie_name: str = "stacknest_refresh"
     refresh_cookie_samesite: Literal["strict", "lax", "none"] = "strict"
     refresh_cookie_secure: bool = True
+    # Chemin du cookie : `/` par defaut car l'API est servie derriere un prefixe
+    # de passerelle `/api` (Vite en dev, Nginx en prod). Un chemin restreint cote
+    # back (ex. `/auth/refresh`) ne matcherait pas l'URL publique
+    # `/api/auth/refresh` -> cookie jamais renvoye. Resserrable via env en prod.
+    refresh_cookie_path: str = "/"
 
     # ---------- CORS ----------
     # Origines autorisees a appeler l'API avec credentials (cookies). Liste
