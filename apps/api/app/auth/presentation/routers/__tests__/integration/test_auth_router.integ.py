@@ -235,8 +235,16 @@ class TestLoginRefreshLogout:
     async def test_refresh_renvoie_un_nouvel_access(self, harness: _AuthTestHarness) -> None:
         email = _unique_email("refresh")
         await self._register(harness, email)
-        await harness.client.post("/auth/login", json={"email": email, "password": "motdepasse1"})
-        # Le client httpx persiste le cookie pose par /auth/login (Path=/auth/refresh).
+        login = await harness.client.post(
+            "/auth/login", json={"email": email, "password": "motdepasse1"}
+        )
+        # Regression : le cookie refresh doit avoir Path=/ (et non /auth/refresh)
+        # pour etre renvoye derriere le prefixe de passerelle /api ; sinon le
+        # navigateur n'enverrait jamais le cookie a /api/auth/refresh.
+        set_cookie = login.headers["set-cookie"].lower()
+        assert "path=/auth/refresh" not in set_cookie
+        assert "path=/" in set_cookie
+        # Le client httpx persiste le cookie pose par /auth/login (Path=/).
         response = await harness.client.post("/auth/refresh")
 
         assert response.status_code == 200
@@ -263,7 +271,7 @@ class TestLoginRefreshLogout:
 
         # Le logout efface le cookie cote client : on re-injecte l'ancien refresh
         # pour verifier qu'il est desormais rejete (token_version bumpee).
-        harness.client.cookies.set("stacknest_refresh", refresh_cookie, path="/auth/refresh")
+        harness.client.cookies.set("stacknest_refresh", refresh_cookie, path="/")
         replay = await harness.client.post("/auth/refresh")
         assert replay.status_code == 401
 
