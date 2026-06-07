@@ -46,7 +46,26 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Service one-shot : applique les migrations Alembic puis seed le catalogue
+  # (idempotent) AVANT que l'API/worker demarrent. Sans lui, la base est vide
+  # au premier `compose up` et l'app est cassee (aucune table, catalogue vide).
+  migrate:
+    image: ${API_IMAGE:-stacknest-api:local}
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    command: ["sh", "-c", "alembic upgrade head && python -m app.cli seed-catalog"]
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://stacknest:stacknest@db:5432/stacknest}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [stacknest]
+    restart: "no"
+
   api:
+    image: ${API_IMAGE:-stacknest-api:local}
     build:
       context: ./apps/api
       dockerfile: Dockerfile
@@ -64,6 +83,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks: [stacknest]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=2).status == 200 else 1)"]
@@ -77,9 +98,11 @@ services:
   # Pour l'instant, on partage l'image api avec une commande no-op qui garde
   # le conteneur en vie afin de valider l'orchestration (6 services CA1).
   worker:
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+    image: ${API_IMAGE:-stacknest-api:local}
+    # Placeholder : ne sert pas d'API HTTP → on desactive le healthcheck herite
+    # de l'image (qui sonde :8000). Le vrai worker (consumer Redis) aura le sien.
+    healthcheck:
+      disable: true
     command: ["python", "-c", "import time; print('[worker] placeholder STN-11 — TODO scaffolder app/worker'); time.sleep(2**31)"]
     environment:
       APP_ENV: ${APP_ENV:-dev}
@@ -88,6 +111,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks: [stacknest]
     restart: unless-stopped
 

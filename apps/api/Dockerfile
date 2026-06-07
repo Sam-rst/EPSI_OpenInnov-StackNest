@@ -17,8 +17,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-# Puis le code applicatif
+# Puis le code applicatif + les migrations Alembic (necessaires au boot pour
+# `alembic upgrade head` cote conteneur — service `migrate` du compose).
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./
 RUN uv sync --frozen --no-dev
 
 
