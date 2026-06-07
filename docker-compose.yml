@@ -94,20 +94,23 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # TODO: worker reel quand le module app/worker sera scaffole (ticket dedie).
-  # Pour l'instant, on partage l'image api avec une commande no-op qui garde
-  # le conteneur en vie afin de valider l'orchestration (6 services CA1).
+  # Worker arq : consomme la file Redis `stacknest:deployment` et orchestre le
+  # cycle de vie reel des conteneurs (PROVISION/STOP/START/DESTROY/REGENERATE)
+  # via le DockerSdkProvisioner. Partage l'image API (meme paquet `app/`) mais
+  # ne sert aucune API HTTP. La cible Docker est `DOCKER_HOST` (vide = demon
+  # local en dev ; ssh://deployer@B injecte par la CD en preview/prod).
   worker:
     image: ${API_IMAGE:-stacknest-api:local}
-    # Placeholder : ne sert pas d'API HTTP → on desactive le healthcheck herite
-    # de l'image (qui sonde :8000). Le vrai worker (consumer Redis) aura le sien.
+    # Ne sert pas d'API HTTP → on desactive le healthcheck herite de l'image
+    # (qui sonde :8000). La sante du worker se lit via Redis/arq, pas via HTTP.
     healthcheck:
       disable: true
-    command: ["python", "-c", "import time; print('[worker] placeholder STN-11 — TODO scaffolder app/worker'); time.sleep(2**31)"]
+    command: ["arq", "app.worker_main.WorkerSettings"]
     environment:
       APP_ENV: ${APP_ENV:-dev}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://stacknest:stacknest@db:5432/stacknest}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DOCKER_HOST: ${DOCKER_HOST:-}
     depends_on:
       redis:
         condition: service_healthy
