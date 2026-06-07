@@ -35,6 +35,7 @@ class TemplateAssembler:
             popular=command.popular,
             tags=list(command.tags),
             is_active=command.is_active,
+            engine=command.engine,
             versions=[TemplateAssembler._to_version(spec) for spec in command.versions],
             params=[TemplateAssembler._to_param(spec) for spec in command.params],
             image_repository=command.image_repository,

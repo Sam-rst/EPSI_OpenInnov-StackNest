@@ -3,6 +3,7 @@
 from uuid import uuid4
 
 from app.catalog.domain.entities.template import Template
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.template_category import TemplateCategory
 from app.catalog.domain.value_objects.slug import Slug
 from app.catalog.presentation.schemas.template_dto_mapper import TemplateDTOMapper
@@ -62,3 +63,20 @@ class TestToCardSansDescripteur:
         assert "image_repository" not in card.model_dump()
         assert "internal_port" not in card.model_dump()
         assert "secret_env" not in card.model_dump()
+
+
+class TestEngineExpose:
+    def test_la_carte_expose_le_moteur(self) -> None:
+        card = TemplateDTOMapper.to_card(_template(engine=EngineKind.TERRAFORM))
+
+        assert card.engine is EngineKind.TERRAFORM
+
+    def test_la_carte_expose_docker_par_defaut(self) -> None:
+        card = TemplateDTOMapper.to_card(_template())
+
+        assert card.engine is EngineKind.DOCKER
+
+    def test_le_detail_expose_le_moteur(self) -> None:
+        detail = TemplateDTOMapper.to_detail(_template(engine=EngineKind.TERRAFORM))
+
+        assert detail.engine is EngineKind.TERRAFORM

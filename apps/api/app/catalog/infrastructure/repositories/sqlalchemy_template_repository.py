@@ -116,3 +116,4 @@ class SqlAlchemyTemplateRepository(TemplateRepository):
         model.popular = template.popular
         model.tags = list(template.tags)
         model.is_active = template.is_active
+        model.engine = template.engine

@@ -1,6 +1,7 @@
 """Tests unitaires des donnees de seed du catalogue (integrite, coherence)."""
 
 from app.catalog.application.commands.template_command import TemplateCommand
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.value_objects.slug import Slug
 from app.catalog.infrastructure.seed.catalog_seed import CATALOG_SEED
 
@@ -131,3 +132,34 @@ class TestSeedDescripteurProvisioning:
         for item in CATALOG_SEED:
             if item.internal_port is not None:
                 assert item.image_repository is not None, item.slug
+
+
+_EXPECTED_TERRAFORM_SLUGS = {"ubuntu-24-04", "elk", "vpc", "s3"}
+
+
+class TestSeedEngine:
+    """Verifie le moteur de provisioning derive de la presence d'une image."""
+
+    def test_ressources_sans_image_sont_terraform(self) -> None:
+        terraform_slugs = {
+            item.slug for item in CATALOG_SEED if item.engine is EngineKind.TERRAFORM
+        }
+
+        assert terraform_slugs == _EXPECTED_TERRAFORM_SLUGS
+
+    def test_ressources_avec_image_sont_docker(self) -> None:
+        for item in CATALOG_SEED:
+            if item.image_repository is not None:
+                assert item.engine is EngineKind.DOCKER, item.slug
+
+    def test_engine_terraform_implique_aucune_image(self) -> None:
+        for item in CATALOG_SEED:
+            if item.engine is EngineKind.TERRAFORM:
+                assert item.image_repository is None, item.slug
+
+    def test_engine_coherent_avec_la_presence_d_image(self) -> None:
+        for item in CATALOG_SEED:
+            expected = (
+                EngineKind.DOCKER if item.image_repository is not None else EngineKind.TERRAFORM
+            )
+            assert item.engine is expected, item.slug
