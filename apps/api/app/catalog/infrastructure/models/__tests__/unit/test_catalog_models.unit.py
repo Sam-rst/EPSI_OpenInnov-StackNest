@@ -27,6 +27,9 @@ class TestTemplateModel:
             "popular",
             "tags",
             "is_active",
+            "image_repository",
+            "internal_port",
+            "secret_env",
             "created_at",
             "updated_at",
         }
@@ -36,6 +39,13 @@ class TestTemplateModel:
 
     def test_is_active_defaut_true(self) -> None:
         assert TemplateModel.__table__.columns["is_active"].server_default is not None
+
+    def test_colonnes_du_descripteur_de_provisioning_sont_nullables(self) -> None:
+        colonnes = TemplateModel.__table__.columns
+
+        assert colonnes["image_repository"].nullable is True
+        assert colonnes["internal_port"].nullable is True
+        assert colonnes["secret_env"].nullable is True
 
 
 class TestTemplateVersionModel:

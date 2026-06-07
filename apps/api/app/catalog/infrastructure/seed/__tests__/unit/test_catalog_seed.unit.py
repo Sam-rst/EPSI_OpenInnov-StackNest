@@ -59,3 +59,75 @@ class TestSeedCoherence:
     def test_les_items_sont_des_commandes(self) -> None:
         for item in CATALOG_SEED:
             assert isinstance(item, TemplateCommand)
+
+
+class TestSeedDescripteurProvisioning:
+    """Verifie le descripteur de provisioning (image/port/secret) par template."""
+
+    _BY_SLUG = {item.slug: item for item in CATALOG_SEED}
+
+    def test_postgresql_pointe_image_postgres(self) -> None:
+        item = self._BY_SLUG["postgresql-16"]
+
+        assert item.image_repository == "postgres"
+        assert item.internal_port == 5432
+        assert item.secret_env == "POSTGRES_PASSWORD"
+
+    def test_redis_sans_secret(self) -> None:
+        item = self._BY_SLUG["redis-7"]
+
+        assert item.image_repository == "redis"
+        assert item.internal_port == 6379
+        assert item.secret_env is None
+
+    def test_nginx_expose_port_80_sans_secret(self) -> None:
+        item = self._BY_SLUG["nginx"]
+
+        assert item.image_repository == "nginx"
+        assert item.internal_port == 80
+        assert item.secret_env is None
+
+    def test_node_sans_port_ni_secret(self) -> None:
+        item = self._BY_SLUG["node-20"]
+
+        assert item.image_repository == "node"
+        assert item.internal_port is None
+        assert item.secret_env is None
+
+    def test_python_sans_port_ni_secret(self) -> None:
+        item = self._BY_SLUG["python-3-13"]
+
+        assert item.image_repository == "python"
+        assert item.internal_port is None
+        assert item.secret_env is None
+
+    def test_ollama_image_avec_namespace(self) -> None:
+        item = self._BY_SLUG["ollama"]
+
+        assert item.image_repository == "ollama/ollama"
+        assert item.internal_port == 11434
+        assert item.secret_env is None
+
+    def test_minio_image_avec_namespace(self) -> None:
+        item = self._BY_SLUG["minio"]
+
+        assert item.image_repository == "minio/minio"
+        assert item.internal_port == 9000
+        assert item.secret_env is None
+
+    def test_s3_bucket_sans_image(self) -> None:
+        item = self._BY_SLUG["s3"]
+
+        assert item.image_repository is None
+        assert item.internal_port is None
+        assert item.secret_env is None
+
+    def test_un_secret_implique_une_image(self) -> None:
+        for item in CATALOG_SEED:
+            if item.secret_env is not None:
+                assert item.image_repository is not None, item.slug
+
+    def test_un_port_interne_implique_une_image(self) -> None:
+        for item in CATALOG_SEED:
+            if item.internal_port is not None:
+                assert item.image_repository is not None, item.slug
