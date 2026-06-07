@@ -64,6 +64,15 @@ class Settings(BaseSettings):
     # `/api/auth/refresh` -> cookie jamais renvoye. Resserrable via env en prod.
     refresh_cookie_path: str = "/"
 
+    # ---------- Provisioning Docker ----------
+    # Cible du demon Docker pour le `DockerSdkProvisioner` (worker de
+    # deploiement). Vide par defaut = demon local (docker-py `from_env`), pratique
+    # en dev. En preview/prod, la CD injecte `DOCKER_HOST=ssh://deployer@B` pour
+    # provisionner sur l'hote d'execution distant (machine B), isole du plan de
+    # controle (cf. spec deploiement, decisions 3 et 4). Aucun secret ici : la cle
+    # SSH est geree hors application (agent SSH / fichier monte).
+    docker_host: str = ""
+
     # ---------- CORS ----------
     # Origines autorisees a appeler l'API avec credentials (cookies). Liste
     # vide par defaut : en dev, le front est servi par le meme reverse-proxy
