@@ -1,0 +1,77 @@
+"""Tests unitaires de l'entite Template (guards metier + agregat)."""
+
+from uuid import uuid4
+
+import pytest
+
+from app.catalog.domain.entities.template import Template
+from app.catalog.domain.entities.template_param import TemplateParam
+from app.catalog.domain.entities.template_version import TemplateVersion
+from app.catalog.domain.enums.param_type import ParamType
+from app.catalog.domain.enums.template_category import TemplateCategory
+from app.catalog.domain.value_objects.slug import Slug
+
+
+def _template(**overrides: object) -> Template:
+    params: dict[str, object] = {
+        "id": uuid4(),
+        "slug": Slug("postgresql-16"),
+        "name": "PostgreSQL",
+        "icon": "database",
+        "category": TemplateCategory.DATABASE,
+        "provider": "Docker",
+        "description": "Base relationnelle managee.",
+        "popular": True,
+        "tags": ["SQL", "Persistant"],
+        "is_active": True,
+        "versions": [],
+        "params": [],
+    }
+    params.update(overrides)
+    return Template(**params)  # type: ignore[arg-type]
+
+
+class TestTemplateValide:
+    def test_construction_nominale(self) -> None:
+        template = _template()
+
+        assert template.name == "PostgreSQL"
+        assert template.category is TemplateCategory.DATABASE
+        assert str(template.slug) == "postgresql-16"
+
+    def test_agregat_porte_versions_et_params(self) -> None:
+        version = TemplateVersion(
+            id=uuid4(), version="16", is_default=True, is_lts=False, eol_date=None
+        )
+        param = TemplateParam(
+            id=uuid4(),
+            key="port",
+            label="Port",
+            type=ParamType.INT,
+            required=False,
+            default_value="5432",
+            options=None,
+            order_index=0,
+        )
+        template = _template(versions=[version], params=[param])
+
+        assert template.versions == [version]
+        assert template.params == [param]
+
+
+class TestTemplateGuards:
+    def test_name_vide_leve_value_error(self) -> None:
+        with pytest.raises(ValueError):
+            _template(name="")
+
+    def test_icon_vide_leve_value_error(self) -> None:
+        with pytest.raises(ValueError):
+            _template(icon="  ")
+
+    def test_provider_vide_leve_value_error(self) -> None:
+        with pytest.raises(ValueError):
+            _template(provider="")
+
+    def test_description_vide_leve_value_error(self) -> None:
+        with pytest.raises(ValueError):
+            _template(description="")
