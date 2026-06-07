@@ -25,9 +25,7 @@ class TemplateDetailDTO(TemplateCardDTO):
     image_repository: str | None = Field(
         None, description="Depot de l'image Docker (image effective : repository:version)."
     )
-    internal_port: int | None = Field(
-        None, description="Port ecoute dans le conteneur (ex. 5432)."
-    )
+    internal_port: int | None = Field(None, description="Port ecoute dans le conteneur (ex. 5432).")
     secret_env: str | None = Field(
         None,
         description="Nom de la variable d'env recevant le mot de passe genere (null si aucun).",
