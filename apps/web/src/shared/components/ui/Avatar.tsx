@@ -44,7 +44,10 @@ export function Avatar({ name, color = '#0d9297', size = 28, className }: Avatar
         height: size,
         fontSize: size * 0.36,
         backgroundColor: color,
-        lineHeight: 1,
+        // `normal` (et non `1`) : la line-box naturelle de la police est
+        // symetrique autour de la glyphe -> capitales parfaitement centrees
+        // verticalement dans le cercle (line-height:1 les remontait de ~1px).
+        lineHeight: 'normal',
       }}
     >
       {computeInitials(name)}
