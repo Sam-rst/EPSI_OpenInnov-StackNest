@@ -7,6 +7,11 @@ uniquement des metadonnees techniques publiques (versions, dates d'EOL connues).
 Les dates d'EOL refletent les calendriers publics des projets a la date de
 redaction (2026) ; elles servent d'illustration de catalogue, pas de source de
 verite operationnelle.
+
+Chaque template porte un descripteur de provisioning optionnel (image_repository
+/ internal_port / secret_env) renseigne pour les ressources Docker (images
+publiques reelles). Les ressources Terraform (VM, VPC, bucket S3) et les stacks
+multi-conteneurs (ELK) le laissent a None.
 """
 
 from datetime import date
@@ -54,6 +59,9 @@ _POSTGRESQL = TemplateCommand(
     popular=True,
     tags=["SQL", "Persistant"],
     is_active=True,
+    image_repository="postgres",
+    internal_port=5432,
+    secret_env="POSTGRES_PASSWORD",
     versions=[
         VersionSpec(version="16", is_default=True, is_lts=False, eol_date=date(2028, 11, 9)),
         VersionSpec(version="15", is_default=False, is_lts=True, eol_date=date(2027, 11, 11)),
@@ -93,6 +101,9 @@ _REDIS = TemplateCommand(
     popular=True,
     tags=["Cache", "In-memory"],
     is_active=True,
+    image_repository="redis",
+    internal_port=6379,
+    secret_env=None,
     versions=[
         VersionSpec(version="7.2", is_default=True, is_lts=False, eol_date=None),
         VersionSpec(version="7.0", is_default=False, is_lts=False, eol_date=date(2025, 12, 31)),
@@ -122,6 +133,9 @@ _MINIO = TemplateCommand(
     popular=False,
     tags=["S3", "Object"],
     is_active=True,
+    image_repository="minio/minio",
+    internal_port=9000,
+    secret_env=None,
     versions=[
         VersionSpec(version="RELEASE.2025-04-22", is_default=True, is_lts=False, eol_date=None),
     ],
@@ -158,6 +172,10 @@ _UBUNTU = TemplateCommand(
     popular=True,
     tags=["VM", "Linux"],
     is_active=True,
+    # Provisionnee par Terraform (VM), pas via une image Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
     versions=[
         VersionSpec(version="24.04 LTS", is_default=True, is_lts=True, eol_date=date(2029, 4, 30)),
         VersionSpec(version="22.04 LTS", is_default=False, is_lts=True, eol_date=date(2027, 4, 30)),
@@ -204,6 +222,9 @@ _NODE = TemplateCommand(
     popular=False,
     tags=["Runtime", "JS"],
     is_active=True,
+    image_repository="node",
+    internal_port=None,
+    secret_env=None,
     versions=[
         VersionSpec(version="20 LTS", is_default=True, is_lts=True, eol_date=date(2026, 4, 30)),
         VersionSpec(version="22 LTS", is_default=False, is_lts=True, eol_date=date(2027, 4, 30)),
@@ -233,6 +254,9 @@ _PYTHON = TemplateCommand(
     popular=False,
     tags=["Runtime", "Python"],
     is_active=True,
+    image_repository="python",
+    internal_port=None,
+    secret_env=None,
     versions=[
         VersionSpec(version="3.13", is_default=True, is_lts=False, eol_date=date(2029, 10, 31)),
         VersionSpec(version="3.12", is_default=False, is_lts=False, eol_date=date(2028, 10, 31)),
@@ -262,6 +286,9 @@ _NGINX = TemplateCommand(
     popular=False,
     tags=["Proxy", "TLS"],
     is_active=True,
+    image_repository="nginx",
+    internal_port=80,
+    secret_env=None,
     versions=[
         VersionSpec(version="1.27", is_default=True, is_lts=False, eol_date=None),
         VersionSpec(version="1.26", is_default=False, is_lts=True, eol_date=None),
@@ -299,6 +326,9 @@ _VAULT = TemplateCommand(
     popular=False,
     tags=["Secrets", "KMS"],
     is_active=True,
+    image_repository="hashicorp/vault",
+    internal_port=8200,
+    secret_env=None,
     versions=[
         VersionSpec(version="1.17", is_default=True, is_lts=False, eol_date=None),
         VersionSpec(version="1.16", is_default=False, is_lts=False, eol_date=None),
@@ -327,6 +357,10 @@ _ELK = TemplateCommand(
     popular=False,
     tags=["Logs", "Search"],
     is_active=True,
+    # Stack multi-conteneurs : pas une image unique provisionnable telle quelle.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
     versions=[
         VersionSpec(version="8.15", is_default=True, is_lts=False, eol_date=None),
         VersionSpec(version="7.17", is_default=False, is_lts=True, eol_date=date(2026, 8, 1)),
@@ -356,6 +390,9 @@ _OLLAMA = TemplateCommand(
     popular=True,
     tags=["LLM", "GPU"],
     is_active=True,
+    image_repository="ollama/ollama",
+    internal_port=11434,
+    secret_env=None,
     versions=[
         VersionSpec(version="0.5", is_default=True, is_lts=False, eol_date=None),
     ],
@@ -392,6 +429,10 @@ _VPC = TemplateCommand(
     popular=False,
     tags=["VPC", "Subnet"],
     is_active=True,
+    # Ressource reseau provisionnee par Terraform, pas un conteneur Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
     versions=[
         VersionSpec(version="v1", is_default=True, is_lts=False, eol_date=None),
     ],
@@ -427,6 +468,10 @@ _S3 = TemplateCommand(
     popular=False,
     tags=["S3", "AWS"],
     is_active=True,
+    # Bucket d'objet (Terraform), pas une image Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
     versions=[
         VersionSpec(version="v1", is_default=True, is_lts=False, eol_date=None),
     ],

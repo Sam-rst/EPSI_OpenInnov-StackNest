@@ -51,3 +51,6 @@ class TemplateCommand:
     is_active: bool
     versions: list[VersionSpec] = field(default_factory=list)
     params: list[ParamSpec] = field(default_factory=list)
+    image_repository: str | None = None
+    internal_port: int | None = None
+    secret_env: str | None = None

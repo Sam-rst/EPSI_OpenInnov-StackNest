@@ -23,6 +23,15 @@ class Template:
     - `is_active` : masque un template sans le supprimer (defaut true).
     - `versions`  : versions disponibles (vide a la creation).
     - `params`    : parametres de provisioning (vide a la creation).
+
+    Descripteur de provisioning (optionnel, consomme par la feature deploiement
+    pour construire un conteneur Docker) :
+
+    - `image_repository` : depot de l'image Docker (ex. `postgres`). L'image
+      effective est `{image_repository}:{version}`.
+    - `internal_port`    : port ecoute dans le conteneur (ex. `5432`).
+    - `secret_env`       : nom de la variable d'environnement recevant le mot de
+      passe genere (ex. `POSTGRES_PASSWORD`) ; `None` si aucun secret.
     """
 
     id: UUID
@@ -37,6 +46,9 @@ class Template:
     is_active: bool = True
     versions: list[TemplateVersion] = field(default_factory=list)
     params: list[TemplateParam] = field(default_factory=list)
+    image_repository: str | None = field(default=None)
+    internal_port: int | None = field(default=None)
+    secret_env: str | None = field(default=None)
     created_at: datetime | None = field(default=None)
     updated_at: datetime | None = field(default=None)
 

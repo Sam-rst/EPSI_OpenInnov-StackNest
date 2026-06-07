@@ -36,6 +36,9 @@ class TemplateDTOMapper:
             tags=list(template.tags),
             description=template.description,
             popular=template.popular,
+            image_repository=template.image_repository,
+            internal_port=template.internal_port,
+            secret_env=template.secret_env,
             versions=[
                 TemplateVersionDTO(
                     version=version.version,

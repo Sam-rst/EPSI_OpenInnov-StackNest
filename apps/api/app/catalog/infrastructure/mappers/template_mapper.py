@@ -40,6 +40,9 @@ class TemplateMapper:
             is_active=model.is_active,
             versions=[TemplateMapper._version_to_entity(v) for v in versions or []],
             params=[TemplateMapper._param_to_entity(p) for p in params or []],
+            image_repository=model.image_repository,
+            internal_port=model.internal_port,
+            secret_env=model.secret_env,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -57,6 +60,9 @@ class TemplateMapper:
             popular=entity.popular,
             tags=list(entity.tags),
             is_active=entity.is_active,
+            image_repository=entity.image_repository,
+            internal_port=entity.internal_port,
+            secret_env=entity.secret_env,
         )
 
     @staticmethod

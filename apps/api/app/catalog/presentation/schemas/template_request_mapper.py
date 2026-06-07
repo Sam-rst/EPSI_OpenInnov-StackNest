@@ -23,6 +23,9 @@ class TemplateRequestMapper:
             popular=request.popular,
             tags=list(request.tags),
             is_active=request.is_active,
+            image_repository=request.image_repository,
+            internal_port=request.internal_port,
+            secret_env=request.secret_env,
             versions=[
                 VersionSpec(
                     version=version.version,
