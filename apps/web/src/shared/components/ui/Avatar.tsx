@@ -1,7 +1,7 @@
 import { cn } from '../../lib/cn'
 
 interface AvatarProps {
-  /** Nom complet — sert au calcul des initiales et au libellé accessible. */
+  /** Nom complet ou email — sert au calcul des initiales et au libellé accessible. */
   name: string
   /** Couleur de fond (par défaut cyan de marque). */
   color?: string
@@ -10,14 +10,21 @@ interface AvatarProps {
   className?: string
 }
 
-const computeInitials = (name: string): string =>
-  name
-    .split(' ')
+// Pour une adresse email (contient « @ »), on dérive les initiales de la partie
+// locale découpée sur . _ - (ex. john.doe@x → « JD », qa-admin@x → « QA »).
+// Sinon, première lettre de chaque mot séparé par des espaces.
+const computeInitials = (name: string): string => {
+  const atIndex = name.indexOf('@')
+  const isEmail = atIndex > 0
+  const source = isEmail ? name.slice(0, atIndex) : name
+  const segments = isEmail ? source.split(/[._-]+/) : source.split(' ')
+  return segments
     .map((part) => part[0])
     .filter(Boolean)
     .slice(0, 2)
     .join('')
     .toUpperCase()
+}
 
 /**
  * Pastille d'initiales pour représenter un utilisateur. Décoratif visuellement

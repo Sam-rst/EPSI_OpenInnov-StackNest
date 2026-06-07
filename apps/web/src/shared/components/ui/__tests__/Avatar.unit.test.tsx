@@ -34,4 +34,22 @@ describe('Avatar', () => {
 
     expect(screen.getByRole('img', { name: 'Yassine Zouitni' })).toBeInTheDocument()
   })
+
+  it('dérive les initiales d’un email depuis la partie locale (points)', () => {
+    render(<Avatar name="john.doe@boite.fr" />)
+
+    expect(screen.getByText('JD')).toBeInTheDocument()
+  })
+
+  it('découpe aussi sur les tirets et underscores de la partie locale', () => {
+    render(<Avatar name="qa-admin@stacknest.local" />)
+
+    expect(screen.getByText('QA')).toBeInTheDocument()
+  })
+
+  it('garde l’email complet comme libellé accessible', () => {
+    render(<Avatar name="john.doe@boite.fr" />)
+
+    expect(screen.getByRole('img', { name: 'john.doe@boite.fr' })).toBeInTheDocument()
+  })
 })
