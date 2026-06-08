@@ -59,5 +59,4 @@ export const ChatStreamEventName = {
   ERROR: 'error',
 } as const
 
-export type ChatStreamEventName =
-  (typeof ChatStreamEventName)[keyof typeof ChatStreamEventName]
+export type ChatStreamEventName = (typeof ChatStreamEventName)[keyof typeof ChatStreamEventName]

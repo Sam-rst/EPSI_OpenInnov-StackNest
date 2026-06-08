@@ -3,8 +3,12 @@ import type { ConversationDTO } from '../types/dto/ConversationDTO'
 /**
  * Fils de discussion d'exemple (display-only) — étiquetés « exemple » dans les
  * titres pour rester honnête tant que le back n'est pas branché. Horodatages
- * relatifs à un « maintenant » glissant calculé au chargement, afin que les
+ * relatifs à un « maintenant » glissant calculé à l'amorce, afin que les
  * libellés (« il y a 2 h ») restent crédibles sans dater la démo.
+ *
+ * Un petit store en mémoire (réinitialisable pour les tests) fait persister les
+ * créations/renommages/suppressions le temps de la session : le seam REST se
+ * comporte comme une vraie liste serveur, sans backend.
  */
 
 const MINUTE_MS = 60_000
@@ -15,7 +19,7 @@ function isoAgo(ms: number): string {
   return new Date(Date.now() - ms).toISOString()
 }
 
-export function buildConversationFixtures(): ConversationDTO[] {
+function seedConversations(): ConversationDTO[] {
   return [
     {
       id: 'c1',
@@ -36,4 +40,40 @@ export function buildConversationFixtures(): ConversationDTO[] {
       updated_at: isoAgo(DAY_MS),
     },
   ]
+}
+
+let store: ConversationDTO[] = seedConversations()
+
+/** Réinitialise le store sur les fils d'exemple (utilisé par les tests). */
+export function resetConversationStore(): void {
+  store = seedConversations()
+}
+
+/** Renvoie une copie de la liste courante des fils. */
+export function listConversationStore(): ConversationDTO[] {
+  return [...store]
+}
+
+/** Insère un fil en tête de liste et le renvoie. */
+export function addConversationToStore(dto: ConversationDTO): ConversationDTO {
+  store = [dto, ...store]
+  return dto
+}
+
+/** Renomme un fil dans le store et renvoie sa version à jour (ou `undefined`). */
+export function renameConversationInStore(id: string, title: string): ConversationDTO | undefined {
+  let updated: ConversationDTO | undefined
+  store = store.map((conversation) => {
+    if (conversation.id !== id) {
+      return conversation
+    }
+    updated = { ...conversation, title, updated_at: new Date().toISOString() }
+    return updated
+  })
+  return updated
+}
+
+/** Supprime un fil du store. */
+export function removeConversationFromStore(id: string): void {
+  store = store.filter((conversation) => conversation.id !== id)
 }

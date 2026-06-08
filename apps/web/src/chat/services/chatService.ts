@@ -1,4 +1,9 @@
-import { buildConversationFixtures } from '../data/conversations.fixtures'
+import {
+  addConversationToStore,
+  listConversationStore,
+  removeConversationFromStore,
+  renameConversationInStore,
+} from '../data/conversations.fixtures'
 import { seedMessagesFor } from '../data/messages.fixtures'
 import { mapConversationDto, mapMessageDto } from '../mappers/chatMapper'
 import type { ConversationDTO } from '../types/dto/ConversationDTO'
@@ -37,7 +42,7 @@ function delay<T>(value: T): Promise<T> {
 
 /** Liste les fils de l'utilisateur (`GET /chat/conversations`). */
 export async function listConversations(): Promise<readonly Conversation[]> {
-  const dtos = await delay<readonly ConversationDTO[]>(buildConversationFixtures())
+  const dtos = await delay<readonly ConversationDTO[]>(listConversationStore())
   return dtos.map(mapConversationDto)
 }
 
@@ -55,12 +60,13 @@ export async function createConversation(title: string): Promise<Conversation> {
     created_at: new Date().toISOString(),
     updated_at: null,
   }
-  return mapConversationDto(await delay(dto))
+  return mapConversationDto(await delay(addConversationToStore(dto)))
 }
 
 /** Renomme un fil (`PATCH /chat/conversations/{id}`) et renvoie son modèle. */
 export async function renameConversation(id: string, title: string): Promise<Conversation> {
-  const dto: ConversationDTO = {
+  const updated = renameConversationInStore(id, title)
+  const dto: ConversationDTO = updated ?? {
     id,
     title,
     created_at: new Date().toISOString(),
@@ -71,7 +77,7 @@ export async function renameConversation(id: string, title: string): Promise<Con
 
 /** Supprime un fil (`DELETE /chat/conversations/{id}`). */
 export async function deleteConversation(id: string): Promise<void> {
-  void id
+  removeConversationFromStore(id)
   await delay(undefined)
 }
 

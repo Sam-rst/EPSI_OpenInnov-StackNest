@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { buildActionResultFrame } from '../data/stream.fixtures'
 import { mapStreamEvent } from '../mappers/chatMapper'
 import { openChatStream } from '../services/chatStreamSeam'
-import type { ActionStatus } from '../types/enums/ActionStatus'
+import { ActionStatus } from '../types/enums/ActionStatus'
 import { MessageRole } from '../types/enums/MessageRole'
 import type { ChatStreamEvent } from '../types/models/ChatStreamEvent'
 import type { Message } from '../types/models/Message'
@@ -21,7 +22,13 @@ interface StreamState {
   lastDeploymentId: string | undefined
 }
 
-const INITIAL_STATE: StreamState = {
+/** État interne : la progression accumulée, étiquetée par le fil courant. */
+interface KeyedStreamState extends StreamState {
+  /** Fil auquel se rapporte la progression — sert à réinitialiser au changement. */
+  keyedId: string
+}
+
+const EMPTY_PROGRESS: StreamState = {
   messages: [],
   streamingText: '',
   isStreaming: false,
@@ -29,9 +36,21 @@ const INITIAL_STATE: StreamState = {
   lastDeploymentId: undefined,
 }
 
+function initialState(conversationId: string): KeyedStreamState {
+  return { ...EMPTY_PROGRESS, keyedId: conversationId }
+}
+
 export interface UseChatStreamResult extends StreamState {
   /** Envoie un message utilisateur et ouvre le flux de réponse de l'assistant. */
   send: (content: string) => void
+  /**
+   * Applique le résultat scripté d'une action confirmée (display-only) : marque
+   * l'action « exécutée » et mémorise le déploiement créé. Au branchement, ce
+   * résultat arrivera par le flux SSE (`action_result`) et cette méthode disparaîtra.
+   */
+  applyActionResult: (actionId: string) => void
+  /** Marque localement une action comme annulée (rejet utilisateur). */
+  rejectActionLocally: (actionId: string) => void
 }
 
 /** Applique le statut résultant à l'action portée par un message. */
@@ -47,8 +66,12 @@ function withActionStatus(
   )
 }
 
-/** Réduit un événement SSE déjà mappé sur l'état accumulé du fil. */
-function reduceEvent(state: StreamState, event: ChatStreamEvent): StreamState {
+/**
+ * Réduit un événement SSE déjà mappé sur l'état accumulé du fil. Générique sur
+ * le type d'état (chaque branche spread `...state`) pour préserver l'étiquette
+ * `keyedId` portée par l'état interne.
+ */
+function reduceEvent<S extends StreamState>(state: S, event: ChatStreamEvent): S {
   switch (event.type) {
     case 'token':
       return { ...state, streamingText: state.streamingText + event.delta }
@@ -95,22 +118,25 @@ function buildUserMessage(content: string): Message {
  * le corps du seam change (ouverture `@microsoft/fetch-event-source` + Bearer).
  */
 export function useChatStream(conversationId: string): UseChatStreamResult {
-  const [state, setState] = useState<StreamState>(INITIAL_STATE)
+  const [state, setState] = useState<KeyedStreamState>(() => initialState(conversationId))
   const controllerRef = useRef<AbortController | undefined>(undefined)
+
+  // Changement de fil : on repart d'un état vierge pendant le rendu (pattern
+  // « ajuster l'état au rendu » de React, sans effet) — un fil n'hérite jamais
+  // de la progression d'un autre. L'abandon du flux courant est délégué à
+  // l'effet ci-dessous (le ref n'est pas touché pendant le rendu).
+  if (state.keyedId !== conversationId) {
+    setState(initialState(conversationId))
+  }
 
   const abortCurrent = useCallback((): void => {
     controllerRef.current?.abort()
     controllerRef.current = undefined
   }, [])
 
-  // Changement de fil (ou démontage) : on abandonne le flux courant et on repart
-  // d'un état vierge — un fil n'hérite jamais de la progression d'un autre.
-  useEffect(() => {
-    setState(INITIAL_STATE)
-    return () => {
-      abortCurrent()
-    }
-  }, [conversationId, abortCurrent])
+  // Abandon du flux quand le fil change (cleanup) ou au démontage : un système
+  // externe (la connexion SSE) qu'on synchronise avec le fil courant.
+  useEffect(() => abortCurrent, [conversationId, abortCurrent])
 
   const send = useCallback(
     (content: string): void => {
@@ -146,5 +172,31 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
     [conversationId, abortCurrent],
   )
 
-  return { ...state, send }
+  const applyActionResult = useCallback((actionId: string): void => {
+    const frame = buildActionResultFrame(actionId)
+    const event = mapStreamEvent(frame.event, frame.data)
+    setState((previous) => reduceEvent(previous, event))
+  }, [])
+
+  const rejectActionLocally = useCallback((actionId: string): void => {
+    setState((previous) => ({
+      ...previous,
+      messages: previous.messages.map((message) =>
+        message.action?.id === actionId
+          ? { ...message, action: { ...message.action, status: ActionStatus.REJECTED } }
+          : message,
+      ),
+    }))
+  }, [])
+
+  return {
+    messages: state.messages,
+    streamingText: state.streamingText,
+    isStreaming: state.isStreaming,
+    error: state.error,
+    lastDeploymentId: state.lastDeploymentId,
+    send,
+    applyActionResult,
+    rejectActionLocally,
+  }
 }

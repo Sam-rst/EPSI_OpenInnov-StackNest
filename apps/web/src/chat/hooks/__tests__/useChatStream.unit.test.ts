@@ -223,4 +223,49 @@ describe('useChatStream (réducteur SSE alimenté par le seam)', () => {
     })
     expect(result.current.lastDeploymentId).toBe('dep-1')
   })
+
+  it('applyActionResult fige l’action exécutée (résultat scripté du seam)', async () => {
+    const { result } = renderHook(() => useChatStream('c1'))
+    act(() => result.current.send('go'))
+    const stream = lastStream()
+
+    act(() => {
+      stream.onFrame(messageFrame('Proposition'))
+      stream.onFrame(actionFrame())
+    })
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(2)
+    })
+
+    act(() => {
+      result.current.applyActionResult('act-1')
+    })
+
+    await waitFor(() => {
+      expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.EXECUTED)
+    })
+    expect(result.current.lastDeploymentId).toBeTruthy()
+  })
+
+  it('rejectActionLocally fige l’action annulée', async () => {
+    const { result } = renderHook(() => useChatStream('c1'))
+    act(() => result.current.send('go'))
+    const stream = lastStream()
+
+    act(() => {
+      stream.onFrame(messageFrame('Proposition'))
+      stream.onFrame(actionFrame())
+    })
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(2)
+    })
+
+    act(() => {
+      result.current.rejectActionLocally('act-1')
+    })
+
+    await waitFor(() => {
+      expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.REJECTED)
+    })
+  })
 })

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
+import { resetConversationStore } from '../../data/conversations.fixtures'
 import { MessageRole } from '../../types/enums/MessageRole'
 import {
   confirmAction,
@@ -12,6 +13,10 @@ import {
 } from '../chatService'
 
 describe('chatService (seam display-only)', () => {
+  beforeEach(() => {
+    resetConversationStore()
+  })
+
   it('liste des fils d’exemple mappés en modèles', async () => {
     const conversations = await listConversations()
 

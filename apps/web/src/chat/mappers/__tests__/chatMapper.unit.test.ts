@@ -87,9 +87,7 @@ describe('chatMapper', () => {
     })
 
     it('retombe sur des valeurs sûres pour des enums inconnus', () => {
-      const proposal = mapActionProposalDto(
-        proposalDto({ kind: 'mystère', status: 'bizarre' }),
-      )
+      const proposal = mapActionProposalDto(proposalDto({ kind: 'mystère', status: 'bizarre' }))
 
       expect(proposal.kind).toBe(ActionKind.DEPLOY)
       expect(proposal.status).toBe(ActionStatus.PROPOSED)
@@ -152,10 +150,7 @@ describe('chatMapper', () => {
     })
 
     it('mappe une proposition d’action', () => {
-      const event = mapStreamEvent(
-        'action_proposed',
-        JSON.stringify({ action: proposalDto() }),
-      )
+      const event = mapStreamEvent('action_proposed', JSON.stringify({ action: proposalDto() }))
 
       expect(event.type).toBe('action_proposed')
       if (event.type === 'action_proposed') {
