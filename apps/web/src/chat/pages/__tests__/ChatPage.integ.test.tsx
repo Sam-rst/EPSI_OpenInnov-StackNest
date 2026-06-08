@@ -1,3 +1,4 @@
+import type { EventSourceMessage, FetchEventSourceInit } from '@microsoft/fetch-event-source'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
@@ -6,63 +7,56 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { server } from '../../../../tests/mocks/server'
 import { createQueryWrapper } from '../../../../tests/utils/queryWrapper'
-import { resetConversationStore } from '../../data/conversations.fixtures'
-import type { ScriptedStreamFrame } from '../../data/stream.fixtures'
-import type { StreamFrameHandler } from '../../services/chatStreamSeam'
+import type { ConversationDetailDTO } from '../../types/dto/ConversationDetailDTO'
 import { ChatStreamEventName } from '../../types/models/ChatStreamEvent'
 import { ChatPage } from '../ChatPage'
 
 /**
- * On mocke le seam SSE (`openChatStream`) : le test capture le handler de trames
- * et pilote le flux (token → message → action_proposed). Les déploiements de
- * l'aside passent par MSW (`GET /deployments`). Le scénario complet : envoi →
- * bulle qui se remplit → carte d'action → confirmation → aside.
+ * On mocke `@microsoft/fetch-event-source` (le flux SSE de la conversation) et le
+ * `tokenStore` (Bearer). Le REST `/chat` et `/deployments` passent par MSW. Le
+ * scénario complet : liste + amorce → envoi (POST 202) → bulle qui se remplit →
+ * carte d'action → confirmation (POST 202) → résultat SSE → statut « Exécutée ».
  */
-const { openChatStreamMock } = vi.hoisted(() => ({ openChatStreamMock: vi.fn() }))
+const { fetchEventSourceMock, getAccessTokenMock } = vi.hoisted(() => ({
+  fetchEventSourceMock: vi.fn(),
+  getAccessTokenMock: vi.fn(),
+}))
 
-vi.mock('../../services/chatStreamSeam', () => ({ openChatStream: openChatStreamMock }))
+vi.mock('@microsoft/fetch-event-source', () => ({
+  fetchEventSource: fetchEventSourceMock,
+  EventStreamContentType: 'text/event-stream',
+}))
 
-let capturedOnFrame: StreamFrameHandler | undefined
+vi.mock('../../../core/api/tokenStore', () => ({ getAccessToken: getAccessTokenMock }))
 
-function emit(frame: ScriptedStreamFrame): void {
-  capturedOnFrame?.(frame)
+let capturedInit: FetchEventSourceInit | undefined
+
+/** Promesse jamais résolue : le flux SSE reste « ouvert » sous le contrôle du test. */
+function neverResolves(): Promise<void> {
+  return new Promise<void>(() => undefined)
 }
 
-function tokenFrame(delta: string): ScriptedStreamFrame {
-  return { event: ChatStreamEventName.TOKEN, data: JSON.stringify({ delta }) }
+function emit(event: string, data: unknown): void {
+  const frame: EventSourceMessage = { id: '', event, data: JSON.stringify(data), retry: undefined }
+  capturedInit?.onmessage?.(frame)
 }
 
-function messageFrame(content: string): ScriptedStreamFrame {
+const DETAIL: ConversationDetailDTO = {
+  conversation: {
+    id: 'c1',
+    title: 'Env de dev Node + Postgres',
+    created_at: '2026-06-08T10:00:00Z',
+    updated_at: '2026-06-08T11:30:00Z',
+  },
+  messages: [{ id: 'm1', role: 'assistant', content: 'Décris-moi ton besoin.', created_at: null }],
+}
+
+function deployProposal(): Record<string, unknown> {
   return {
-    event: ChatStreamEventName.MESSAGE,
-    data: JSON.stringify({
-      message: {
-        id: 'm-final',
-        role: 'assistant',
-        content,
-        created_at: '2026-06-08T12:00:00Z',
-        action: null,
-      },
-    }),
-  }
-}
-
-function actionFrame(): ScriptedStreamFrame {
-  return {
-    event: ChatStreamEventName.ACTION_PROPOSED,
-    data: JSON.stringify({
-      action: {
-        id: 'act-1',
-        kind: 'deploy',
-        status: 'proposed',
-        intent: 'Déployer un PostgreSQL 16 isolé',
-        template_id: 'pg16',
-        version: '16',
-        image: 'postgres:16-alpine',
-        params: { 'Base de données': 'app' },
-        quotas: { CPU: '1 vCPU' },
-      },
-    }),
+    action_id: 'act-1',
+    kind: 'deploy',
+    restatement: 'Déployer un PostgreSQL 16 isolé',
+    recap: { template: 'PostgreSQL', version: '16', name: 'db', params: { db_name: 'app' } },
   }
 }
 
@@ -77,21 +71,22 @@ function renderChat() {
   )
 }
 
-describe('ChatPage (parcours chat IA display-only)', () => {
+describe('ChatPage (parcours chat IA → API REST + SSE)', () => {
   beforeEach(() => {
-    resetConversationStore()
-    capturedOnFrame = undefined
-    openChatStreamMock.mockReset()
-    openChatStreamMock.mockImplementation(
-      (_id: string, _msg: string, onFrame: StreamFrameHandler) => {
-        capturedOnFrame = onFrame
-        return new Promise<void>(() => {
-          // jamais résolu : le flux reste « ouvert » sous le contrôle du test
-        })
-      },
-    )
+    capturedInit = undefined
+    fetchEventSourceMock.mockReset()
+    getAccessTokenMock.mockReset()
+    getAccessTokenMock.mockReturnValue('access-jwt')
+    fetchEventSourceMock.mockImplementation((_url: string, init: FetchEventSourceInit) => {
+      capturedInit = init
+      return neverResolves()
+    })
 
     server.use(
+      http.get('*/chat/conversations', () => HttpResponse.json([DETAIL.conversation])),
+      http.get('*/chat/conversations/c1', () => HttpResponse.json(DETAIL)),
+      http.post('*/chat/conversations/c1/messages', () => new HttpResponse(null, { status: 202 })),
+      http.post('*/chat/actions/act-1/confirm', () => new HttpResponse(null, { status: 202 })),
       http.get('*/deployments', () =>
         HttpResponse.json([
           {
@@ -117,7 +112,7 @@ describe('ChatPage (parcours chat IA display-only)', () => {
     server.resetHandlers()
   })
 
-  it('affiche les 3 colonnes : fils, message d’accueil, déploiements actifs', async () => {
+  it('affiche les 3 colonnes : fils, message d’amorce, déploiements actifs', async () => {
     renderChat()
 
     expect(await screen.findByText(/Env de dev Node \+ Postgres/)).toBeInTheDocument()
@@ -125,54 +120,73 @@ describe('ChatPage (parcours chat IA display-only)', () => {
     expect(await screen.findByText('postgres-prod')).toBeInTheDocument()
   })
 
+  it('ouvre le flux SSE de la conversation active avec le Bearer', async () => {
+    renderChat()
+    await screen.findByText(/Décris-moi ton besoin/)
+
+    await waitFor(() => {
+      expect(fetchEventSourceMock).toHaveBeenCalled()
+    })
+    const [url, init] = fetchEventSourceMock.mock.calls[0] as [string, FetchEventSourceInit]
+    expect(url).toContain('/chat/conversations/c1/stream')
+    expect(init.headers?.Authorization).toBe('Bearer access-jwt')
+  })
+
   it('envoie un message, remplit la bulle puis propose une action confirmable', async () => {
     const user = userEvent.setup()
     renderChat()
-    await screen.findByText(/Env de dev Node \+ Postgres/)
+    await screen.findByText(/Décris-moi ton besoin/)
+    await waitFor(() => expect(fetchEventSourceMock).toHaveBeenCalled())
 
     const textarea = screen.getByRole('textbox')
     await user.type(textarea, 'Je veux un Postgres isolé')
     await user.click(screen.getByRole('button', { name: /Envoyer/ }))
 
-    // Le message utilisateur apparaît.
     expect(screen.getByText('Je veux un Postgres isolé')).toBeInTheDocument()
 
-    // La bulle de streaming se remplit token par token.
     act(() => {
-      emit(tokenFrame('Je prépare '))
-      emit(tokenFrame('une proposition…'))
+      emit(ChatStreamEventName.TOKEN, { delta: 'Je prépare ' })
+      emit(ChatStreamEventName.TOKEN, { delta: 'une proposition…' })
     })
     await waitFor(() => {
       expect(screen.getByText(/Je prépare une proposition…/)).toBeInTheDocument()
     })
 
-    // Message final + carte d'action proposée.
     act(() => {
-      emit(messageFrame('Voici ce que je propose :'))
-      emit(actionFrame())
+      emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal())
     })
     await waitFor(() => {
       expect(screen.getByText(/Déployer un PostgreSQL 16 isolé/)).toBeInTheDocument()
     })
-    expect(screen.getByText('Base de données')).toBeInTheDocument()
+    expect(screen.getByText('db_name')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Confirmer/ })).toBeEnabled()
   })
 
-  it('confirme l’action : la carte passe « Exécutée »', async () => {
+  it('confirme l’action : le résultat SSE passe la carte « Exécutée »', async () => {
     const user = userEvent.setup()
     renderChat()
-    await screen.findByText(/Env de dev Node \+ Postgres/)
+    await screen.findByText(/Décris-moi ton besoin/)
+    await waitFor(() => expect(fetchEventSourceMock).toHaveBeenCalled())
 
     await user.type(screen.getByRole('textbox'), 'go')
     await user.click(screen.getByRole('button', { name: /Envoyer/ }))
 
     act(() => {
-      emit(messageFrame('Proposition :'))
-      emit(actionFrame())
+      emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal())
     })
     await screen.findByRole('button', { name: /Confirmer/ })
 
     await user.click(screen.getByRole('button', { name: /Confirmer/ }))
+
+    // Le résultat d'exécution arrive par le flux SSE (pas d'optimisme local).
+    act(() => {
+      emit(ChatStreamEventName.ACTION_RESULT, {
+        action_id: 'act-1',
+        kind: 'deploy',
+        success: true,
+        deployment_id: 'dep-1',
+      })
+    })
 
     await waitFor(() => {
       expect(screen.getByText('Exécutée')).toBeInTheDocument()
@@ -181,6 +195,26 @@ describe('ChatPage (parcours chat IA display-only)', () => {
 
   it('crée une nouvelle conversation', async () => {
     const user = userEvent.setup()
+    const newConversation = {
+      id: 'c-new',
+      title: 'Nouvelle conversation',
+      created_at: null,
+      updated_at: null,
+    }
+    let created = false
+    server.use(
+      // La liste reflète la création (le hook réinvalide après le POST).
+      http.get('*/chat/conversations', () =>
+        HttpResponse.json(created ? [newConversation, DETAIL.conversation] : [DETAIL.conversation]),
+      ),
+      http.post('*/chat/conversations', () => {
+        created = true
+        return HttpResponse.json(newConversation, { status: 201 })
+      }),
+      http.get('*/chat/conversations/c-new', () =>
+        HttpResponse.json({ conversation: newConversation, messages: [] }),
+      ),
+    )
     renderChat()
     await screen.findByText(/Env de dev Node \+ Postgres/)
 
@@ -189,7 +223,6 @@ describe('ChatPage (parcours chat IA display-only)', () => {
 
     await user.click(screen.getByRole('button', { name: /Nouvelle conversation/ }))
 
-    // Après création : le bouton + le nouveau fil dans la liste.
     await waitFor(() => {
       expect(screen.getAllByText('Nouvelle conversation').length).toBeGreaterThan(1)
     })

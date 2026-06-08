@@ -1,15 +1,14 @@
-import type { ActionProposalDTO } from './ActionProposalDTO'
-import type { MessageDTO } from './MessageDTO'
-
 /**
  * Miroir EXACT des trames du flux SSE `GET /chat/conversations/{id}/stream`.
  *
- * Chaque trame est un événement nommé (`event:` SSE) au `data` JSON typé :
- *   - `token`           → fragment de texte de la réponse en cours (streaming).
- *   - `message`         → message assistant finalisé (remplace le buffer de tokens).
- *   - `action_proposed` → proposition d'action (déclenche la carte de confirmation).
- *   - `action_result`   → résultat d'exécution d'une action confirmée.
- *   - `error`           → erreur métier honnête (affichée à l'utilisateur).
+ * Chaque trame est un événement nommé (`event:` SSE) au `data` JSON typé, calqué
+ * sur les payloads publiés par le back (`SendMessage` / `ConfirmAction` /
+ * `RejectAction`) :
+ *   - `token`           → `{delta}` fragment de texte de la réponse en cours.
+ *   - `message`         → `{content}` message assistant finalisé (texte seul).
+ *   - `action_proposed` → `{action_id, kind, restatement, recap}` proposition.
+ *   - `action_result`   → `{action_id, kind, success, deployment_id}` résultat.
+ *   - `error`           → `{message}` erreur métier honnête.
  *
  * Le mapper transforme ces DTO bruts en `ChatStreamEvent` (union discriminée UI).
  */
@@ -20,25 +19,38 @@ export interface TokenEventDTO {
   delta: string
 }
 
-/** Message assistant finalisé (clôt le streaming du tour courant). */
+/** Message assistant finalisé (texte seul ; clôt le streaming du tour courant). */
 export interface MessageEventDTO {
-  message: MessageDTO
+  /** Contenu textuel complet du message assistant. */
+  content: string
 }
 
-/** Proposition d'action (confirmation avancée) émise par l'assistant. */
+/**
+ * Proposition d'action (confirmation avancée) émise par l'assistant.
+ *
+ * `recap` est un dictionnaire hétérogène construit côté gate : pour un déploiement
+ * `{template, version, name, params}` (où `params` est lui-même un objet), pour le
+ * cycle de vie `{deployment, status}`. Le mapper l'aplatit en lignes affichables.
+ */
 export interface ActionProposedEventDTO {
-  action: ActionProposalDTO
+  action_id: string
+  /** Nature brute de l'action (`deploy` / `stop` / `start` / `regenerate`). */
+  kind: string
+  /** Reformulation de l'intention détectée, en français. */
+  restatement: string
+  /** Récapitulatif clé → valeur (valeurs scalaires ou objets imbriqués). */
+  recap: Readonly<Record<string, unknown>>
 }
 
-/** Résultat d'exécution d'une action confirmée (statut brut + message). */
+/** Résultat d'exécution d'une action confirmée (succès booléen). */
 export interface ActionResultEventDTO {
   action_id: string
-  /** Statut brut résultant (`executed` / `failed`). */
-  status: string
-  /** Identifiant du déploiement créé (action `deploy`), ou `null`. */
-  deployment_id: string | null
-  /** Libellé humain du résultat, ou `null`. */
-  message: string | null
+  /** Nature brute de l'action (`deploy` / `stop` / …). */
+  kind: string
+  /** `true` si la délégation au déploiement a réussi, `false` sinon. */
+  success: boolean
+  /** Identifiant du déploiement créé (action `deploy` réussie), ou `null`. */
+  deployment_id?: string | null
 }
 
 /** Erreur métier honnête remontée dans le flux. */

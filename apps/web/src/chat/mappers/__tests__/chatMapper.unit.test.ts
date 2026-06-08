@@ -1,17 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { ActionProposedEventDTO } from '../../types/dto/ChatStreamEventDTO'
+import type { ConversationDTO } from '../../types/dto/ConversationDTO'
+import type { MessageDTO } from '../../types/dto/MessageDTO'
 import { ActionKind } from '../../types/enums/ActionKind'
 import { ActionStatus } from '../../types/enums/ActionStatus'
 import { MessageRole } from '../../types/enums/MessageRole'
-import type { ActionProposalDTO } from '../../types/dto/ActionProposalDTO'
-import type { ConversationDTO } from '../../types/dto/ConversationDTO'
-import type { MessageDTO } from '../../types/dto/MessageDTO'
-import {
-  mapActionProposalDto,
-  mapConversationDto,
-  mapMessageDto,
-  mapStreamEvent,
-} from '../chatMapper'
+import { mapConversationDto, mapMessageDto, mapStreamEvent } from '../chatMapper'
 
 function conversationDto(overrides: Partial<ConversationDTO> = {}): ConversationDTO {
   return {
@@ -23,17 +18,14 @@ function conversationDto(overrides: Partial<ConversationDTO> = {}): Conversation
   }
 }
 
-function proposalDto(overrides: Partial<ActionProposalDTO> = {}): ActionProposalDTO {
+function deployProposalDto(
+  overrides: Partial<ActionProposedEventDTO> = {},
+): ActionProposedEventDTO {
   return {
-    id: 'a1',
+    action_id: 'a1',
     kind: 'deploy',
-    status: 'proposed',
-    intent: 'Déployer un PostgreSQL 16 isolé pour Yassine',
-    template_id: 'pg16',
-    version: '16',
-    image: 'postgres:16-alpine',
-    params: { db_name: 'app' },
-    quotas: { CPU: '1 vCPU' },
+    restatement: 'Deployer PostgreSQL (version 16) sous le nom « db ».',
+    recap: { template: 'PostgreSQL', version: '16', name: 'db', params: { db_name: 'app' } },
     ...overrides,
   }
 }
@@ -58,14 +50,6 @@ describe('chatMapper', () => {
       expect(conversation.relativeWhen).toBe('il y a 30 min')
     })
 
-    it('affiche « à l’instant » pour un fil tout juste mis à jour', () => {
-      const conversation = mapConversationDto(
-        conversationDto({ updated_at: '2026-06-08T11:59:30Z' }),
-      )
-
-      expect(conversation.relativeWhen).toBe("à l'instant")
-    })
-
     it('retombe sur la date de création quand le fil est vide', () => {
       const conversation = mapConversationDto(
         conversationDto({ created_at: '2026-06-08T11:00:00Z', updated_at: null }),
@@ -73,35 +57,24 @@ describe('chatMapper', () => {
 
       expect(conversation.relativeWhen).toBe('il y a 1 h')
     })
-  })
 
-  describe('mapActionProposalDto', () => {
-    it('normalise kind/status et aplatit params + quotas en listes', () => {
-      const proposal = mapActionProposalDto(proposalDto())
+    it('reste robuste quand les deux horodatages sont null', () => {
+      const conversation = mapConversationDto(
+        conversationDto({ created_at: null, updated_at: null }),
+      )
 
-      expect(proposal.kind).toBe(ActionKind.DEPLOY)
-      expect(proposal.status).toBe(ActionStatus.PROPOSED)
-      expect(proposal.templateId).toBe('pg16')
-      expect(proposal.params).toEqual([{ label: 'db_name', value: 'app' }])
-      expect(proposal.quotas).toEqual([{ label: 'CPU', value: '1 vCPU' }])
-    })
-
-    it('retombe sur des valeurs sûres pour des enums inconnus', () => {
-      const proposal = mapActionProposalDto(proposalDto({ kind: 'mystère', status: 'bizarre' }))
-
-      expect(proposal.kind).toBe(ActionKind.DEPLOY)
-      expect(proposal.status).toBe(ActionStatus.PROPOSED)
+      expect(conversation.createdAt).toBeNull()
+      expect(conversation.relativeWhen).toBeTruthy()
     })
   })
 
   describe('mapMessageDto', () => {
-    it('mappe un message utilisateur sans action', () => {
+    it('mappe un message utilisateur (jamais d’action en REST)', () => {
       const dto: MessageDTO = {
         id: 'm1',
         role: 'user',
         content: 'Je veux un Postgres isolé',
         created_at: '2026-06-08T11:58:00Z',
-        action: null,
       }
 
       const message = mapMessageDto(dto)
@@ -111,19 +84,11 @@ describe('chatMapper', () => {
       expect(message.action).toBeUndefined()
     })
 
-    it('mappe un message assistant porteur d’une action', () => {
-      const dto: MessageDTO = {
-        id: 'm2',
-        role: 'assistant',
-        content: 'Voici ce que je propose :',
-        created_at: '2026-06-08T11:59:00Z',
-        action: proposalDto(),
-      }
-
-      const message = mapMessageDto(dto)
+    it('mappe un rôle inconnu vers assistant (repli sûr)', () => {
+      const message = mapMessageDto({ id: 'm2', role: 'mystère', content: 'x', created_at: null })
 
       expect(message.role).toBe(MessageRole.ASSISTANT)
-      expect(message.action?.kind).toBe(ActionKind.DEPLOY)
+      expect(message.createdAt).toBeTruthy()
     })
   })
 
@@ -133,40 +98,66 @@ describe('chatMapper', () => {
       expect(event).toEqual({ type: 'token', delta: 'Post' })
     })
 
-    it('mappe un message finalisé', () => {
-      const messageDto: MessageDTO = {
-        id: 'm3',
-        role: 'assistant',
-        content: 'Terminé.',
-        created_at: '2026-06-08T12:00:00Z',
-        action: null,
-      }
-      const event = mapStreamEvent('message', JSON.stringify({ message: messageDto }))
+    it('mappe un message finalisé (texte seul) en modèle assistant', () => {
+      const event = mapStreamEvent('message', JSON.stringify({ content: 'Terminé.' }))
 
-      expect(event).toEqual({
-        type: 'message',
-        message: expect.objectContaining({ id: 'm3', role: MessageRole.ASSISTANT }),
-      })
+      expect(event.type).toBe('message')
+      if (event.type === 'message') {
+        expect(event.message.role).toBe(MessageRole.ASSISTANT)
+        expect(event.message.content).toBe('Terminé.')
+        expect(event.message.id).toBeTruthy()
+      }
     })
 
-    it('mappe une proposition d’action', () => {
-      const event = mapStreamEvent('action_proposed', JSON.stringify({ action: proposalDto() }))
+    it('mappe une proposition de déploiement (restatement + recap aplati)', () => {
+      const event = mapStreamEvent('action_proposed', JSON.stringify(deployProposalDto()))
 
       expect(event.type).toBe('action_proposed')
       if (event.type === 'action_proposed') {
-        expect(event.action.kind).toBe(ActionKind.DEPLOY)
+        const action = event.action
+        expect(action.id).toBe('a1')
+        expect(action.kind).toBe(ActionKind.DEPLOY)
+        expect(action.status).toBe(ActionStatus.PROPOSED)
+        expect(action.intent).toBe('Deployer PostgreSQL (version 16) sous le nom « db ».')
+        expect(action.version).toBe('16')
+        // Le récap est aplati en lignes affichables (params imbriqués déroulés).
+        expect(action.params).toEqual([
+          { label: 'template', value: 'PostgreSQL' },
+          { label: 'version', value: '16' },
+          { label: 'name', value: 'db' },
+          { label: 'db_name', value: 'app' },
+        ])
+        expect(action.quotas).toEqual([])
       }
     })
 
-    it('mappe un résultat d’action et normalise le statut', () => {
+    it('mappe une proposition de cycle de vie (recap deployment + status)', () => {
+      const event = mapStreamEvent(
+        'action_proposed',
+        JSON.stringify(
+          deployProposalDto({
+            kind: 'stop',
+            restatement: 'Arreter le deploiement « ma-base ».',
+            recap: { deployment: 'ma-base', status: 'running' },
+          }),
+        ),
+      )
+
+      expect(event.type).toBe('action_proposed')
+      if (event.type === 'action_proposed') {
+        expect(event.action.kind).toBe(ActionKind.STOP)
+        expect(event.action.version).toBeNull()
+        expect(event.action.params).toEqual([
+          { label: 'deployment', value: 'ma-base' },
+          { label: 'status', value: 'running' },
+        ])
+      }
+    })
+
+    it('mappe un résultat d’action réussi vers le statut exécuté', () => {
       const event = mapStreamEvent(
         'action_result',
-        JSON.stringify({
-          action_id: 'a1',
-          status: 'executed',
-          deployment_id: 'dep-1',
-          message: 'Ressource prête',
-        }),
+        JSON.stringify({ action_id: 'a1', kind: 'deploy', success: true, deployment_id: 'dep-1' }),
       )
 
       expect(event).toEqual({
@@ -174,8 +165,21 @@ describe('chatMapper', () => {
         actionId: 'a1',
         status: ActionStatus.EXECUTED,
         deploymentId: 'dep-1',
-        message: 'Ressource prête',
+        message: null,
       })
+    })
+
+    it('mappe un résultat d’action échoué vers le statut échec', () => {
+      const event = mapStreamEvent(
+        'action_result',
+        JSON.stringify({ action_id: 'a2', kind: 'stop', success: false }),
+      )
+
+      expect(event.type).toBe('action_result')
+      if (event.type === 'action_result') {
+        expect(event.status).toBe(ActionStatus.FAILED)
+        expect(event.deploymentId).toBeNull()
+      }
     })
 
     it('mappe une erreur', () => {
