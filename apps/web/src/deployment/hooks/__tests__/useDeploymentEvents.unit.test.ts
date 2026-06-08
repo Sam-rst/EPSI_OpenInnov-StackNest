@@ -1,4 +1,5 @@
-import { act, renderHook } from '@testing-library/react'
+import type { EventSourceMessage, FetchEventSourceInit } from '@microsoft/fetch-event-source'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { DeploymentEventDTO } from '../../types/dto/DeploymentEventDTO'
@@ -7,103 +8,161 @@ import { DeploymentStep } from '../../types/enums/DeploymentStep'
 import { useDeploymentEvents } from '../useDeploymentEvents'
 
 /**
- * Faux `EventSource` contrôlable : enregistre les écouteurs par nom d'event et
- * permet au test d'émettre des trames SSE (nommées d'après le statut, comme le
- * back). Expose `closed` pour vérifier le cleanup.
+ * On mocke entièrement `@microsoft/fetch-event-source` : chaque ouverture de flux
+ * crée une `FakeStream` qui capture l'`init` (headers, signal, callbacks) et
+ * reproduit le contrat de la lib — `onopen`/`onmessage`/`onerror` peuvent lever
+ * pour rejeter la promesse, l'`abort` du signal la résout. Le test pilote ainsi
+ * le flux SSE (events, 401, abandon) sans réseau ni `EventSource` natif.
  */
-class FakeEventSource {
-  static instances: FakeEventSource[] = []
+const { fetchEventSourceMock, refreshAccessTokenMock, getAccessTokenMock } = vi.hoisted(() => ({
+  fetchEventSourceMock: vi.fn(),
+  refreshAccessTokenMock: vi.fn(),
+  getAccessTokenMock: vi.fn(),
+}))
 
-  url: string
-  withCredentials: boolean
-  closed = false
-  private listeners = new Map<string, Set<EventListener>>()
+vi.mock('@microsoft/fetch-event-source', () => ({
+  fetchEventSource: fetchEventSourceMock,
+  EventStreamContentType: 'text/event-stream',
+}))
 
-  constructor(url: string, init?: { withCredentials?: boolean }) {
+vi.mock('../../../core/api/tokenStore', () => ({
+  getAccessToken: getAccessTokenMock,
+}))
+
+vi.mock('../../../core/api/refreshSession', () => ({
+  refreshAccessToken: refreshAccessTokenMock,
+}))
+
+/**
+ * Flux SSE simulé : pilotable par le test, fidèle à la mécanique de la lib
+ * (une erreur dans `onopen`/`onerror` rejette la promesse `fetchEventSource`).
+ */
+class FakeStream {
+  static instances: FakeStream[] = []
+
+  readonly url: string
+  readonly init: FetchEventSourceInit
+  private resolve!: () => void
+  private reject!: (error: unknown) => void
+  readonly promise: Promise<void>
+
+  constructor(url: string, init: FetchEventSourceInit) {
     this.url = url
-    this.withCredentials = init?.withCredentials ?? false
-    FakeEventSource.instances.push(this)
+    this.init = init
+    this.promise = new Promise<void>((resolve, reject) => {
+      this.resolve = resolve
+      this.reject = reject
+    })
+    init.signal?.addEventListener('abort', () => this.resolve())
+    FakeStream.instances.push(this)
   }
 
-  addEventListener(name: string, listener: EventListener): void {
-    const set = this.listeners.get(name) ?? new Set<EventListener>()
-    set.add(listener)
-    this.listeners.set(name, set)
+  /** Émule la réponse HTTP d'ouverture : un `onopen` qui lève rejette la promesse. */
+  open(status: number): void {
+    try {
+      const result = this.init.onopen?.(httpResponse(status))
+      void Promise.resolve(result).catch((error) => this.fail(error))
+    } catch (error) {
+      this.fail(error)
+    }
   }
 
-  removeEventListener(name: string, listener: EventListener): void {
-    this.listeners.get(name)?.delete(listener)
+  /** Émule la réception d'une trame SSE (event nommé d'après le statut). */
+  message(dto: DeploymentEventDTO): void {
+    this.init.onmessage?.(sseFrame(dto))
   }
 
-  close(): void {
-    this.closed = true
-  }
-
-  /** Émet une trame SSE (event nommé d'après le statut, payload JSON). */
-  emit(dto: DeploymentEventDTO): void {
-    const event = new MessageEvent(dto.status, { data: JSON.stringify(dto) })
-    for (const listener of this.listeners.get(dto.status) ?? []) {
-      listener(event)
+  /** Route une erreur via `onerror` comme la lib : si `onerror` lève, on rejette. */
+  private fail(error: unknown): void {
+    try {
+      this.init.onerror?.(error)
+    } catch (rethrown) {
+      this.reject(rethrown)
     }
   }
 }
 
-function frame(overrides: Partial<DeploymentEventDTO> & { status: string }): DeploymentEventDTO {
+/** Construit une réponse HTTP minimale (status + content-type) pour `onopen`. */
+function httpResponse(status: number): Response {
+  const contentType = status === 200 ? 'text/event-stream' : 'application/json'
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (name: string) => (name === 'content-type' ? contentType : null) },
+  } as unknown as Response
+}
+
+/** Construit une trame `EventSourceMessage` (event nommé d'après le statut). */
+function sseFrame(dto: DeploymentEventDTO): EventSourceMessage {
+  return { id: '', event: dto.status, data: JSON.stringify(dto), retry: undefined }
+}
+
+function dtoFrame(overrides: Partial<DeploymentEventDTO> & { status: string }): DeploymentEventDTO {
   return { message: null, access_url: null, secret: null, ...overrides }
 }
 
-/** Renvoie la dernière instance d'`EventSource` simulée, ou échoue le test. */
-function lastSource(): FakeEventSource {
-  const source = FakeEventSource.instances.at(-1)
-  if (source === undefined) {
-    throw new Error('Aucune connexion EventSource ouverte.')
+/** Renvoie le dernier flux SSE ouvert, ou échoue le test. */
+function lastStream(): FakeStream {
+  const stream = FakeStream.instances.at(-1)
+  if (stream === undefined) {
+    throw new Error('Aucun flux fetchEventSource ouvert.')
   }
-  return source
+  return stream
 }
 
-describe('useDeploymentEvents (EventSource réel)', () => {
+describe('useDeploymentEvents (fetchEventSource authentifié)', () => {
   beforeEach(() => {
-    FakeEventSource.instances = []
-    vi.stubGlobal('EventSource', FakeEventSource as unknown as typeof EventSource)
+    FakeStream.instances = []
+    fetchEventSourceMock.mockReset()
+    refreshAccessTokenMock.mockReset()
+    getAccessTokenMock.mockReset()
+    getAccessTokenMock.mockReturnValue('access-jwt')
+
+    fetchEventSourceMock.mockImplementation((url: string, init: FetchEventSourceInit) => {
+      const stream = new FakeStream(url, init)
+      return stream.promise
+    })
   })
 
   afterEach(() => {
-    vi.unstubAllGlobals()
+    vi.clearAllMocks()
   })
 
-  it('ouvre une connexion SSE avec credentials sur le bon endpoint', () => {
+  it('ouvre le flux SSE sur le bon endpoint avec le header Bearer', () => {
     renderHook(() => useDeploymentEvents('dep-1'))
 
-    expect(FakeEventSource.instances).toHaveLength(1)
-    const source = FakeEventSource.instances[0]
-    expect(source?.url).toContain('/deployments/dep-1/events')
-    expect(source?.withCredentials).toBe(true)
+    expect(fetchEventSourceMock).toHaveBeenCalledTimes(1)
+    const stream = lastStream()
+    expect(stream.url).toContain('/deployments/dep-1/events')
+    expect(stream.init.headers?.Authorization).toBe('Bearer access-jwt')
   })
 
-  it('démarre vide puis accumule les logs reçus', () => {
+  it('démarre vide puis accumule les logs reçus', async () => {
     const { result } = renderHook(() => useDeploymentEvents('dep-1'))
-    const source = lastSource()
+    const stream = lastStream()
 
     expect(result.current.logs).toHaveLength(0)
     expect(result.current.isDone).toBe(false)
 
     act(() => {
-      source.emit(frame({ status: 'provisioning', message: 'Pull de l’image…' }))
+      stream.message(dtoFrame({ status: 'provisioning', message: 'Pull de l’image…' }))
     })
 
-    expect(result.current.logs).toHaveLength(1)
+    await waitFor(() => {
+      expect(result.current.logs).toHaveLength(1)
+    })
     expect(result.current.logs[0]?.message).toBe('Pull de l’image…')
     expect(result.current.status).toBe(DeploymentStatus.PROVISIONING)
     expect(result.current.currentStep).toBe(DeploymentStep.PULL_IMAGE)
   })
 
-  it('au passage running, révèle l’accès (url + secret), termine et ferme la connexion', () => {
+  it('au passage running, révèle l’accès (url + secret), termine et abandonne le flux', async () => {
     const { result } = renderHook(() => useDeploymentEvents('dep-1'))
-    const source = lastSource()
+    const stream = lastStream()
 
     act(() => {
-      source.emit(
-        frame({
+      stream.message(
+        dtoFrame({
           status: 'running',
           message: 'Ressource prête',
           access_url: '10.0.0.5:32769',
@@ -112,30 +171,74 @@ describe('useDeploymentEvents (EventSource réel)', () => {
       )
     })
 
+    await waitFor(() => {
+      expect(result.current.isDone).toBe(true)
+    })
     expect(result.current.status).toBe(DeploymentStatus.RUNNING)
     expect(result.current.currentStep).toBe(DeploymentStep.READY)
     expect(result.current.access).toEqual({
       url: '10.0.0.5:32769',
       password: 'mdp-usage-unique',
     })
-    expect(result.current.isDone).toBe(true)
-    expect(source.closed).toBe(true)
+    expect(stream.init.signal?.aborted).toBe(true)
   })
 
-  it('n’ouvre aucune connexion sans identifiant', () => {
+  it('n’ouvre aucun flux sans identifiant', () => {
     const { result } = renderHook(() => useDeploymentEvents(undefined))
 
-    expect(FakeEventSource.instances).toHaveLength(0)
+    expect(fetchEventSourceMock).not.toHaveBeenCalled()
     expect(result.current.logs).toHaveLength(0)
     expect(result.current.isDone).toBe(false)
   })
 
-  it('ferme la connexion au démontage (cleanup)', () => {
+  it('abandonne le flux au démontage (cleanup via AbortController)', () => {
     const { unmount } = renderHook(() => useDeploymentEvents('dep-1'))
-    const source = lastSource()
+    const stream = lastStream()
+
+    expect(stream.init.signal?.aborted).toBe(false)
 
     unmount()
 
-    expect(source.closed).toBe(true)
+    expect(stream.init.signal?.aborted).toBe(true)
+  })
+
+  it('sur 401, rafraîchit l’access token puis rouvre le flux avec le nouveau Bearer', async () => {
+    getAccessTokenMock.mockReturnValueOnce('access-expiré')
+    getAccessTokenMock.mockReturnValue('access-frais')
+    refreshAccessTokenMock.mockResolvedValue(undefined)
+
+    renderHook(() => useDeploymentEvents('dep-1'))
+    const firstStream = lastStream()
+    expect(firstStream.init.headers?.Authorization).toBe('Bearer access-expiré')
+
+    // Le back renvoie 401 (token expiré) : le flux doit déclencher le refresh.
+    await act(async () => {
+      firstStream.open(401)
+    })
+
+    await waitFor(() => {
+      expect(refreshAccessTokenMock).toHaveBeenCalledTimes(1)
+    })
+    await waitFor(() => {
+      expect(fetchEventSourceMock).toHaveBeenCalledTimes(2)
+    })
+    expect(lastStream().init.headers?.Authorization).toBe('Bearer access-frais')
+  })
+
+  it('si le refresh échoue, passe en erreur sans boucle de reconnexion', async () => {
+    refreshAccessTokenMock.mockRejectedValue(new Error('refresh expiré'))
+
+    const { result } = renderHook(() => useDeploymentEvents('dep-1'))
+    const stream = lastStream()
+
+    await act(async () => {
+      stream.open(401)
+    })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+    // Pas de reconnexion : un seul flux ouvert au total.
+    expect(fetchEventSourceMock).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,3 +1,4 @@
+import type { EventSourceMessage, FetchEventSourceInit } from '@microsoft/fetch-event-source'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -9,39 +10,28 @@ import type { DeploymentDTO } from '../../types/dto/DeploymentDTO'
 import type { DeploymentEventDTO } from '../../types/dto/DeploymentEventDTO'
 import { DeploymentDetailPage } from '../DeploymentDetailPage'
 
-/** Faux `EventSource` contrôlable : la dernière instance est pilotée par le test. */
-class FakeEventSource {
-  static last: FakeEventSource | undefined
+/**
+ * On mocke `@microsoft/fetch-event-source` : le flux SSE de la page est piloté par
+ * le test. La dernière instance capture l'`init` (callbacks) pour émettre des
+ * trames sans réseau ni `EventSource` natif.
+ */
+const { fetchEventSourceMock } = vi.hoisted(() => ({ fetchEventSourceMock: vi.fn() }))
 
-  url: string
-  closed = false
-  private listeners = new Map<string, Set<EventListener>>()
+vi.mock('@microsoft/fetch-event-source', () => ({
+  fetchEventSource: fetchEventSourceMock,
+  EventStreamContentType: 'text/event-stream',
+}))
 
-  constructor(url: string) {
-    this.url = url
-    FakeEventSource.last = this
+let lastInit: FetchEventSourceInit | undefined
+
+function emit(dto: DeploymentEventDTO): void {
+  const frame: EventSourceMessage = {
+    id: '',
+    event: dto.status,
+    data: JSON.stringify(dto),
+    retry: undefined,
   }
-
-  addEventListener(name: string, listener: EventListener): void {
-    const set = this.listeners.get(name) ?? new Set<EventListener>()
-    set.add(listener)
-    this.listeners.set(name, set)
-  }
-
-  removeEventListener(name: string, listener: EventListener): void {
-    this.listeners.get(name)?.delete(listener)
-  }
-
-  close(): void {
-    this.closed = true
-  }
-
-  emit(dto: DeploymentEventDTO): void {
-    const event = new MessageEvent(dto.status, { data: JSON.stringify(dto) })
-    for (const listener of this.listeners.get(dto.status) ?? []) {
-      listener(event)
-    }
-  }
+  lastInit?.onmessage?.(frame)
 }
 
 function frame(overrides: Partial<DeploymentEventDTO> & { status: string }): DeploymentEventDTO {
@@ -80,12 +70,18 @@ function renderDetail(id: string) {
 
 describe('DeploymentDetailPage (suivi SSE)', () => {
   beforeEach(() => {
-    vi.stubGlobal('EventSource', FakeEventSource as unknown as typeof EventSource)
-    FakeEventSource.last = undefined
+    lastInit = undefined
+    fetchEventSourceMock.mockReset()
+    fetchEventSourceMock.mockImplementation((_url: string, init: FetchEventSourceInit) => {
+      lastInit = init
+      return new Promise<void>((resolve) => {
+        init.signal?.addEventListener('abort', () => resolve())
+      })
+    })
   })
 
   afterEach(() => {
-    vi.unstubAllGlobals()
+    vi.clearAllMocks()
     server.resetHandlers()
   })
 
@@ -106,8 +102,8 @@ describe('DeploymentDetailPage (suivi SSE)', () => {
     await screen.findByRole('heading', { name: 'postgres-prod' })
 
     act(() => {
-      FakeEventSource.last?.emit(frame({ status: 'provisioning', message: 'Pull…' }))
-      FakeEventSource.last?.emit(
+      emit(frame({ status: 'provisioning', message: 'Pull…' }))
+      emit(
         frame({
           status: 'running',
           message: 'Ressource prête',

@@ -1,15 +1,27 @@
+import type { FetchEventSourceInit } from '@microsoft/fetch-event-source'
 import { render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HttpResponse, http } from 'msw'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { routes } from '../router'
 import { ThemeProvider } from '../theme/ThemeProvider'
 import { AuthProvider } from '../../auth/providers/AuthProvider'
 import { server } from '../../../tests/mocks/server'
 
-// EventSource (flux SSE du suivi déploiement) est stubbé globalement dans
-// tests/setup.ts : la page de suivi en ouvre un, sans émettre d'event ici.
+// Le flux SSE (suivi déploiement) ouvre `fetchEventSource` : on mocke la lib pour
+// qu'aucun fetch réseau ne parte ici (la page de suivi en ouvre un sans qu'on
+// émette d'event). Le flux reste « ouvert » jusqu'à l'abort de cleanup.
+vi.mock('@microsoft/fetch-event-source', () => ({
+  fetchEventSource: vi.fn(
+    (_url: string, init: FetchEventSourceInit) =>
+      new Promise<void>((resolve) => {
+        init.signal?.addEventListener('abort', () => resolve())
+      }),
+  ),
+  EventStreamContentType: 'text/event-stream',
+}))
+
 // Le catalogue et les déploiements chargent leurs données via React Query. On
 // stubbe les contrats pour que les routes rendent sans erreur réseau.
 beforeEach(() => {
