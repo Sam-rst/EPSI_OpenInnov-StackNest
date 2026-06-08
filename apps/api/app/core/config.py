@@ -73,6 +73,24 @@ class Settings(BaseSettings):
     # SSH est geree hors application (agent SSH / fichier monte).
     docker_host: str = ""
 
+    # ---------- Chat IA / LLM ----------
+    # Fournisseur de LLM selectionne (pluggable, cf. design decision 5) :
+    # `ollama` (defaut, local, sans cle), `openai` ou `anthropic`. La fabrique
+    # est tolerante : aucune cle n'est requise au boot, seulement a l'appel
+    # reseau effectif. Source de verite : .env / env vars.
+    llm_provider: str = "ollama"
+    # Cle d'API du fournisseur (OpenAI / Anthropic). Vide par defaut : Ollama ne
+    # requiert pas de cle. La CD injecte la cle reelle via SOPS en preview/prod ;
+    # aucun secret reel n'est code en dur dans le repo.
+    llm_api_key: str = ""
+    # Modele utilise (depend du fournisseur ; default neutre surchargeable).
+    llm_model: str = "llama3.1"
+    # URL de base de l'API du fournisseur. Vide = URL par defaut de l'adaptateur
+    # (api.openai.com / api.anthropic.com / http://localhost:11434 pour Ollama).
+    llm_base_url: str = ""
+    # Timeout (secondes) des appels reseau au fournisseur LLM.
+    llm_timeout_seconds: float = 60.0
+
     # ---------- CORS ----------
     # Origines autorisees a appeler l'API avec credentials (cookies). Liste
     # vide par defaut : en dev, le front est servi par le meme reverse-proxy
