@@ -1,6 +1,7 @@
 import type { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 
-import { clearAccessToken, getAccessToken, setAccessToken } from './tokenStore'
+import { refreshAccessToken } from './refreshSession'
+import { clearAccessToken, getAccessToken } from './tokenStore'
 
 /** Marque une config de requête déjà rejouée après refresh (évite la boucle infinie). */
 interface RetriableConfig extends InternalAxiosRequestConfig {
@@ -22,11 +23,6 @@ const PUBLIC_AUTH_PATHS = ['/auth/login']
 
 /** Code HTTP signalant un access token absent/expiré. */
 const UNAUTHORIZED = 401
-
-function buildRefreshUrl(client: AxiosInstance): string {
-  const baseUrl = client.defaults.baseURL ?? ''
-  return `${baseUrl}/auth/refresh`
-}
 
 function isUnauthorized(status: number | undefined): boolean {
   return status === UNAUTHORIZED
@@ -97,13 +93,6 @@ export function attachAuthInterceptor(
       return client.request(config)
     },
   )
-}
-
-async function refreshAccessToken(client: AxiosInstance): Promise<void> {
-  const { data } = await client.post<{ access_token: string }>(buildRefreshUrl(client), undefined, {
-    _isRefreshCall: true,
-  } as RetriableConfig)
-  setAccessToken(data.access_token)
 }
 
 /**
