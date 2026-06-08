@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.presentation.routers.auth_router import router as auth_router
 from app.catalog.presentation.routers.catalog_router import router as catalog_router
+from app.chat.presentation.routers.chat_router import router as chat_router
 from app.core.config import Settings, get_settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
@@ -83,6 +84,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "qu'une seule fois, sur l'event running)."
                 ),
             },
+            {
+                "name": "Chat IA",
+                "description": (
+                    "Assistant conversationnel : fils de discussion (CRUD), envoi "
+                    "de messages (traitement asynchrone, suivi via flux SSE), et "
+                    "confirmation / rejet des actions proposees (deleguees aux use "
+                    "cases de deploiement). Le LLM ne voit jamais de secret."
+                ),
+            },
         ],
     )
     app.add_middleware(LoggingMiddleware)
@@ -101,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(catalog_router)
     app.include_router(deployment_router)
+    app.include_router(chat_router)
 
     @app.get("/version", tags=["Platform"], summary="Metadonnees de build et de deploiement")
     async def version(settings: SettingsDep) -> VersionResponse:
