@@ -36,4 +36,12 @@ export interface TemplateConfigParam {
   defaultValue: string | null
   options: readonly string[] | null
   orderIndex: number
+  /**
+   * Bornes optionnelles d'un paramètre numérique (`int`), reflétant le
+   * descripteur catalogue quand le back les fournit. Absentes (`undefined`) tant
+   * que le contrat ne les expose pas — l'UI reste alors non bornée (défensif #6).
+   */
+  min?: number
+  max?: number
+  step?: number
 }

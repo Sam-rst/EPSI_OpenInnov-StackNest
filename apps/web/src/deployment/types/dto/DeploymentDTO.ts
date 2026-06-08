@@ -11,6 +11,12 @@
 export interface DeploymentDTO {
   id: string
   template_id: string
+  /**
+   * Nom lisible du template provisionné (ex. « PostgreSQL »), si l'API le joint.
+   * Optionnel : champ récemment ajouté à `DeploymentResponse` — peut être absent
+   * d'un back plus ancien, on le mappe donc défensivement (#13).
+   */
+  template_name?: string | null
   /** Libellé de version déployée (ex. « 16 »). */
   template_version: string
   /** Nom de la ressource saisi à la configuration. */

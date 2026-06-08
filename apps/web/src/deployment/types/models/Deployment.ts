@@ -14,6 +14,11 @@ export interface Deployment {
   id: string
   /** Identifiant du template du catalogue provisionné. */
   templateId: string
+  /**
+   * Nom lisible du template (ex. « PostgreSQL »), si l'API le joint. Optionnel :
+   * on retombe sur `templateId` (UUID) à l'affichage quand il est absent (#13).
+   */
+  templateName?: string
   version: string
   name: string
   status: DeploymentStatus

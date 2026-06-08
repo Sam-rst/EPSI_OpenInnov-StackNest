@@ -32,7 +32,7 @@ export function DockerPreview({ template, values }: DockerPreviewProps) {
       <div className="border-border bg-surface-sunken flex h-10 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
           <Icon name="container" size={13} className="text-cyan" />
-          <span className="text-text-primary font-mono text-[12px]">aperçu conteneur</span>
+          <span className="text-text-primary font-mono text-[12px]">aperçu Docker</span>
           <Badge tone="cyan">live</Badge>
         </div>
         <span className="text-text-muted text-[11px]">secret masqué</span>

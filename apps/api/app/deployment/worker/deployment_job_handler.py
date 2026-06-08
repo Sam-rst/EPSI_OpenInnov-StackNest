@@ -34,6 +34,11 @@ _logger = structlog.get_logger(__name__)
 
 _CONTAINER_REF_KEY = "container_ref"
 
+# Nombre maximal de lignes de log diffusees au passage `running` : un simple tail
+# (cf. retours QC #10), pas un streaming continu. Suffit a alimenter le panneau
+# Logs de l'UI sans surcharger le flux SSE.
+_LOG_TAIL_LINES = 50
+
 
 class DeploymentJobHandler:
     """Traite un `DeploymentJob` en orchestrant repository, provisioner et events.
@@ -166,6 +171,37 @@ class DeploymentJobHandler:
             deployment.id,
             DeploymentEvent(status=DeploymentStatus.RUNNING, access_url=access_url, secret=secret),
         )
+        await self._publish_logs(deployment, result.container_ref)
+
+    async def _publish_logs(self, deployment: Deployment, container_ref: str) -> None:
+        """Diffuse un tail des logs du conteneur (best-effort, jamais bloquant).
+
+        Lecture des logs = I/O infra : un echec ne doit PAS faire echouer le job
+        (le deploiement reste `running`). On ne publie un event que si le tail
+        contient effectivement des lignes (pas de message vide).
+        """
+        try:
+            output = await self._provisioner.logs(container_ref)
+        except Exception as error:  # frontiere infra : logs best-effort
+            _logger.warning(
+                "deployment.job.logs_unavailable",
+                deployment_id=str(deployment.id),
+                error=str(error),
+            )
+            return
+        tail = self._tail(output)
+        if not tail:
+            return
+        await self._publisher.publish(
+            deployment.id,
+            DeploymentEvent(status=DeploymentStatus.RUNNING, message=tail),
+        )
+
+    @staticmethod
+    def _tail(output: str) -> str:
+        """Renvoie les dernieres lignes non vides du log, sans depasser la limite."""
+        lines = [line for line in output.splitlines() if line.strip()]
+        return "\n".join(lines[-_LOG_TAIL_LINES:])
 
     async def _transition(self, deployment: Deployment, status: DeploymentStatus) -> None:
         """Persiste un changement de statut sans metadonnees puis publie l'event."""

@@ -3,10 +3,12 @@
 from uuid import UUID
 
 from app.catalog.domain.entities.template import Template
+from app.catalog.domain.entities.template_param import TemplateParam
 from app.catalog.domain.interfaces.template_repository import TemplateRepository
 from app.deployment.domain.interfaces.template_provisioning_reader import (
     TemplateProvisioningReader,
 )
+from app.deployment.domain.value_objects.template_param_spec import TemplateParamSpec
 from app.deployment.domain.value_objects.template_provisioning import TemplateProvisioning
 
 
@@ -15,8 +17,10 @@ class CatalogTemplateProvisioningReader(TemplateProvisioningReader):
 
     Implemente le port du domaine deploiement en deleguant au `TemplateRepository`
     du catalogue : le slice deploiement reste decouple du catalogue (il ne connait
-    que son port). Renvoie `None` si le template est introuvable ou si la version
-    demandee n'existe pas, ce que le use case traduit en 404.
+    que son port). Projette le nom lisible du template et ses parametres
+    (cle/type/requis/options) — consommes pour valider la creation, masquer les
+    secrets et afficher un nom plutot qu'un UUID. Renvoie `None` si le template est
+    introuvable ou si la version demandee n'existe pas (404 cote use case).
     """
 
     def __init__(self, repository: TemplateRepository) -> None:
@@ -31,9 +35,21 @@ class CatalogTemplateProvisioningReader(TemplateProvisioningReader):
             internal_port=template.internal_port,
             secret_env=template.secret_env,
             engine=template.engine,
+            template_name=template.name,
+            params=tuple(self._to_spec(param) for param in template.params),
         )
 
     @staticmethod
     def _has_version(template: Template, version: str) -> bool:
         """Vrai si le template propose la version demandee."""
         return any(candidate.version == version for candidate in template.versions)
+
+    @staticmethod
+    def _to_spec(param: TemplateParam) -> TemplateParamSpec:
+        """Projette un parametre catalogue en descripteur consomme par le deploiement."""
+        return TemplateParamSpec(
+            key=param.key,
+            type=param.type,
+            required=param.required,
+            options=param.options,
+        )

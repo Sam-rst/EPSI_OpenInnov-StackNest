@@ -52,6 +52,18 @@ describe('mapDeploymentDto', () => {
 
     expect(model.status).toBe(DeploymentStatus.PENDING)
   })
+
+  it('reprend le template_name quand l’API le fournit (#13)', () => {
+    const model = mapDeploymentDto({ ...runningDto, template_name: 'PostgreSQL' })
+
+    expect(model.templateName).toBe('PostgreSQL')
+  })
+
+  it('laisse templateName indéfini quand le champ est absent (défensif #13)', () => {
+    const model = mapDeploymentDto(runningDto)
+
+    expect(model.templateName).toBeUndefined()
+  })
 })
 
 describe('mapDeploymentEventDto', () => {

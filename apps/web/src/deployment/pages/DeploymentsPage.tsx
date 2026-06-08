@@ -8,9 +8,9 @@ import { DeploymentsTable } from '../components/list/DeploymentsTable'
 import { useDeployments } from '../hooks/useDeployments'
 
 /**
- * Liste des déploiements de l'utilisateur (display-only). Affiche un squelette
- * au chargement, un état d'erreur avec réessai, un état vide honnête, ou la
- * table « ressources actives ».
+ * Liste des déploiements de l'utilisateur, branchée sur l'API réelle. Affiche un
+ * squelette au chargement, un état d'erreur avec réessai, un état vide honnête,
+ * ou la table « ressources actives ».
  */
 export function DeploymentsPage() {
   const navigate = useNavigate()

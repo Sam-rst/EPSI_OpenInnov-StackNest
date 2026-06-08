@@ -20,6 +20,11 @@ function mapVersion(dto: TemplateConfigVersionDTO): TemplateConfigVersion {
   }
 }
 
+/** Reprend une borne numérique seulement si le DTO fournit un nombre fini (#6). */
+function optionalNumber(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
 function mapParam(dto: TemplateConfigParamDTO): TemplateConfigParam {
   return {
     key: dto.key,
@@ -29,6 +34,9 @@ function mapParam(dto: TemplateConfigParamDTO): TemplateConfigParam {
     defaultValue: dto.default_value,
     options: dto.options,
     orderIndex: dto.order_index,
+    min: optionalNumber(dto.min),
+    max: optionalNumber(dto.max),
+    step: optionalNumber(dto.step),
   }
 }
 

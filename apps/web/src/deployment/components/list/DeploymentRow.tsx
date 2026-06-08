@@ -31,7 +31,8 @@ export function DeploymentRow({ deployment }: DeploymentRowProps) {
       </td>
       <td className="px-4 py-3">
         <span className="text-text-secondary font-mono text-[12px]">
-          {deployment.templateId} · {deployment.version}
+          {/* Nom lisible du template si l'API le fournit, sinon l'UUID (#13). */}
+          {deployment.templateName ?? deployment.templateId} · {deployment.version}
         </span>
       </td>
       <td className="px-4 py-3">

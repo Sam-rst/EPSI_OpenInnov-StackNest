@@ -22,6 +22,20 @@ services:
       mailhog:
         condition: service_healthy
 
+  # Worker : execution locale des conteneurs via le demon Docker de l'hote.
+  # Le DockerSdkProvisioner (docker.from_env) a besoin du socket Docker pour
+  # parler au demon local. Sans ce montage, le worker plante au demarrage
+  # (FileNotFoundError sur /var/run/docker.sock) et aucun deploiement ne se
+  # provisionne. En prod, on cible un hote d'execution distant via
+  # DOCKER_HOST=ssh://deployer@B a la place (aucun socket monte).
+  worker:
+    # Local uniquement : le socket Docker hote est root:docker, or l'image
+    # tourne en utilisateur non-root -> PermissionError. On force root pour
+    # l'execution locale. En prod (DOCKER_HOST=ssh), pas de socket -> non requis.
+    user: "root"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
   # Inbox de capture : SMTP sur 1025, UI web sur 8025 (http://localhost:8025).
   mailhog:
     image: mailhog/mailhog:v1.0.1
