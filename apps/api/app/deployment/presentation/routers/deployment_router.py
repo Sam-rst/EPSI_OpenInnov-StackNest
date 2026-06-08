@@ -39,6 +39,7 @@ from app.deployment.presentation.dependencies.deployment_providers import (
     get_job_queue,
     get_template_provisioning_reader,
 )
+from app.deployment.presentation.routers.provisioning_resolver import ProvisioningResolver
 from app.deployment.presentation.schemas.deployment_create_request import (
     DeploymentCreateRequest,
 )
@@ -90,7 +91,8 @@ async def create_deployment(
     deployment = await CreateDeployment(repository=repository, queue=queue, reader=reader).execute(
         command
     )
-    return DeploymentResponse.from_entity(deployment)
+    provisioning = await reader.get(deployment.template_id, deployment.template_version)
+    return DeploymentResponse.from_entity(deployment, provisioning)
 
 
 @router.get(
@@ -100,11 +102,19 @@ async def create_deployment(
 )
 async def list_deployments(
     repository: RepositoryDep,
+    reader: ReaderDep,
     user: CurrentUserDep,
 ) -> list[DeploymentResponse]:
-    """Renvoie les deploiements appartenant a l'utilisateur authentifie."""
+    """Renvoie les deploiements de l'utilisateur (template_name + secrets masques)."""
     deployments = await ListDeployments(repository).execute(user.id)
-    return [DeploymentResponse.from_entity(deployment) for deployment in deployments]
+    resolver = ProvisioningResolver(reader)
+    return [
+        DeploymentResponse.from_entity(
+            deployment,
+            await resolver.resolve(deployment.template_id, deployment.template_version),
+        )
+        for deployment in deployments
+    ]
 
 
 @router.get(
@@ -115,11 +125,13 @@ async def list_deployments(
 async def get_deployment(
     deployment_id: UUID,
     repository: RepositoryDep,
+    reader: ReaderDep,
     user: CurrentUserDep,
 ) -> DeploymentResponse:
     """Renvoie le detail d'un deploiement de l'utilisateur, ou 404."""
     deployment = await GetDeployment(repository).execute(deployment_id, user.id)
-    return DeploymentResponse.from_entity(deployment)
+    provisioning = await reader.get(deployment.template_id, deployment.template_version)
+    return DeploymentResponse.from_entity(deployment, provisioning)
 
 
 @router.post(

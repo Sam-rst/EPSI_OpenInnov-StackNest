@@ -24,15 +24,18 @@ class FakeProvisioner(Provisioner):
         self,
         *,
         result: ProvisionResult | None = None,
+        logs_output: str = "",
     ) -> None:
         self._result = result or ProvisionResult(
             host="host-b", port=32768, container_ref="container-new"
         )
+        self._logs_output = logs_output
         self.created: list[ContainerSpec] = []
         self.recreated: list[tuple[ContainerSpec, str]] = []
         self.started: list[str] = []
         self.stopped: list[str] = []
         self.destroyed: list[str] = []
+        self.logs_calls: list[str] = []
 
     async def create(self, spec: ContainerSpec) -> ProvisionResult:
         self.created.append(spec)
@@ -53,7 +56,8 @@ class FakeProvisioner(Provisioner):
         return self._result
 
     async def logs(self, container_ref: str) -> str:
-        return ""
+        self.logs_calls.append(container_ref)
+        return self._logs_output
 
 
 class FailingProvisioner(FakeProvisioner):
@@ -91,3 +95,7 @@ class FakeEventPublisher(EventPublisher):
     def secrets(self) -> list[str]:
         """Secrets non nuls publies (doit n'apparaitre qu'une fois au running)."""
         return [event.secret for _, event in self.events if event.secret is not None]
+
+    def messages(self) -> list[str]:
+        """Messages non nuls publies (logs du conteneur, progression...)."""
+        return [event.message for _, event in self.events if event.message is not None]
