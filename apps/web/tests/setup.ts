@@ -49,6 +49,24 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
     IntersectionObserverStub as unknown as typeof IntersectionObserver
 }
 
+// jsdom n'implémente pas EventSource (utilisé par le flux SSE de suivi des
+// déploiements). Stub no-op par défaut : un test qui pilote le SSE le surcharge
+// via vi.stubGlobal pour émettre des events.
+if (typeof globalThis.EventSource === 'undefined') {
+  class EventSourceStub {
+    close(): void {
+      // no-op : le stub n'émet jamais d'event
+    }
+    addEventListener(): void {
+      // no-op
+    }
+    removeEventListener(): void {
+      // no-op
+    }
+  }
+  globalThis.EventSource = EventSourceStub as unknown as typeof EventSource
+}
+
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' })
 })

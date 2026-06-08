@@ -27,9 +27,8 @@ function LiveBadge({ isDone }: { isDone: boolean }) {
 }
 
 /**
- * Console de logs streamés (simulés en display-only). Auto-scroll en bas à
- * chaque nouvelle ligne ; chaque message est explicitement préfixé « exemple »
- * dans les fixtures pour rester honnête.
+ * Console de logs streamés via SSE. Auto-scroll en bas à chaque nouvelle ligne ;
+ * chaque ligne est dérivée du `message` de l'event de progression réel.
  */
 export function StreamedLogs({ logs, isDone }: StreamedLogsProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -46,7 +45,7 @@ export function StreamedLogs({ logs, isDone }: StreamedLogsProps) {
       <div className="border-border bg-surface-sunken flex h-10 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
           <Icon name="terminal" size={13} className="text-cyan" />
-          <span className="text-text-primary font-mono text-[12px]">Logs (exemple)</span>
+          <span className="text-text-primary font-mono text-[12px]">Logs</span>
         </div>
         <LiveBadge isDone={isDone} />
       </div>

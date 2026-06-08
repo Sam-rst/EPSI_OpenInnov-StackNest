@@ -5,17 +5,18 @@ interface DetailsCardProps {
   deployment: Deployment
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (iso === null) {
+    return '—'
+  }
   const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString('fr-FR')
 }
 
-/** Carte Détails : image, version, accès host:port, params et date de création. */
+/** Carte Détails : template+version, accès host:port, params et date de création. */
 export function DetailsCard({ deployment }: DetailsCardProps) {
   const rows: readonly (readonly [string, string])[] = [
-    ['Template', `${deployment.templateName} ${deployment.version}`],
-    ['Moteur', deployment.engineLabel],
-    ['Image', deployment.image ?? '—'],
+    ['Template', `${deployment.templateId} · ${deployment.version}`],
     ['Accès', deployment.accessUrl ?? 'indisponible'],
     ['Créé le', formatDate(deployment.createdAt)],
   ]

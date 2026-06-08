@@ -1,12 +1,18 @@
 import { renderHook, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { afterEach, describe, expect, it } from 'vitest'
 
+import { server } from '../../../../tests/mocks/server'
 import { createQueryWrapper } from '../../../../tests/utils/queryWrapper'
 import { useDeploymentActions } from '../useDeploymentActions'
 
-describe('useDeploymentActions (stubs display-only)', () => {
+describe('useDeploymentActions (API REST)', () => {
+  afterEach(() => {
+    server.resetHandlers()
+  })
+
   it('expose les quatre actions de cycle de vie', () => {
-    const { result } = renderHook(() => useDeploymentActions('exemple-pg'), {
+    const { result } = renderHook(() => useDeploymentActions('dep-1'), {
       wrapper: createQueryWrapper(),
     })
 
@@ -16,8 +22,10 @@ describe('useDeploymentActions (stubs display-only)', () => {
     expect(typeof result.current.regeneratePassword.mutate).toBe('function')
   })
 
-  it('résout une action sans erreur en display-only', async () => {
-    const { result } = renderHook(() => useDeploymentActions('exemple-pg'), {
+  it('résout l’action stop (202) avec succès', async () => {
+    server.use(http.post('*/deployments/dep-1/stop', () => new HttpResponse(null, { status: 202 })))
+
+    const { result } = renderHook(() => useDeploymentActions('dep-1'), {
       wrapper: createQueryWrapper(),
     })
 
@@ -25,6 +33,22 @@ describe('useDeploymentActions (stubs display-only)', () => {
 
     await waitFor(() => {
       expect(result.current.stop.isSuccess).toBe(true)
+    })
+  })
+
+  it('remonte l’échec d’une action (409)', async () => {
+    server.use(
+      http.post('*/deployments/dep-1/start', () => new HttpResponse(null, { status: 409 })),
+    )
+
+    const { result } = renderHook(() => useDeploymentActions('dep-1'), {
+      wrapper: createQueryWrapper(),
+    })
+
+    result.current.start.mutate()
+
+    await waitFor(() => {
+      expect(result.current.start.isError).toBe(true)
     })
   })
 })

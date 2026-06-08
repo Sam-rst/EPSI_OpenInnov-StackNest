@@ -1,26 +1,18 @@
 /**
- * Miroir d'un déploiement renvoyé par l'API (`GET /deployments`,
- * `GET /deployments/{id}`). Reflète l'entité back `Deployment`
- * (cf. `app/deployment/domain/entities/deployment.py`).
+ * Miroir EXACT d'un déploiement renvoyé par l'API REST (`GET /deployments`,
+ * `GET /deployments/{id}`, `POST /deployments`). Aligné sur le schéma back
+ * `DeploymentResponse` (cf. `app/deployment/presentation/schemas/deployment_response.py`).
  *
- * Contrat figé côté back §5/§7 : `host` + `published_port` ne sont disponibles
- * qu'une fois la ressource provisionnée (sinon `null`). Le mot de passe ne
- * transite JAMAIS par ce DTO : il n'apparaît qu'une fois dans l'event « running ».
+ * Contrat de sécurité figé : `host` + `published_port` ne sont disponibles
+ * qu'une fois la ressource provisionnée (sinon `null`) ; `access_url` (`host:port`)
+ * de même. Le mot de passe ne transite JAMAIS par ce DTO : il n'apparaît qu'une
+ * seule fois dans l'event SSE « running » (cf. `DeploymentEventDTO`).
  */
 export interface DeploymentDTO {
   id: string
-  owner_id: string
   template_id: string
-  /** Nom affiché du template (joint côté API pour l'affichage liste/détail). */
-  template_name: string
-  /** Slug d'icône lucide du template (ex. « database »). */
-  template_icon: string
-  /** Valeur brute de l'enum `engine_kind` (« docker » | « terraform »). */
-  engine: string
   /** Libellé de version déployée (ex. « 16 »). */
   template_version: string
-  /** Dépôt d'image Docker effectif (ex. « postgres »), ou `null`. */
-  image_repository: string | null
   /** Nom de la ressource saisi à la configuration. */
   name: string
   /** Valeur brute de l'enum `deployment_status`. */
@@ -31,8 +23,10 @@ export interface DeploymentDTO {
   host: string | null
   /** Port publié sur l'hôte, ou `null` tant que non provisionné. */
   published_port: number | null
-  /** Date de création ISO 8601. */
-  created_at: string
-  /** Date de dernière mise à jour ISO 8601. */
-  updated_at: string
+  /** Adresse d'accès `host:port` calculée par l'API, ou `null` tant que non publié. */
+  access_url: string | null
+  /** Date de création ISO 8601, ou `null`. */
+  created_at: string | null
+  /** Date de dernière mise à jour ISO 8601, ou `null`. */
+  updated_at: string | null
 }

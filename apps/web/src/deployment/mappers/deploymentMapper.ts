@@ -1,60 +1,73 @@
 import type { DeploymentDTO } from '../types/dto/DeploymentDTO'
 import type { DeploymentEventDTO } from '../types/dto/DeploymentEventDTO'
-import { labelForStatus } from '../types/enums/DeploymentStatus'
-import { labelForEngine } from '../types/enums/EngineKind'
-import { toDeploymentStatus, toEngineKind } from '../types/guards/deploymentGuards'
+import { DeploymentStatus, labelForStatus } from '../types/enums/DeploymentStatus'
+import { toDeploymentStatus } from '../types/guards/deploymentGuards'
 import type { Deployment } from '../types/models/Deployment'
-import type { DeploymentEvent } from '../types/models/DeploymentEvent'
-
-/** Construit l'image effective `repository:version`, ou `null` si non provisionnée. */
-function buildImage(repository: string | null, version: string): string | null {
-  if (repository === null) {
-    return null
-  }
-  return `${repository}:${version}`
-}
-
-/** Construit l'accès `host:port`, ou `null` tant que l'un des deux manque. */
-function buildAccessUrl(host: string | null, port: number | null): string | null {
-  if (host === null || port === null) {
-    return null
-  }
-  return `${host}:${port}`
-}
+import type {
+  DeploymentAccess,
+  DeploymentEvent,
+  DeploymentLog,
+  DeploymentLogLevel,
+} from '../types/models/DeploymentEvent'
 
 /** Mappe un déploiement API (`DeploymentDTO`) vers le modèle UI `Deployment`. */
 export function mapDeploymentDto(dto: DeploymentDTO): Deployment {
-  const engine = toEngineKind(dto.engine)
   const status = toDeploymentStatus(dto.status)
 
   return {
     id: dto.id,
-    ownerId: dto.owner_id,
     templateId: dto.template_id,
-    templateName: dto.template_name,
-    templateIcon: dto.template_icon,
-    engine,
-    engineLabel: labelForEngine(engine),
     version: dto.template_version,
-    image: buildImage(dto.image_repository, dto.template_version),
     name: dto.name,
     status,
     statusLabel: labelForStatus(status),
     params: dto.params,
     host: dto.host,
     port: dto.published_port,
-    accessUrl: buildAccessUrl(dto.host, dto.published_port),
+    accessUrl: dto.access_url,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
   }
 }
 
+/** Déduit le niveau d'affichage d'un log à partir du statut de l'event. */
+function logLevelForStatus(status: DeploymentStatus): DeploymentLogLevel {
+  if (status === DeploymentStatus.FAILED) {
+    return 'err'
+  }
+  if (status === DeploymentStatus.RUNNING) {
+    return 'ok'
+  }
+  return 'info'
+}
+
+/** Horodatage court (HH:MM:SS) au moment de la réception de l'event. */
+function nowTime(): string {
+  return new Date().toLocaleTimeString('fr-FR', { hour12: false })
+}
+
+/** Construit la ligne de log d'un event, à partir de son `message` éventuel. */
+function buildLog(dto: DeploymentEventDTO, status: DeploymentStatus): DeploymentLog | undefined {
+  if (dto.message === null) {
+    return undefined
+  }
+  return { time: nowTime(), level: logLevelForStatus(status), message: dto.message }
+}
+
+/** Construit l'accès d'un event quand l'API a livré l'`access_url` et le secret. */
+function buildAccess(dto: DeploymentEventDTO): DeploymentAccess | undefined {
+  if (dto.access_url === null || dto.secret === null) {
+    return undefined
+  }
+  return { url: dto.access_url, password: dto.secret }
+}
+
 /** Mappe un event SSE (`DeploymentEventDTO`) vers le modèle UI `DeploymentEvent`. */
 export function mapDeploymentEventDto(dto: DeploymentEventDTO): DeploymentEvent {
+  const status = toDeploymentStatus(dto.status)
   return {
-    at: dto.at,
-    status: dto.status === undefined ? undefined : toDeploymentStatus(dto.status),
-    log: dto.log,
-    access: dto.access,
+    status,
+    log: buildLog(dto, status),
+    access: buildAccess(dto),
   }
 }

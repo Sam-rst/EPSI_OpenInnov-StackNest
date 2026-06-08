@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { server } from '../../../../tests/mocks/server'
@@ -45,6 +45,12 @@ const pgDetail: TemplateDetailDTO = {
   ],
 }
 
+/** Page de config factice : révèle le `?template=` reçu pour vérifier le routing. */
+function ConfigProbe() {
+  const [params] = useSearchParams()
+  return <div>Page de configuration de {params.get('template')}</div>
+}
+
 function renderDetail(initialId = 'pg16') {
   const Wrapper = createQueryWrapper()
   return render(
@@ -52,6 +58,7 @@ function renderDetail(initialId = 'pg16') {
       <MemoryRouter initialEntries={[`/catalog/${initialId}`]}>
         <Routes>
           <Route path="/catalog/:id" element={<CatalogDetailPage />} />
+          <Route path="/deployments/config" element={<ConfigProbe />} />
         </Routes>
       </MemoryRouter>
     </Wrapper>,
@@ -74,14 +81,20 @@ describe('CatalogDetailPage', () => {
     expect(screen.getByText('Mot de passe')).toBeInTheDocument()
   })
 
-  it('expose un bouton « Déployer » désactivé (feature à venir)', async () => {
+  it('le bouton « Déployer » mène à la configuration du template', async () => {
     server.use(http.get('*/catalog/templates/pg16', () => HttpResponse.json(pgDetail)))
 
     renderDetail()
     await screen.findByRole('heading', { name: 'PostgreSQL' })
 
     const deployButton = screen.getByRole('button', { name: /Déployer/ })
-    expect(deployButton).toBeDisabled()
+    expect(deployButton).toBeEnabled()
+
+    await userEvent.click(deployButton)
+
+    await waitFor(() => {
+      expect(screen.getByText('Page de configuration de pg16')).toBeInTheDocument()
+    })
   })
 
   it('affiche un état d’erreur honnête quand le template est introuvable', async () => {

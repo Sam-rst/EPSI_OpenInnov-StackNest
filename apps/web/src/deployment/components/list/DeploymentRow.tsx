@@ -8,12 +8,15 @@ interface DeploymentRowProps {
   deployment: Deployment
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (iso === null) {
+    return '—'
+  }
   const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString('fr-FR')
 }
 
-/** Ligne de la table des déploiements : nom · template+moteur · statut · accès · date. */
+/** Ligne de la table des déploiements : nom · template+version · statut · accès · date. */
 export function DeploymentRow({ deployment }: DeploymentRowProps) {
   return (
     <tr className="border-border hover:bg-surface-sunken border-t transition">
@@ -22,15 +25,14 @@ export function DeploymentRow({ deployment }: DeploymentRowProps) {
           to={`/deployments/${deployment.id}`}
           className="text-text-primary hover:text-cyan inline-flex items-center gap-2 font-medium transition"
         >
-          <Icon name={deployment.templateIcon} size={15} className="text-cyan" />
+          <Icon name="box" size={15} className="text-cyan" />
           {deployment.name}
         </Link>
       </td>
       <td className="px-4 py-3">
-        <span className="text-text-secondary mr-2">
-          {deployment.templateName} {deployment.version}
+        <span className="text-text-secondary font-mono text-[12px]">
+          {deployment.templateId} · {deployment.version}
         </span>
-        <Badge tone="neutral">{deployment.engineLabel}</Badge>
       </td>
       <td className="px-4 py-3">
         <Badge tone={toneForStatus(deployment.status)}>{deployment.statusLabel}</Badge>
