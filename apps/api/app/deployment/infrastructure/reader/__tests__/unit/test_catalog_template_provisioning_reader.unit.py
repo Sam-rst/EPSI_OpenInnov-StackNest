@@ -4,8 +4,10 @@ from uuid import uuid4
 
 from app.catalog.application.__tests__.fakes import FakeTemplateRepository, make_template
 from app.catalog.domain.entities.template import Template
+from app.catalog.domain.entities.template_param import TemplateParam
 from app.catalog.domain.entities.template_version import TemplateVersion
 from app.catalog.domain.enums.engine_kind import EngineKind
+from app.catalog.domain.enums.param_type import ParamType
 from app.deployment.infrastructure.reader.catalog_template_provisioning_reader import (
     CatalogTemplateProvisioningReader,
 )
@@ -15,8 +17,27 @@ def _version(label: str) -> TemplateVersion:
     return TemplateVersion(id=uuid4(), version=label, is_default=True, is_lts=False, eol_date=None)
 
 
-def _docker_template(*, versions: list[str]) -> Template:
-    template = make_template(versions=[_version(v) for v in versions])
+def _param(
+    key: str,
+    *,
+    type: ParamType = ParamType.STRING,
+    required: bool = False,
+    options: dict[str, object] | None = None,
+) -> TemplateParam:
+    return TemplateParam(
+        id=uuid4(),
+        key=key,
+        label=key.upper(),
+        type=type,
+        required=required,
+        default_value=None,
+        options=options,
+        order_index=0,
+    )
+
+
+def _docker_template(*, versions: list[str], params: list[TemplateParam] | None = None) -> Template:
+    template = make_template(versions=[_version(v) for v in versions], params=params)
     template.engine = EngineKind.DOCKER
     template.image_repository = "postgres"
     template.internal_port = 5432
@@ -65,3 +86,37 @@ class TestCatalogTemplateProvisioningReader:
         assert descriptor is not None
         assert descriptor.engine is EngineKind.TERRAFORM
         assert descriptor.is_docker() is False
+
+    async def test_projette_le_nom_du_template(self) -> None:
+        template = _docker_template(versions=["16"])
+        template.name = "PostgreSQL"
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "16")
+
+        assert descriptor is not None
+        assert descriptor.template_name == "PostgreSQL"
+
+    async def test_projette_les_parametres_du_template(self) -> None:
+        params = [
+            _param("db_name", required=True),
+            _param("api_key", type=ParamType.SECRET, required=True),
+        ]
+        template = _docker_template(versions=["16"], params=params)
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "16")
+
+        assert descriptor is not None
+        keys = {spec.key for spec in descriptor.params}
+        assert keys == {"db_name", "api_key"}
+        assert descriptor.secret_param_keys() == frozenset({"api_key"})
+
+    async def test_descripteur_sans_parametre(self) -> None:
+        template = _docker_template(versions=["16"])
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "16")
+
+        assert descriptor is not None
+        assert descriptor.params == ()

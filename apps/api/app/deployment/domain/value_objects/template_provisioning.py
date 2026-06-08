@@ -1,8 +1,9 @@
 """Value object TemplateProvisioning : descripteur de provisioning d'un template."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.catalog.domain.enums.engine_kind import EngineKind
+from app.deployment.domain.value_objects.template_param_spec import TemplateParamSpec
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,11 @@ class TemplateProvisioning:
       (ex. `POSTGRES_PASSWORD`), ou `None` si le template ne porte aucun secret.
     - `engine`           : moteur de provisioning (`docker` deployable au MVP,
       `terraform` rejete par la gate moteur — cf. design section 12).
+    - `template_name`    : libelle lisible du template (ex. `PostgreSQL`), expose
+      dans la reponse REST pour eviter d'afficher l'UUID cote UI.
+    - `params`           : descripteurs des parametres attendus (cle/type/requis/
+      options). Pilotent la validation a la creation et le masquage des secrets
+      dans la reponse REST.
 
     `image_repository` doit etre non vide pour un template Docker : la guard
     clause l'exige uniquement quand un libelle est fourni (un template Terraform
@@ -32,6 +38,8 @@ class TemplateProvisioning:
     internal_port: int | None
     secret_env: str | None
     engine: EngineKind
+    template_name: str = ""
+    params: tuple[TemplateParamSpec, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.image_repository is not None and not self.image_repository.strip():
@@ -44,3 +52,7 @@ class TemplateProvisioning:
     def requires_secret(self) -> bool:
         """Vrai si le template declare une variable d'env recevant un secret."""
         return self.secret_env is not None
+
+    def secret_param_keys(self) -> frozenset[str]:
+        """Cles des parametres de type `secret` (a masquer dans la reponse REST)."""
+        return frozenset(spec.key for spec in self.params if spec.is_secret())

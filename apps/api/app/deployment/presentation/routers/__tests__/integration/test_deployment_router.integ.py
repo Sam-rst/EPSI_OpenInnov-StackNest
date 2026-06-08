@@ -25,6 +25,7 @@ from app.auth.presentation.dependencies.current_user import (
     get_token_service,
     get_user_repository,
 )
+from app.catalog.domain.enums.param_type import ParamType
 from app.deployment.application.__tests__.fakes import (
     FakeDeploymentRepository,
     FakeJobQueue,
@@ -37,6 +38,7 @@ from app.deployment.domain.enums.deployment_status import DeploymentStatus
 from app.deployment.domain.enums.job_kind import JobKind
 from app.deployment.domain.interfaces.event_subscriber import EventSubscriber
 from app.deployment.domain.value_objects.deployment_event import DeploymentEvent
+from app.deployment.domain.value_objects.template_param_spec import TemplateParamSpec
 from app.deployment.presentation.dependencies.deployment_providers import (
     get_deployment_repository,
     get_event_subscriber,
@@ -208,6 +210,59 @@ class TestCreate:
 
         assert response.status_code == 404
 
+    async def test_creation_nom_invalide_renvoie_422(self, context: dict[str, object]) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        template_id: UUID = context["template_id"]  # type: ignore[assignment]
+        queue: FakeJobQueue = context["queue"]  # type: ignore[assignment]
+
+        response = await http.post(
+            "/deployments",
+            json={
+                "template_id": str(template_id),
+                "version": "16",
+                "name": "Ma Base!",
+                "params": {},
+            },
+            headers=_auth(user),
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"] == "INVALID_DEPLOYMENT_NAME"
+        # Rien n'a ete enfile : aucun job de provisioning.
+        assert queue.enqueued == []
+
+    async def test_creation_param_requis_manquant_renvoie_422(
+        self, context: dict[str, object]
+    ) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        queue: FakeJobQueue = context["queue"]  # type: ignore[assignment]
+        template_id = UUID(int=42)
+        specs = (
+            TemplateParamSpec(key="db_name", type=ParamType.STRING, required=True, options=None),
+        )
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, "16"): docker_descriptor(params=specs)}
+        )
+        app = http._transport.app  # type: ignore[attr-defined]
+        app.dependency_overrides[get_template_provisioning_reader] = lambda: reader
+
+        response = await http.post(
+            "/deployments",
+            json={
+                "template_id": str(template_id),
+                "version": "16",
+                "name": "ma-base",
+                "params": {},
+            },
+            headers=_auth(user),
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"] == "INVALID_DEPLOYMENT_PARAMS"
+        assert queue.enqueued == []
+
 
 class TestListAndGet:
     async def test_liste_ne_renvoie_que_les_deploiements_de_l_owner(
@@ -264,6 +319,68 @@ class TestListAndGet:
         response = await http.get(f"/deployments/{uuid4()}", headers=_auth(user))
 
         assert response.status_code == 404
+
+
+class TestResponseEnrichment:
+    async def test_detail_expose_le_template_name_et_masque_le_secret(
+        self, context: dict[str, object]
+    ) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        repository: FakeDeploymentRepository = context["repository"]  # type: ignore[assignment]
+        template_id = UUID(int=99)
+        specs = (
+            TemplateParamSpec(key="db_name", type=ParamType.STRING, required=True, options=None),
+            TemplateParamSpec(key="api_key", type=ParamType.SECRET, required=True, options=None),
+        )
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, "16"): docker_descriptor(template_name="PostgreSQL", params=specs)}
+        )
+        app = http._transport.app  # type: ignore[attr-defined]
+        app.dependency_overrides[get_template_provisioning_reader] = lambda: reader
+        deployment = make_deployment(
+            owner_id=user.id, template_id=template_id, template_version="16"
+        )
+        deployment.params = {"db_name": "app", "api_key": "valeur-sensible-xyz"}
+        await repository.add(deployment)
+
+        response = await http.get(f"/deployments/{deployment.id}", headers=_auth(user))
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["template_name"] == "PostgreSQL"
+        assert body["params"]["db_name"] == "app"
+        # La valeur du param secret n'est JAMAIS renvoyee en clair.
+        assert body["params"]["api_key"] != "valeur-sensible-xyz"
+        assert "valeur-sensible-xyz" not in response.text
+
+    async def test_liste_masque_les_secrets_et_expose_template_name(
+        self, context: dict[str, object]
+    ) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        repository: FakeDeploymentRepository = context["repository"]  # type: ignore[assignment]
+        template_id = UUID(int=99)
+        specs = (
+            TemplateParamSpec(key="api_key", type=ParamType.SECRET, required=True, options=None),
+        )
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, "16"): docker_descriptor(template_name="PostgreSQL", params=specs)}
+        )
+        app = http._transport.app  # type: ignore[attr-defined]
+        app.dependency_overrides[get_template_provisioning_reader] = lambda: reader
+        deployment = make_deployment(
+            owner_id=user.id, template_id=template_id, template_version="16"
+        )
+        deployment.params = {"api_key": "secret-de-liste-123"}
+        await repository.add(deployment)
+
+        response = await http.get("/deployments", headers=_auth(user))
+
+        assert response.status_code == 200, response.text
+        assert "secret-de-liste-123" not in response.text
+        item = response.json()[0]
+        assert item["template_name"] == "PostgreSQL"
 
 
 class TestLifecycleActions:

@@ -12,12 +12,22 @@ from app.deployment.application.__tests__.fakes import (
 from app.deployment.domain.enums.deployment_status import DeploymentStatus
 from app.deployment.domain.enums.job_kind import JobKind
 from app.deployment.domain.value_objects.deployment_job import DeploymentJob
+from app.deployment.infrastructure.provisioner.provisioning_exception import (
+    ProvisioningException,
+)
 from app.deployment.worker.__tests__.fakes import (
     FailingProvisioner,
     FakeEventPublisher,
     FakeProvisioner,
 )
 from app.deployment.worker.deployment_job_handler import DeploymentJobHandler
+
+
+class _LogsFailingProvisioner(FakeProvisioner):
+    """Provisioner dont la lecture des logs echoue (le reste fonctionne)."""
+
+    async def logs(self, container_ref: str) -> str:
+        raise ProvisioningException("logs boom")
 
 
 def _handler(
@@ -367,3 +377,77 @@ class TestRegenerate:
         stored = await repository.get_by_id(deployment.id)
         assert stored is not None
         assert stored.status is DeploymentStatus.FAILED
+
+
+class TestRunningLogs:
+    async def test_publie_les_logs_du_conteneur_au_running(self) -> None:
+        template_id = uuid4()
+        deployment = make_deployment(
+            template_id=template_id, status=DeploymentStatus.PENDING, container_ref=None
+        )
+        repository = FakeDeploymentRepository([deployment])
+        publisher = FakeEventPublisher()
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, deployment.template_version): docker_descriptor()}
+        )
+        provisioner = FakeProvisioner(logs_output="ligne 1\nligne 2")
+        handler = _handler(
+            repository=repository,
+            provisioner=provisioner,
+            publisher=publisher,
+            reader=reader,
+        )
+
+        await handler.handle(DeploymentJob(JobKind.PROVISION, deployment.id))
+
+        # Les logs du conteneur (lus via Provisioner.logs) sont diffuses.
+        assert "ligne 1" in " ".join(publisher.messages())
+        assert provisioner.logs_calls == ["container-new"]
+
+    async def test_logs_indisponibles_n_empechent_pas_le_running(self) -> None:
+        # La lecture des logs est best-effort : un echec ne fait pas basculer en
+        # failed, le deploiement reste running.
+        template_id = uuid4()
+        deployment = make_deployment(
+            template_id=template_id, status=DeploymentStatus.PENDING, container_ref=None
+        )
+        repository = FakeDeploymentRepository([deployment])
+        publisher = FakeEventPublisher()
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, deployment.template_version): docker_descriptor()}
+        )
+        handler = _handler(
+            repository=repository,
+            provisioner=_LogsFailingProvisioner(),
+            publisher=publisher,
+            reader=reader,
+        )
+
+        await handler.handle(DeploymentJob(JobKind.PROVISION, deployment.id))
+
+        stored = await repository.get_by_id(deployment.id)
+        assert stored is not None
+        assert stored.status is DeploymentStatus.RUNNING
+        assert publisher.statuses()[-1] == "running"
+
+    async def test_pas_d_event_log_quand_aucune_ligne(self) -> None:
+        # Tail vide : on ne pollue pas le flux avec un message vide.
+        template_id = uuid4()
+        deployment = make_deployment(
+            template_id=template_id, status=DeploymentStatus.PENDING, container_ref=None
+        )
+        repository = FakeDeploymentRepository([deployment])
+        publisher = FakeEventPublisher()
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, deployment.template_version): docker_descriptor()}
+        )
+        handler = _handler(
+            repository=repository,
+            provisioner=FakeProvisioner(logs_output="   "),
+            publisher=publisher,
+            reader=reader,
+        )
+
+        await handler.handle(DeploymentJob(JobKind.PROVISION, deployment.id))
+
+        assert publisher.messages() == []

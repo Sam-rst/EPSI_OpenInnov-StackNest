@@ -16,6 +16,7 @@ from app.deployment.domain.interfaces.template_provisioning_reader import (
     TemplateProvisioningReader,
 )
 from app.deployment.domain.value_objects.deployment_job import DeploymentJob
+from app.deployment.domain.value_objects.template_param_spec import TemplateParamSpec
 from app.deployment.domain.value_objects.template_provisioning import TemplateProvisioning
 
 
@@ -116,6 +117,8 @@ def docker_descriptor(
     image_repository: str = "postgres",
     internal_port: int | None = 5432,
     secret_env: str | None = "POSTGRES_PASSWORD",
+    template_name: str = "PostgreSQL",
+    params: tuple[TemplateParamSpec, ...] = (),
 ) -> TemplateProvisioning:
     """Descripteur de provisioning Docker valide pour les tests."""
     return TemplateProvisioning(
@@ -123,6 +126,8 @@ def docker_descriptor(
         internal_port=internal_port,
         secret_env=secret_env,
         engine=EngineKind.DOCKER,
+        template_name=template_name,
+        params=params,
     )
 
 
