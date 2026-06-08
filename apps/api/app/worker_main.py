@@ -29,6 +29,14 @@ from app.catalog.infrastructure.repositories.sqlalchemy_template_repository impo
     SqlAlchemyTemplateRepository,
 )
 from app.core.config import get_settings
+
+# Enregistre TOUS les modeles ORM (User/Template/Deployment...) sur le metadata
+# partage. Indispensable dans cet entrypoint worker autonome : sans cet import,
+# les modeles auth/catalog ne sont pas charges et les FK de `deployments`
+# (owner_id -> users, template_id -> templates) ne se resolvent pas
+# (sqlalchemy NoReferencedTableError). L'API n'a pas ce probleme car elle importe
+# tous les routers (donc tous les modeles) au boot.
+from app.core.database import models_registry as _models_registry  # noqa: F401
 from app.core.database.engine import get_sessionmaker
 from app.deployment.domain.interfaces.provisioner import Provisioner
 from app.deployment.domain.value_objects.deployment_job import DeploymentJob

@@ -13,6 +13,7 @@ loggue : seuls l'image, les labels et le port publie le sont.
 """
 
 import asyncio
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -32,6 +33,11 @@ _logger = structlog.get_logger(__name__)
 _LOCAL_HOST = "localhost"
 _NANO_CPUS_PER_CORE = 1_000_000_000
 _PROTOCOL = "tcp"
+# Apres `run(detach=True)`, Docker peuple le mapping de port de maniere
+# asynchrone : `container.ports` est souvent vide juste apres le run. On poll
+# `reload()` jusqu'a ce que le port hote ephemere soit assigne (race docker-py).
+_PORT_POLL_ATTEMPTS = 40
+_PORT_POLL_DELAY_SECONDS = 0.25
 
 
 class DockerSdkProvisioner(Provisioner):
@@ -134,9 +140,8 @@ class DockerSdkProvisioner(Provisioner):
         try:
             await asyncio.to_thread(self._pull_image, spec.image)
             container = await asyncio.to_thread(self._run_detached, run_kwargs)
-            await asyncio.to_thread(container.reload)
             container_ref = _require_container_id(container.id)
-            port = _read_published_port(container.ports, spec.internal_port)
+            port = await asyncio.to_thread(_await_published_port, container, spec.internal_port)
         except ProvisioningException:
             raise
         except Exception as err:  # frontiere infra docker-py : on traduit toute erreur
@@ -202,6 +207,25 @@ def _read_published_port(ports: dict[str, Any] | None, internal_port: int | None
         raise ProvisioningException("ContainerSpec sans port interne : rien a publier.")
     host_port = _host_port_of((ports or {}).get(f"{internal_port}/{_PROTOCOL}"))
     return _require_port(host_port)
+
+
+def _await_published_port(container: Container, internal_port: int | None) -> int:
+    """Relit l'etat du conteneur jusqu'a ce que Docker ait publie le port hote.
+
+    Apres `containers.run(detach=True)`, `container.ports` est souvent vide : le
+    binding de port apparait de maniere asynchrone. On poll `reload()` jusqu'a
+    `_PORT_POLL_ATTEMPTS`, sinon on leve `ProvisioningException` (timeout).
+    """
+    if internal_port is None:
+        raise ProvisioningException("ContainerSpec sans port interne : rien a publier.")
+    key = f"{internal_port}/{_PROTOCOL}"
+    for _ in range(_PORT_POLL_ATTEMPTS):
+        container.reload()
+        host_port = _host_port_of((container.ports or {}).get(key))
+        if host_port is not None:
+            return host_port
+        time.sleep(_PORT_POLL_DELAY_SECONDS)
+    raise ProvisioningException("Aucun port publie par Docker pour ce conteneur (timeout).")
 
 
 def _read_first_published_port(ports: dict[str, Any] | None) -> int:
