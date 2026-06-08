@@ -57,9 +57,14 @@ export function DeploymentDetailPage() {
     )
   }
 
-  // Statut affiché : la progression simulée prime dès qu'elle a démarré, sinon
-  // on retombe sur le statut persisté de la ressource.
-  const hasProgressed = events.logs.length > 0
+  // Statut affiché : le flux SSE prime dès qu'il a émis un état (log reçu, accès
+  // livré, statut sorti de l'état initial, ou flux terminé) ; sinon on retombe
+  // sur le statut persisté de la ressource (chargé en REST).
+  const hasProgressed =
+    events.logs.length > 0 ||
+    events.access !== undefined ||
+    events.isDone ||
+    events.status !== DeploymentStatus.PENDING
   const liveStatus = hasProgressed ? events.status : deployment.status
   const failed = liveStatus === DeploymentStatus.FAILED
   const currentStep =

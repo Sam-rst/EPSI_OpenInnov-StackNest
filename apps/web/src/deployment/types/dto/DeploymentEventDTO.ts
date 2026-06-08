@@ -1,40 +1,21 @@
 /**
- * Miroir d'un event SSE du flux `GET /deployments/{id}/events` (back §5/§7).
+ * Miroir EXACT d'une trame SSE du flux `GET /deployments/{id}/events`.
+ * Aligné sur le payload back `format_deployment_event_sse`
+ * (cf. `app/deployment/presentation/schemas/deployment_event_sse.py`).
  *
- * Deux familles d'events :
- * - transition de statut (`status` renseigné) → met à jour le badge + le stepper ;
- * - ligne de log (`log` renseigné) → append dans la console live.
- *
- * Le champ `access` (host/port/user/password) n'est présent QU'UNE seule fois,
- * dans l'event de passage à « running ». Le mot de passe n'est jamais reloggé.
+ * Chaque event porte le nouveau `status` du déploiement et un `message` humain
+ * optionnel (progression / cause d'échec). Le couple `access_url` (`host:port`)
+ * + `secret` n'est renseigné QU'UNE seule fois, sur l'event de passage à
+ * « running » : c'est le seul canal où le mot de passe transite (jamais en REST),
+ * affiché une seule fois côté client.
  */
 export interface DeploymentEventDTO {
-  /** Horodatage ISO 8601 de l'event. */
-  at: string
-  /** Nouveau statut (valeur brute de `deployment_status`), si transition. */
-  status?: string
-  /** Ligne de log streamée, si event de log. */
-  log?: DeploymentLogDTO
-  /** Accès complets transmis une seule fois au passage « running ». */
-  access?: DeploymentAccessDTO
-}
-
-/** Niveau d'une ligne de log streamée. */
-export type DeploymentLogLevelDTO = 'info' | 'ok' | 'err'
-
-/** Une ligne de log `docker logs` streamée via SSE. */
-export interface DeploymentLogDTO {
-  /** Horodatage court affiché (ex. « 14:32:18 »). */
-  time: string
-  level: DeploymentLogLevelDTO
-  message: string
-}
-
-/** Accès à la ressource, transmis une seule fois (event « running »). */
-export interface DeploymentAccessDTO {
-  host: string
-  port: number
-  user: string
-  /** Mot de passe généré, affiché une seule fois (jamais re-récupérable). */
-  password: string
+  /** Nouveau statut du déploiement (valeur brute de `deployment_status`). */
+  status: string
+  /** Libellé humain de progression / d'échec, ou `null`. */
+  message: string | null
+  /** Accès `host:port` (uniquement à l'état running), ou `null`. */
+  access_url: string | null
+  /** Mot de passe généré (uniquement à l'état running, une fois), ou `null`. */
+  secret: string | null
 }

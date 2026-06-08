@@ -8,8 +8,10 @@ import { ThemeProvider } from '../theme/ThemeProvider'
 import { AuthProvider } from '../../auth/providers/AuthProvider'
 import { server } from '../../../tests/mocks/server'
 
-// Le catalogue charge ses données via React Query (GET /catalog/templates[/:id]).
-// On stubbe les contrats pour que les routes /catalog rendent sans erreur réseau.
+// EventSource (flux SSE du suivi déploiement) est stubbé globalement dans
+// tests/setup.ts : la page de suivi en ouvre un, sans émettre d'event ici.
+// Le catalogue et les déploiements chargent leurs données via React Query. On
+// stubbe les contrats pour que les routes rendent sans erreur réseau.
 beforeEach(() => {
   server.use(
     http.get('*/catalog/templates', () => HttpResponse.json([])),
@@ -26,6 +28,21 @@ beforeEach(() => {
         popular: false,
         versions: [],
         params: [],
+      }),
+    ),
+    http.get('*/deployments/:id', ({ params }) =>
+      HttpResponse.json({
+        id: params.id,
+        template_id: 'pg16',
+        template_version: '16',
+        name: 'déploiement de test',
+        status: 'provisioning',
+        params: {},
+        host: null,
+        published_port: null,
+        access_url: null,
+        created_at: null,
+        updated_at: null,
       }),
     ),
   )

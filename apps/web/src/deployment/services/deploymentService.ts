@@ -1,90 +1,88 @@
+import { apiClient } from '../../core/api/apiClient'
 import { mapDeploymentDto } from '../mappers/deploymentMapper'
+import type { DeploymentDTO } from '../types/dto/DeploymentDTO'
 import type { DeploymentWriteDTO } from '../types/dto/DeploymentWriteDTO'
 import type { Deployment } from '../types/models/Deployment'
-import { EXAMPLE_DEPLOYMENTS, findExampleDeployment } from './deploymentFixtures'
 
 /**
- * Service-seam de la feature déploiement (display-only).
+ * Service de la feature déploiement, branché sur l'API REST `/deployments`.
  *
  * Pattern identique au catalogue : les composants consomment des modèles via ce
- * service. Aujourd'hui il lit des fixtures d'EXEMPLE ; au branchement (slice de
- * wiring suivante) chaque fonction appellera l'API réelle (`apiClient`) en
- * conservant exactement la même signature publique :
- *   - `GET /deployments`            → listDeployments()
- *   - `GET /deployments/{id}`       → getDeployment(id)
- *   - `POST /deployments`          → createDeployment(payload)
+ * service, qui appelle `apiClient` et mappe les réponses. Le secret ne transite
+ * jamais par REST : il n'apparaît qu'une seule fois dans le flux SSE
+ * (`useDeploymentEvents`), au passage « running ».
  *
- * Aucune donnée réelle ni credential ici : tout est fictif et marqué « exemple ».
+ *   - `GET /deployments`                         → listDeployments()
+ *   - `GET /deployments/{id}`                    → getDeployment(id)
+ *   - `POST /deployments`                        → createDeployment(payload)
+ *   - `POST /deployments/{id}/{action}` (202)    → stop / start / destroy / regenerate
  */
 
-/** Latence simulée (ms) pour rendre visibles les états de chargement. */
-const SIMULATED_LATENCY_MS = 250
+const DEPLOYMENTS_PATH = '/deployments'
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
+/** Corps réellement accepté par `POST /deployments` (cf. `DeploymentCreateRequest`). */
+interface CreateDeploymentBody {
+  template_id: string
+  version: string
+  name: string
+  params: Record<string, string>
 }
 
-/** Liste les déploiements de l'utilisateur (display-only : fixtures d'exemple). */
+/** Liste les déploiements de l'utilisateur authentifié (`GET /deployments`). */
 export async function listDeployments(): Promise<readonly Deployment[]> {
-  await delay(SIMULATED_LATENCY_MS)
-  return EXAMPLE_DEPLOYMENTS.map(mapDeploymentDto)
+  const { data } = await apiClient.get<DeploymentDTO[]>(DEPLOYMENTS_PATH)
+  return data.map(mapDeploymentDto)
 }
 
-/** Récupère le détail d'un déploiement (display-only : fixtures d'exemple). */
+/** Récupère le détail d'un déploiement possédé (`GET /deployments/{id}`). */
 export async function getDeployment(id: string): Promise<Deployment> {
-  await delay(SIMULATED_LATENCY_MS)
-  const dto = findExampleDeployment(id)
-  if (dto === undefined) {
-    throw new Error(`Déploiement introuvable (exemple) : ${id}`)
-  }
-  return mapDeploymentDto(dto)
+  const { data } = await apiClient.get<DeploymentDTO>(`${DEPLOYMENTS_PATH}/${id}`)
+  return mapDeploymentDto(data)
 }
 
-/** Identifiant renvoyé par la simulation de création. */
+/** Identifiant du déploiement créé, pour naviguer vers sa page de suivi. */
 export interface CreateDeploymentResult {
   id: string
 }
 
 /**
- * Simule la création d'un déploiement (display-only). Renvoie un identifiant
- * d'exemple stable permettant de naviguer vers la page de suivi simulée.
- * Au branchement : `POST /deployments` → `{ id }` du déploiement réel.
+ * Crée un déploiement et lance son provisioning (`POST /deployments` → 201).
+ * N'envoie que les champs acceptés par l'API (`env` et `limits` du formulaire ne
+ * font pas partie du contrat back). Renvoie l'identifiant du déploiement créé.
  */
 export async function createDeployment(
   payload: DeploymentWriteDTO,
 ): Promise<CreateDeploymentResult> {
-  await delay(SIMULATED_LATENCY_MS)
-  // En display-only on ne persiste rien : on ouvre la page de suivi d'exemple.
-  void payload
-  return { id: 'exemple-pg' }
+  const body: CreateDeploymentBody = {
+    template_id: payload.template_id,
+    version: payload.version,
+    name: payload.name,
+    params: payload.params,
+  }
+  const { data } = await apiClient.post<DeploymentDTO>(DEPLOYMENTS_PATH, body)
+  return { id: data.id }
 }
 
 /**
- * Actions de cycle de vie (stubs display-only). Au branchement, chacune appellera
- * `POST /deployments/{id}/{action}` puis invalidera le cache React Query.
- *   - stopDeployment   → POST /deployments/{id}/stop
- *   - startDeployment  → POST /deployments/{id}/start
- *   - destroyDeployment→ POST /deployments/{id}/destroy
- *   - regeneratePassword → POST /deployments/{id}/regenerate-password
+ * Actions de cycle de vie (asynchrones côté back : `202 Accepted`, job enfilé).
+ * Le rafraîchissement de l'UI est piloté par l'invalidation React Query côté hook.
+ *   - stopDeployment              → POST /deployments/{id}/stop
+ *   - startDeployment             → POST /deployments/{id}/start
+ *   - destroyDeployment           → POST /deployments/{id}/destroy
+ *   - regenerateDeploymentPassword→ POST /deployments/{id}/regenerate-password
  */
 export async function stopDeployment(id: string): Promise<void> {
-  await delay(SIMULATED_LATENCY_MS)
-  void id
+  await apiClient.post(`${DEPLOYMENTS_PATH}/${id}/stop`)
 }
 
 export async function startDeployment(id: string): Promise<void> {
-  await delay(SIMULATED_LATENCY_MS)
-  void id
+  await apiClient.post(`${DEPLOYMENTS_PATH}/${id}/start`)
 }
 
 export async function destroyDeployment(id: string): Promise<void> {
-  await delay(SIMULATED_LATENCY_MS)
-  void id
+  await apiClient.post(`${DEPLOYMENTS_PATH}/${id}/destroy`)
 }
 
 export async function regenerateDeploymentPassword(id: string): Promise<void> {
-  await delay(SIMULATED_LATENCY_MS)
-  void id
+  await apiClient.post(`${DEPLOYMENTS_PATH}/${id}/regenerate-password`)
 }

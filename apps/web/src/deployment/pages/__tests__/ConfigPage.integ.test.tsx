@@ -84,8 +84,28 @@ describe('ConfigPage (engine-aware)', () => {
     expect(screen.queryByText('aperçu conteneur')).not.toBeInTheDocument()
   })
 
-  it('déploie après saisie d’un nom et navigue vers la page de suivi', async () => {
-    server.use(http.get('*/catalog/templates/pg16', () => HttpResponse.json(dockerTemplate)))
+  it('déploie après saisie d’un nom (POST /deployments) et navigue vers la page de suivi', async () => {
+    server.use(
+      http.get('*/catalog/templates/pg16', () => HttpResponse.json(dockerTemplate)),
+      http.post('*/deployments', () =>
+        HttpResponse.json(
+          {
+            id: 'dep-new',
+            template_id: 'pg16',
+            template_version: '16',
+            name: 'ma-base',
+            status: 'pending',
+            params: {},
+            host: null,
+            published_port: null,
+            access_url: null,
+            created_at: null,
+            updated_at: null,
+          },
+          { status: 201 },
+        ),
+      ),
+    )
 
     renderConfig('?template=pg16')
     await screen.findByRole('heading', { name: /Configurer PostgreSQL/ })

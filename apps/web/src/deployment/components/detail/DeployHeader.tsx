@@ -11,7 +11,7 @@ interface DeployHeaderProps {
   liveStatusTone: ReturnType<typeof toneForStatus>
 }
 
-/** En-tête de la page détail : retour, nom, badge moteur et badge statut live. */
+/** En-tête de la page détail : retour, nom, template/version et badge statut live. */
 export function DeployHeader({ deployment, liveStatusLabel, liveStatusTone }: DeployHeaderProps) {
   return (
     <div className="mb-6">
@@ -24,17 +24,16 @@ export function DeployHeader({ deployment, liveStatusLabel, liveStatusTone }: De
       </Link>
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-cyan flex h-11 w-11 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--color-cyan)_14%,transparent)]">
-          <Icon name={deployment.templateIcon} size={22} />
+          <Icon name="box" size={22} />
         </span>
         <div className="mr-2">
           <h1 className="text-text-primary text-[24px] font-bold tracking-[-0.02em]">
             {deployment.name}
           </h1>
-          <p className="text-text-muted text-[12.5px]">
-            {deployment.templateName} {deployment.version}
+          <p className="text-text-muted font-mono text-[12.5px]">
+            {deployment.templateId} · {deployment.version}
           </p>
         </div>
-        <Badge tone="neutral">{deployment.engineLabel}</Badge>
         <Badge tone={liveStatusTone}>{liveStatusLabel}</Badge>
       </div>
     </div>

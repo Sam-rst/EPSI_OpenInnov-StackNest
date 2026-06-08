@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom'
+
 import { Badge, Button, Icon } from '../../../shared/components/ui'
 import type { TemplateDetail } from '../../types/models/TemplateDetail'
 
@@ -7,9 +9,12 @@ interface TemplateDetailHeaderProps {
 
 /**
  * En-tête de la fiche détail : icône, nom, catégorie/provider, tags, description
- * et bouton « Déployer » (placeholder — la feature Déploiement arrive en STN-3).
+ * et bouton « Déployer » menant à la configuration du template
+ * (`/deployments/config?template=:id`).
  */
 export function TemplateDetailHeader({ detail }: TemplateDetailHeaderProps) {
+  const navigate = useNavigate()
+
   return (
     <div className="border-border bg-surface-elevated rounded-lg border p-6">
       <div className="flex items-start gap-4">
@@ -27,7 +32,11 @@ export function TemplateDetailHeader({ detail }: TemplateDetailHeaderProps) {
             {detail.categoryLabel} · via {detail.provider}
           </p>
         </div>
-        <Button variant="cyan" icon="rocket" disabled title="Déploiement disponible prochainement">
+        <Button
+          variant="cyan"
+          icon="rocket"
+          onClick={() => navigate(`/deployments/config?template=${detail.id}`)}
+        >
           Déployer
         </Button>
       </div>
