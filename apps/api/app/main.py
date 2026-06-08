@@ -13,6 +13,9 @@ from app.core.logging import configure_logging
 from app.core.middleware.logging_middleware import LoggingMiddleware
 from app.core.presentation.schemas.responses.version_response import VersionResponse
 from app.core.sentry import init_sentry
+from app.deployment.presentation.routers.deployment_router import (
+    router as deployment_router,
+)
 from app.health.presentation.routers.health_router import router as health_router
 
 # Environnements internes autorises a exposer Swagger / ReDoc / OpenAPI.
@@ -70,6 +73,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "reservee aux administrateurs."
                 ),
             },
+            {
+                "name": "Deploiement",
+                "description": (
+                    "Provisioning et cycle de vie des deploiements de "
+                    "l'utilisateur : creation (lance le provisioning), liste, "
+                    "detail, actions (stop/start/destroy/regenerate-password) et "
+                    "flux SSE des events de progression (le secret n'y transite "
+                    "qu'une seule fois, sur l'event running)."
+                ),
+            },
         ],
     )
     app.add_middleware(LoggingMiddleware)
@@ -87,6 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(catalog_router)
+    app.include_router(deployment_router)
 
     @app.get("/version", tags=["Platform"], summary="Metadonnees de build et de deploiement")
     async def version(settings: SettingsDep) -> VersionResponse:
