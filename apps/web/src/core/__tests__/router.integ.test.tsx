@@ -68,7 +68,6 @@ describe('Router — CA1 : routes accessibles selon auth', () => {
     ['/dashboard', /tableau de bord/i],
     ['/catalog', /catalogue/i],
     ['/deployments', /déploiements/i],
-    ['/deployments/config', /configurer/i],
     ['/chat', /chat/i],
     ['/team', /équipe/i],
     ['/settings', /paramètres/i],
@@ -82,6 +81,13 @@ describe('Router — CA1 : routes accessibles selon auth', () => {
       expect(screen.queryByRole('heading', { name: /connexion/i })).not.toBeInTheDocument()
     },
   )
+
+  it('rend ConfigPage sur /deployments/config (invite à choisir un template)', () => {
+    renderAt('/deployments/config', true)
+    const main = screen.getByRole('main')
+    expect(within(main).getByText(/aucun template sélectionné/i)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /connexion/i })).not.toBeInTheDocument()
+  })
 })
 
 describe('Router — CA2 : redirection vers /login pour routes protégées', () => {
@@ -121,18 +127,15 @@ describe('Router — routes placeholder publiques (socle gelé)', () => {
   )
 })
 
-describe('Router — routes placeholder protégées avec paramètre (socle gelé)', () => {
-  const protectedDetailPlaceholders: [string, RegExp][] = [
-    ['/deployments/dep-1', /détail du déploiement/i],
-  ]
+describe('Router — détail déploiement protégé avec paramètre (/deployments/:id)', () => {
+  it('monte la page de suivi (lien retour déploiements) quand authentifié', async () => {
+    renderAt('/deployments/dep-1', true)
 
-  it.each(protectedDetailPlaceholders)(
-    'rend la page placeholder %s quand authentifié',
-    (path, expectedHeading) => {
-      renderAt(path, true)
-      expectPageHeadingInMain(expectedHeading)
-    },
-  )
+    const main = screen.getByRole('main')
+    expect(
+      await within(main).findByRole('link', { name: /retour aux déploiements/i }),
+    ).toBeInTheDocument()
+  })
 })
 
 describe('Router — fiche détail catalogue (/catalog/:id, branchée API)', () => {
