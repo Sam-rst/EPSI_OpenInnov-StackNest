@@ -10,6 +10,7 @@ interface UseDeploymentsResult {
   deployments: readonly Deployment[]
   loading: boolean
   isError: boolean
+  refetch: () => void
 }
 
 /**
@@ -18,7 +19,7 @@ interface UseDeploymentsResult {
  * requête n'a pas abouti, pour simplifier le rendu des états (vide/skeleton).
  */
 export function useDeployments(): UseDeploymentsResult {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: DEPLOYMENTS_QUERY_KEY,
     queryFn: () => listDeployments(),
   })
@@ -27,5 +28,8 @@ export function useDeployments(): UseDeploymentsResult {
     deployments: data ?? [],
     loading: isLoading,
     isError,
+    refetch: () => {
+      void refetch()
+    },
   }
 }
