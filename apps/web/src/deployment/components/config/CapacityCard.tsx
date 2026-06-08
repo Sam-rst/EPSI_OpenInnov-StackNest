@@ -10,6 +10,8 @@ interface CapacityCardProps {
   params: readonly TemplateConfigParam[]
   version: string
   paramValues: Record<string, string>
+  /** Erreurs de validation par clé de paramètre (requis vide), si présentes (#2 #5). */
+  paramErrors?: Record<string, string>
   preset: ResourcePreset
   onVersion: (value: string) => void
   onParam: (key: string, value: string) => void
@@ -31,6 +33,7 @@ export function CapacityCard({
   params,
   version,
   paramValues,
+  paramErrors,
   preset,
   onVersion,
   onParam,
@@ -63,6 +66,7 @@ export function CapacityCard({
               key={param.key}
               param={param}
               value={paramValues[param.key] ?? ''}
+              error={paramErrors?.[param.key]}
               onChange={(value) => onParam(param.key, value)}
             />
           ))}

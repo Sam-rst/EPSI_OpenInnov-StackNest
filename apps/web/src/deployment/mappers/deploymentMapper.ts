@@ -17,6 +17,7 @@ export function mapDeploymentDto(dto: DeploymentDTO): Deployment {
   return {
     id: dto.id,
     templateId: dto.template_id,
+    templateName: dto.template_name ?? undefined,
     version: dto.template_version,
     name: dto.name,
     status,

@@ -39,4 +39,11 @@ export interface TemplateConfigParamDTO {
   default_value: string | null
   options: string[] | null
   order_index: number
+  /**
+   * Bornes d'un paramètre numérique, si le back les expose (contrat à venir).
+   * Optionnelles côté DTO : on les mappe défensivement quand elles existent (#6).
+   */
+  min?: number | null
+  max?: number | null
+  step?: number | null
 }

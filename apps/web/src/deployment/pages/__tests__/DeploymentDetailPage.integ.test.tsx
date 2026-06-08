@@ -125,6 +125,71 @@ describe('DeploymentDetailPage (suivi SSE)', () => {
     expect(screen.getByRole('button', { name: /Détruire/ })).toBeInTheDocument()
   })
 
+  it('ne fuite pas les clés internes (container_ref) dans les paramètres (#14)', async () => {
+    server.use(
+      http.get('*/deployments/dep-1', () =>
+        HttpResponse.json(
+          deploymentDto({ status: 'running', params: { db_name: 'app', container_ref: 'a1b2c3' } }),
+        ),
+      ),
+    )
+
+    renderDetail('dep-1')
+    await screen.findByRole('heading', { name: 'postgres-prod' })
+
+    expect(screen.getByText('db_name')).toBeInTheDocument()
+    expect(screen.queryByText('container_ref')).not.toBeInTheDocument()
+    expect(screen.queryByText('a1b2c3')).not.toBeInTheDocument()
+  })
+
+  it('masque la valeur d’un paramètre secret dans les détails (#17)', async () => {
+    server.use(
+      http.get('*/deployments/dep-1', () =>
+        HttpResponse.json(
+          deploymentDto({ status: 'running', params: { db_password: 'super-secret' } }),
+        ),
+      ),
+    )
+
+    renderDetail('dep-1')
+    await screen.findByRole('heading', { name: 'postgres-prod' })
+
+    expect(screen.getByText('db_password')).toBeInTheDocument()
+    expect(screen.queryByText('super-secret')).not.toBeInTheDocument()
+  })
+
+  it('affiche le nom lisible du template quand l’API le fournit (#13)', async () => {
+    server.use(
+      http.get('*/deployments/dep-1', () =>
+        HttpResponse.json(deploymentDto({ template_name: 'PostgreSQL' })),
+      ),
+    )
+
+    renderDetail('dep-1')
+    await screen.findByRole('heading', { name: 'postgres-prod' })
+
+    expect(screen.getByText(/PostgreSQL · 16/)).toBeInTheDocument()
+  })
+
+  it('n’affiche pas le stepper de provisioning quand le déploiement est arrêté (#15)', async () => {
+    server.use(http.get('*/deployments/dep-1', () => HttpResponse.json(deploymentDto())))
+
+    renderDetail('dep-1')
+    await screen.findByRole('heading', { name: 'postgres-prod' })
+
+    // Transition de cycle de vie reçue en live : arrêté → pas de stepper trompeur.
+    act(() => {
+      emit(frame({ status: 'running', access_url: '10.0.0.5:32769', secret: 'x' }))
+      emit(frame({ status: 'stopped', message: 'Conteneur arrêté' }))
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Arrêté')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Validation')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pull image')).not.toBeInTheDocument()
+  })
+
   it('affiche un état honnête quand le déploiement est introuvable (404)', async () => {
     server.use(http.get('*/deployments/inconnu', () => new HttpResponse(null, { status: 404 })))
 
