@@ -19,10 +19,16 @@ from app.catalog.infrastructure.models.template_param_model import (
 from app.catalog.infrastructure.models.template_version_model import (
     TemplateVersionModel,
 )
+from app.chat.infrastructure.models.chat_action_model import ChatActionModel
+from app.chat.infrastructure.models.conversation_model import ConversationModel
+from app.chat.infrastructure.models.message_model import MessageModel
 from app.deployment.infrastructure.models.deployment_model import DeploymentModel
 
 __all__ = [
+    "ChatActionModel",
+    "ConversationModel",
     "DeploymentModel",
+    "MessageModel",
     "TemplateModel",
     "TemplateParamModel",
     "TemplateVersionModel",
