@@ -68,6 +68,19 @@ services:
     ports: !override
       - "${UI_PORT:-8080}:5173"
 
+  # Worker : execution locale des conteneurs via le demon Docker de l'hote.
+  # Le DockerSdkProvisioner (docker.from_env) a besoin du socket Docker pour
+  # parler au demon local. Sans ce montage, le worker plante au demarrage
+  # (FileNotFoundError sur /var/run/docker.sock) et aucun deploiement ne se
+  # provisionne. En prod, on cible un hote d'execution distant via DOCKER_HOST.
+  worker:
+    # Local uniquement : le socket Docker hote est root:docker, or l'image
+    # tourne en utilisateur non-root -> PermissionError. On force root pour
+    # l'execution locale. En prod (DOCKER_HOST=ssh), pas de socket -> non requis.
+    user: "root"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
   # MailHog : capture des mails sortants en dev (inbox web http://localhost:8025).
   mailhog:
     image: mailhog/mailhog:v1.0.1
