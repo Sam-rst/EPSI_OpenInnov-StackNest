@@ -8,9 +8,7 @@ export function DeploymentsHeader() {
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 className="text-text-primary text-[24px] font-bold tracking-[-0.02em]">Déploiements</h1>
-        <p className="text-text-muted text-[12.5px]">
-          Tes ressources provisionnées et leur état (exemple display-only).
-        </p>
+        <p className="text-text-muted text-[12.5px]">Tes ressources provisionnées et leur état.</p>
       </div>
       <Link to="/catalog">
         <Button variant="cyan" icon="plus">

@@ -1,4 +1,5 @@
 import { Card } from '../common/Card'
+import { toDisplayParams } from './paramDisplay'
 import type { Deployment } from '../../types/models/Deployment'
 
 interface DetailsCardProps {
@@ -13,14 +14,30 @@ function formatDate(iso: string | null): string {
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString('fr-FR')
 }
 
-/** Carte Détails : template+version, accès host:port, params et date de création. */
+/**
+ * Adresse d'accès à afficher : l'`accessUrl` calculée par l'API si présente,
+ * sinon le couple `host:port` quand les deux existent (#11 — cohérence avec la
+ * carte Accès : on montre l'accès dès qu'il existe, sans dire « indisponible »).
+ */
+function accessText(deployment: Deployment): string {
+  if (deployment.accessUrl !== null) {
+    return deployment.accessUrl
+  }
+  if (deployment.host !== null && deployment.port !== null) {
+    return `${deployment.host}:${deployment.port}`
+  }
+  return 'indisponible'
+}
+
+/** Carte Détails : template (nom/UUID)+version, accès, params et date de création. */
 export function DetailsCard({ deployment }: DetailsCardProps) {
+  const templateLabel = deployment.templateName ?? deployment.templateId
   const rows: readonly (readonly [string, string])[] = [
-    ['Template', `${deployment.templateId} · ${deployment.version}`],
-    ['Accès', deployment.accessUrl ?? 'indisponible'],
+    ['Template', `${templateLabel} · ${deployment.version}`],
+    ['Accès', accessText(deployment)],
     ['Créé le', formatDate(deployment.createdAt)],
   ]
-  const paramEntries = Object.entries(deployment.params)
+  const paramEntries = toDisplayParams(deployment.params)
 
   return (
     <Card className="p-4">

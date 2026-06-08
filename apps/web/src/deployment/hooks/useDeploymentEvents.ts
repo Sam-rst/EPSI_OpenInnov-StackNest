@@ -20,10 +20,13 @@ const UNAUTHORIZED = 401
 /** Nombre maximal de refresh + reconnexion sur 401 (borne la boucle de retry). */
 const MAX_REFRESH_RETRIES = 1
 
-/** Statuts terminaux côté flux : on ferme la connexion SSE une fois atteints. */
+/**
+ * Statuts VRAIMENT terminaux côté flux : on ne ferme la connexion SSE que là
+ * (#16). `running`/`stopped` ne sont PAS terminaux — le cycle de vie continue
+ * (start/stop/destroy) et ces transitions doivent arriver en live. Fermer sur
+ * `running`/`stopped` figeait l'UI jusqu'au rechargement (cause du retour #16).
+ */
 const FINAL_STATUSES: ReadonlySet<DeploymentStatus> = new Set([
-  DeploymentStatus.RUNNING,
-  DeploymentStatus.STOPPED,
   DeploymentStatus.FAILED,
   DeploymentStatus.DESTROYED,
 ])

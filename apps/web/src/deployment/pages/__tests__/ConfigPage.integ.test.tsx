@@ -69,7 +69,7 @@ describe('ConfigPage (engine-aware)', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Identité')).toBeInTheDocument()
     expect(screen.getByText('Capacité')).toBeInTheDocument()
-    expect(screen.getByText('aperçu conteneur')).toBeInTheDocument()
+    expect(screen.getByText('aperçu Docker')).toBeInTheDocument()
     // L'aperçu masque le secret (aucune valeur réelle).
     expect(screen.getByText(/POSTGRES_PASSWORD=••••/)).toBeInTheDocument()
   })
@@ -81,7 +81,7 @@ describe('ConfigPage (engine-aware)', () => {
 
     expect(await screen.findByText('Déploiement Terraform à venir')).toBeInTheDocument()
     expect(screen.queryByText('Identité')).not.toBeInTheDocument()
-    expect(screen.queryByText('aperçu conteneur')).not.toBeInTheDocument()
+    expect(screen.queryByText('aperçu Docker')).not.toBeInTheDocument()
   })
 
   it('déploie après saisie d’un nom (POST /deployments) et navigue vers la page de suivi', async () => {
@@ -121,6 +121,41 @@ describe('ConfigPage (engine-aware)', () => {
     await waitFor(() => {
       expect(screen.getByText('Page de suivi')).toBeInTheDocument()
     })
+  })
+
+  it('affiche une erreur inline et garde le bouton bloqué pour un nom invalide', async () => {
+    server.use(http.get('*/catalog/templates/pg16', () => HttpResponse.json(dockerTemplate)))
+
+    renderConfig('?template=pg16')
+    await screen.findByRole('heading', { name: /Configurer PostgreSQL/ })
+
+    const deployButton = screen.getByRole('button', { name: /Déployer/ })
+    await userEvent.type(screen.getByPlaceholderText('ex. ma-base'), 'Ma Base')
+
+    // Le format invalide est expliqué inline et le bouton reste bloqué (#3 #5).
+    expect(await screen.findByText(/Minuscules, chiffres et tirets/)).toBeInTheDocument()
+    expect(deployButton).toBeDisabled()
+  })
+
+  it('affiche le message d’erreur de l’API quand le déploiement échoue (409)', async () => {
+    server.use(
+      http.get('*/catalog/templates/pg16', () => HttpResponse.json(dockerTemplate)),
+      http.post('*/deployments', () =>
+        HttpResponse.json(
+          { error: 'deployment_name_taken', message: 'Ce nom est déjà utilisé.' },
+          { status: 409 },
+        ),
+      ),
+    )
+
+    renderConfig('?template=pg16')
+    await screen.findByRole('heading', { name: /Configurer PostgreSQL/ })
+
+    await userEvent.type(screen.getByPlaceholderText('ex. ma-base'), 'ma-base')
+    await userEvent.click(screen.getByRole('button', { name: /Déployer/ }))
+
+    // L'échec n'est plus silencieux : le message API est visible (#1).
+    expect(await screen.findByText('Ce nom est déjà utilisé.')).toBeInTheDocument()
   })
 
   it('affiche un état honnête quand le template est introuvable', async () => {

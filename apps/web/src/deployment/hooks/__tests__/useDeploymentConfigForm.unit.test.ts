@@ -55,6 +55,102 @@ describe('useDeploymentConfigForm', () => {
     expect(result.current.isValid).toBe(true)
   })
 
+  it('signale un nom vide avec un message inline (sans erreur tant que non touché)', () => {
+    const { result } = renderHook(() => useDeploymentConfigForm(template))
+
+    // Vierge : pas encore d'erreur affichée (champ non touché).
+    expect(result.current.errors.name).toBeUndefined()
+
+    act(() => {
+      result.current.setName('')
+    })
+
+    expect(result.current.errors.name).toBeDefined()
+    expect(result.current.isValid).toBe(false)
+  })
+
+  it('rejette un nom au mauvais format DNS (majuscules, espaces, underscore)', () => {
+    const { result } = renderHook(() => useDeploymentConfigForm(template))
+
+    const invalids = ['Ma-Base', 'ma base', 'ma_base', '-debut', 'fin-', 'a'.repeat(64)]
+    for (const value of invalids) {
+      act(() => {
+        result.current.setName(value)
+      })
+      expect(result.current.isValid).toBe(false)
+      expect(result.current.errors.name).toBeDefined()
+    }
+  })
+
+  it('accepte un nom au format label DNS (minuscules, chiffres, tirets)', () => {
+    const { result } = renderHook(() => useDeploymentConfigForm(template))
+
+    act(() => {
+      result.current.setName('ma-base-01')
+    })
+
+    expect(result.current.errors.name).toBeUndefined()
+    expect(result.current.isValid).toBe(true)
+  })
+
+  it('bloque tant qu’un paramètre requis est vide, débloque une fois rempli', () => {
+    const requiredTemplate: TemplateConfig = {
+      ...template,
+      params: [
+        {
+          key: 'db_name',
+          label: 'Nom de la base',
+          type: ParamKind.STRING,
+          required: true,
+          defaultValue: null,
+          options: null,
+          orderIndex: 0,
+        },
+      ],
+    }
+    const { result } = renderHook(() => useDeploymentConfigForm(requiredTemplate))
+
+    act(() => {
+      result.current.setName('ma-base')
+    })
+
+    // Nom valide mais param requis vide → toujours invalide + erreur sur le param.
+    expect(result.current.isValid).toBe(false)
+    expect(result.current.errors.params.db_name).toBeDefined()
+
+    act(() => {
+      result.current.setParam('db_name', 'app')
+    })
+
+    expect(result.current.errors.params.db_name).toBeUndefined()
+    expect(result.current.isValid).toBe(true)
+  })
+
+  it('n’exige pas les paramètres optionnels vides', () => {
+    const optionalTemplate: TemplateConfig = {
+      ...template,
+      params: [
+        {
+          key: 'note',
+          label: 'Note',
+          type: ParamKind.STRING,
+          required: false,
+          defaultValue: null,
+          options: null,
+          orderIndex: 0,
+        },
+      ],
+    }
+    const { result } = renderHook(() => useDeploymentConfigForm(optionalTemplate))
+
+    act(() => {
+      result.current.setName('ma-base')
+    })
+
+    expect(result.current.isValid).toBe(true)
+    expect(result.current.errors.params.note).toBeUndefined()
+  })
+
   it('met à jour un paramètre dynamique', () => {
     const { result } = renderHook(() => useDeploymentConfigForm(template))
 

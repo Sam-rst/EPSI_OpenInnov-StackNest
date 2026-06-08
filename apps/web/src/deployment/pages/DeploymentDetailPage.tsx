@@ -8,10 +8,10 @@ import { DetailsCard } from '../components/detail/DetailsCard'
 import { LifecycleActions } from '../components/detail/LifecycleActions'
 import { Stepper } from '../components/detail/Stepper'
 import { StreamedLogs } from '../components/detail/StreamedLogs'
+import { stepperViewForStatus } from '../components/detail/stepperView'
 import { useDeployment } from '../hooks/useDeployment'
 import { useDeploymentEvents } from '../hooks/useDeploymentEvents'
 import { DeploymentStatus, labelForStatus, toneForStatus } from '../types/enums/DeploymentStatus'
-import { DeploymentStep } from '../types/enums/DeploymentStep'
 
 function BackLink() {
   return (
@@ -26,9 +26,9 @@ function BackLink() {
 }
 
 /**
- * Page de suivi d'un déploiement (display-only) : header + badge statut +
- * stepper Docker + logs streamés (simulés) + détails + accès (au running) +
- * actions de cycle de vie. La progression et les logs sont d'EXEMPLE.
+ * Page de suivi d'un déploiement : header + badge statut + stepper Docker (phase
+ * de provisioning uniquement, #15) + logs streamés via SSE + détails + accès (au
+ * running) + actions de cycle de vie. Branchée sur l'API réelle (REST + SSE).
  */
 export function DeploymentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -66,9 +66,11 @@ export function DeploymentDetailPage() {
     events.isDone ||
     events.status !== DeploymentStatus.PENDING
   const liveStatus = hasProgressed ? events.status : deployment.status
-  const failed = liveStatus === DeploymentStatus.FAILED
+  const stepper = stepperViewForStatus(liveStatus)
+  // En provisioning, on affine l'étape avec la progression live ; sinon on s'en
+  // tient à l'étape de référence du statut (Prêt au running, figée à l'échec).
   const currentStep =
-    liveStatus === DeploymentStatus.RUNNING ? DeploymentStep.READY : events.currentStep
+    liveStatus === DeploymentStatus.PROVISIONING ? events.currentStep : stepper.currentStep
   const showCredentials = liveStatus === DeploymentStatus.RUNNING && events.access !== undefined
 
   return (
@@ -78,7 +80,7 @@ export function DeploymentDetailPage() {
         liveStatusLabel={labelForStatus(liveStatus)}
         liveStatusTone={toneForStatus(liveStatus)}
       />
-      <Stepper currentStep={currentStep} failed={failed} />
+      {stepper.show && <Stepper currentStep={currentStep} failed={stepper.failed} />}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px]">
         <StreamedLogs logs={events.logs} isDone={events.isDone} />
         <div className="space-y-4">

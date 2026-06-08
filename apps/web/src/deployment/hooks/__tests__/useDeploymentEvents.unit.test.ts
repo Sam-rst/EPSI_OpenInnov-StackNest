@@ -156,7 +156,7 @@ describe('useDeploymentEvents (fetchEventSource authentifié)', () => {
     expect(result.current.currentStep).toBe(DeploymentStep.PULL_IMAGE)
   })
 
-  it('au passage running, révèle l’accès (url + secret), termine et abandonne le flux', async () => {
+  it('au passage running, révèle l’accès (url + secret) sans fermer le flux (#16)', async () => {
     const { result } = renderHook(() => useDeploymentEvents('dep-1'))
     const stream = lastStream()
 
@@ -172,14 +172,72 @@ describe('useDeploymentEvents (fetchEventSource authentifié)', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.isDone).toBe(true)
+      expect(result.current.status).toBe(DeploymentStatus.RUNNING)
     })
-    expect(result.current.status).toBe(DeploymentStatus.RUNNING)
     expect(result.current.currentStep).toBe(DeploymentStep.READY)
     expect(result.current.access).toEqual({
       url: '10.0.0.5:32769',
       password: 'mdp-usage-unique',
     })
+    // `running` n'est PAS terminal : on garde l'écoute pour les transitions de
+    // cycle de vie (stop/start/destroy) qui doivent arriver en live (#16).
+    expect(result.current.isDone).toBe(false)
+    expect(stream.init.signal?.aborted).toBe(false)
+  })
+
+  it('garde le flux ouvert sur stopped, puis suit la transition de redémarrage (#16)', async () => {
+    const { result } = renderHook(() => useDeploymentEvents('dep-1'))
+    const stream = lastStream()
+
+    act(() => {
+      stream.message(dtoFrame({ status: 'running', access_url: '10.0.0.5:32769', secret: 'x' }))
+      stream.message(dtoFrame({ status: 'stopped', message: 'Conteneur arrêté' }))
+    })
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(DeploymentStatus.STOPPED)
+    })
+    // `stopped` n'est pas terminal : un restart doit encore être reçu en live.
+    expect(result.current.isDone).toBe(false)
+    expect(stream.init.signal?.aborted).toBe(false)
+
+    act(() => {
+      stream.message(dtoFrame({ status: 'running', message: 'Redémarré' }))
+    })
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(DeploymentStatus.RUNNING)
+    })
+    expect(result.current.isDone).toBe(false)
+  })
+
+  it('ferme le flux quand le déploiement est détruit (terminal #16)', async () => {
+    const { result } = renderHook(() => useDeploymentEvents('dep-1'))
+    const stream = lastStream()
+
+    act(() => {
+      stream.message(dtoFrame({ status: 'destroyed', message: 'Ressource supprimée' }))
+    })
+
+    await waitFor(() => {
+      expect(result.current.isDone).toBe(true)
+    })
+    expect(result.current.status).toBe(DeploymentStatus.DESTROYED)
+    expect(stream.init.signal?.aborted).toBe(true)
+  })
+
+  it('ferme le flux en cas d’échec (terminal #16)', async () => {
+    const { result } = renderHook(() => useDeploymentEvents('dep-1'))
+    const stream = lastStream()
+
+    act(() => {
+      stream.message(dtoFrame({ status: 'failed', message: 'Échec du provisioning' }))
+    })
+
+    await waitFor(() => {
+      expect(result.current.isDone).toBe(true)
+    })
+    expect(result.current.status).toBe(DeploymentStatus.FAILED)
     expect(stream.init.signal?.aborted).toBe(true)
   })
 
