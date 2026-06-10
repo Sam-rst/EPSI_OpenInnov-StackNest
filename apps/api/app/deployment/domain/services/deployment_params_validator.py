@@ -33,7 +33,10 @@ class DeploymentParamsValidator:
         provided = spec.key in params
         value = params.get(spec.key)
         if self._is_empty(value):
-            if spec.required:
+            # Les params `secret` sont generes au provisioning par le worker : jamais
+            # saisis par l'utilisateur, donc leur absence ne bloque pas la creation
+            # (sinon le chat, qui ne transmet aucun secret, ne pourrait rien deployer).
+            if spec.required and spec.type is not ParamType.SECRET:
                 raise InvalidDeploymentParamsException(
                     f"Le parametre requis « {spec.key} » est manquant ou vide."
                 )
