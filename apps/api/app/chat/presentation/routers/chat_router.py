@@ -9,7 +9,6 @@ que le deploiement. La confirmation d'une action delegue aux use cases du slice
 deploiement (aucune duplication).
 """
 
-from collections.abc import AsyncIterator
 from typing import Annotated
 from uuid import UUID
 
@@ -47,7 +46,6 @@ from app.chat.presentation.dependencies.chat_providers import (
     get_deployment_actions,
     get_llm_provider,
 )
-from app.chat.presentation.schemas.chat_event_sse import format_chat_event_sse
 from app.chat.presentation.schemas.conversation_schemas import (
     ConversationDetailResponse,
     ConversationResponse,
@@ -56,6 +54,7 @@ from app.chat.presentation.schemas.conversation_schemas import (
     RenameConversationRequest,
     SendMessageRequest,
 )
+from app.chat.presentation.schemas.sse_keepalive_stream import sse_keepalive_stream
 from app.deployment.domain.interfaces.deployment_repository import DeploymentRepository
 
 router = APIRouter(prefix="/chat", tags=["Chat IA"])
@@ -198,11 +197,11 @@ async def stream_conversation(
     """
     await GetConversation(conversations).execute(conversation_id=conversation_id, owner_id=user.id)
 
-    async def event_stream() -> AsyncIterator[str]:
-        async for event in subscriber.subscribe(conversation_id):
-            yield format_chat_event_sse(event)
+    # Keepalive : un LLM lent (Ollama CPU) peut rester muet ~30 s ; sans trafic la
+    # connexion idle est coupee. Le wrapper insere un commentaire SSE periodique.
+    events = sse_keepalive_stream(subscriber.subscribe(conversation_id))
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=_SSE_HEADERS)
+    return StreamingResponse(events, media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post(
