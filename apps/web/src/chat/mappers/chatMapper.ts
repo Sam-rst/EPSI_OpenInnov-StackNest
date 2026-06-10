@@ -108,10 +108,20 @@ function resultStatus(success: boolean): ActionStatus {
 
 /**
  * Mappe une trame SSE brute (`event:` + `data` JSON) vers un `ChatStreamEvent`
- * (union discriminée). Lève sur un nom d'événement inconnu : un contrat futur non
- * géré doit échouer franchement plutôt que de passer silencieusement.
+ * (union discriminée).
+ *
+ * Une trame au nom d'événement vide est un **keepalive** : le serveur insère un
+ * commentaire SSE inerte (`: keepalive`) toutes les ~15 s pendant le silence du
+ * LLM, et `@microsoft/fetch-event-source` dispatche un message vide sur la ligne
+ * blanche qui le termine. On la traite en no-op — sans ça, chaque heartbeat
+ * lèverait et couperait le flux (« Connexion interrompue ») dès que le LLM met
+ * plus de 15 s à répondre. Un nom d'événement NON vide mais inconnu lève
+ * toujours : un contrat futur non géré doit échouer franchement.
  */
 export function mapStreamEvent(eventName: string, data: string): ChatStreamEvent {
+  if (eventName === '') {
+    return { type: 'keepalive' }
+  }
   switch (eventName) {
     case ChatStreamEventName.TOKEN: {
       const dto = JSON.parse(data) as TokenEventDTO
