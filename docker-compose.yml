@@ -78,6 +78,13 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://stacknest:stacknest@db:5432/stacknest}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      # Chat IA / LLM (pluggable, cf. design Chat IA). Defaut Ollama local sans
+      # cle. La cle reelle vient de l'env / .env local (gitignore, jamais
+      # commitee) ; en preview/prod la CD l'injecte via SOPS. Aucun secret ici.
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-llama3.1}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
     depends_on:
       db:
         condition: service_healthy
