@@ -72,6 +72,11 @@ export function DeploymentDetailPage() {
   const currentStep =
     liveStatus === DeploymentStatus.PROVISIONING ? events.currentStep : stepper.currentStep
   const showCredentials = liveStatus === DeploymentStatus.RUNNING && events.access !== undefined
+  // Provisioning en cours : on attend des logs live. Sinon (déjà en ligne / arrêté
+  // / échoué à l'ouverture), aucun log à rejouer — pub/sub éphémère — on l'affiche
+  // honnêtement plutôt qu'un « en attente » + pastille « live » trompeurs.
+  const provisioning =
+    liveStatus === DeploymentStatus.PENDING || liveStatus === DeploymentStatus.PROVISIONING
 
   return (
     <div className="mx-auto max-w-[1280px] p-8">
@@ -80,9 +85,11 @@ export function DeploymentDetailPage() {
         liveStatusLabel={labelForStatus(liveStatus)}
         liveStatusTone={toneForStatus(liveStatus)}
       />
-      {stepper.show && <Stepper currentStep={currentStep} failed={stepper.failed} />}
+      {stepper.show && (
+        <Stepper currentStep={currentStep} failed={stepper.failed} completed={stepper.completed} />
+      )}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px]">
-        <StreamedLogs logs={events.logs} isDone={events.isDone} />
+        <StreamedLogs logs={events.logs} isDone={events.isDone} provisioning={provisioning} />
         <div className="space-y-4">
           <DetailsCard deployment={deployment} />
           {showCredentials && events.access && <CredentialsCard access={events.access} />}

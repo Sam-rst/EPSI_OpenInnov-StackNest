@@ -22,8 +22,15 @@ describe('stepperViewForStatus (#15)', () => {
     expect(stepperViewForStatus(DeploymentStatus.RUNNING)).toMatchObject({
       show: true,
       failed: false,
+      completed: true,
       currentStep: DeploymentStep.READY,
     })
+  })
+
+  it('ne marque PAS complété tant que le provisioning est en cours', () => {
+    expect(stepperViewForStatus(DeploymentStatus.PENDING).completed).toBe(false)
+    expect(stepperViewForStatus(DeploymentStatus.PROVISIONING).completed).toBe(false)
+    expect(stepperViewForStatus(DeploymentStatus.FAILED).completed).toBe(false)
   })
 
   it('marque le stepper en échec quand failed (pas de spinner Validation trompeur)', () => {

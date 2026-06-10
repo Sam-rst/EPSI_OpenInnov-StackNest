@@ -7,6 +7,12 @@ import type { DeploymentLog, DeploymentLogLevel } from '../../types/models/Deplo
 interface StreamedLogsProps {
   logs: readonly DeploymentLog[]
   isDone: boolean
+  /**
+   * Provisioning en cours : des logs live sont attendus. Hors provisioning (déjà
+   * en ligne / arrêté / échoué à l'ouverture), le pub/sub est éphémère donc aucun
+   * log n'est rejoué : on l'affiche honnêtement sans pastille « live » trompeuse.
+   */
+  provisioning: boolean
 }
 
 const LEVEL_CLASS: Record<DeploymentLogLevel, string> = {
@@ -15,8 +21,8 @@ const LEVEL_CLASS: Record<DeploymentLogLevel, string> = {
   info: 'text-text-secondary',
 }
 
-function LiveBadge({ isDone }: { isDone: boolean }) {
-  if (isDone) {
+function LiveBadge({ live }: { live: boolean }) {
+  if (!live) {
     return <span className="text-text-muted text-[11px]">terminé</span>
   }
   return (
@@ -28,9 +34,11 @@ function LiveBadge({ isDone }: { isDone: boolean }) {
 
 /**
  * Console de logs streamés via SSE. Auto-scroll en bas à chaque nouvelle ligne ;
- * chaque ligne est dérivée du `message` de l'event de progression réel.
+ * chaque ligne est dérivée du `message` de l'event de progression réel. Les logs
+ * ne sont diffusés que pendant le provisioning (pub/sub éphémère, sans rejeu).
  */
-export function StreamedLogs({ logs, isDone }: StreamedLogsProps) {
+export function StreamedLogs({ logs, isDone, provisioning }: StreamedLogsProps) {
+  const live = provisioning && !isDone
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,7 +55,7 @@ export function StreamedLogs({ logs, isDone }: StreamedLogsProps) {
           <Icon name="terminal" size={13} className="text-cyan" />
           <span className="text-text-primary font-mono text-[12px]">Logs</span>
         </div>
-        <LiveBadge isDone={isDone} />
+        <LiveBadge live={live} />
       </div>
       <div
         ref={containerRef}
@@ -55,7 +63,11 @@ export function StreamedLogs({ logs, isDone }: StreamedLogsProps) {
         style={{ height: 380 }}
       >
         {logs.length === 0 ? (
-          <span className="text-text-muted">En attente des premiers logs…</span>
+          <span className="text-text-muted">
+            {provisioning
+              ? 'En attente des premiers logs…'
+              : 'Aucun log en direct — les logs sont diffusés uniquement pendant le provisioning.'}
+          </span>
         ) : (
           logs.map((line, index) => (
             <div key={index} className="flex gap-3">
