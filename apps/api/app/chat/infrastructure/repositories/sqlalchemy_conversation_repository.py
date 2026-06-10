@@ -72,9 +72,13 @@ class SqlAlchemyConversationRepository(ConversationRepository):
         return MessageMapper.to_entity(model)
 
     async def list_messages(self, conversation_id: UUID) -> list[Message]:
+        # Tri chronologique par `created_at` (clock_timestamp() -> distinct par
+        # insertion). `id` en cle de departage : stable et donc deterministe meme
+        # pour d'eventuelles lignes historiques au meme horodatage (legacy now()),
+        # ce qui evite que l'ordre « flotte » d'un rechargement a l'autre.
         result = await self._session.execute(
             select(MessageModel)
             .where(MessageModel.conversation_id == conversation_id)
-            .order_by(MessageModel.created_at)
+            .order_by(MessageModel.created_at, MessageModel.id)
         )
         return [MessageMapper.to_entity(model) for model in result.scalars().all()]

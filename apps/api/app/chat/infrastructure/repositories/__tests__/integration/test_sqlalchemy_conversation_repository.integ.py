@@ -173,6 +173,44 @@ class TestMessages:
         assert messages[0].role is MessageRole.USER
         assert messages[0].created_at is not None
 
+    async def test_messages_du_meme_tour_sont_horodates_distinctement(
+        self, session: AsyncSession
+    ) -> None:
+        """Un tour de chat persiste user + assistant + tool dans la MEME transaction.
+
+        Avec `now()` (constant sur toute la transaction) les trois `created_at`
+        seraient identiques et `ORDER BY created_at` renverrait un ordre arbitraire
+        (« messages dans le desordre »). Le defaut `clock_timestamp()` donne un
+        horodatage reel a chaque insertion : les trois messages sont strictement
+        ordonnes, donc relus dans l'ordre d'ecriture, de facon deterministe.
+        """
+        repository = SqlAlchemyConversationRepository(session)
+        owner_id = await _seed_user(session)
+        conversation = await repository.add(_conversation(owner_id=owner_id))
+        await session.commit()
+
+        for role, content in (
+            (MessageRole.USER, "premier"),
+            (MessageRole.ASSISTANT, "deuxieme"),
+            (MessageRole.TOOL, "troisieme"),
+        ):
+            await repository.add_message(
+                Message(
+                    id=uuid4(),
+                    conversation_id=conversation.id,
+                    role=role,
+                    content=content,
+                )
+            )
+        await session.commit()
+
+        messages = await repository.list_messages(conversation.id)
+
+        assert [m.content for m in messages] == ["premier", "deuxieme", "troisieme"]
+        premier, deuxieme, troisieme = (m.created_at for m in messages)
+        assert premier is not None and deuxieme is not None and troisieme is not None
+        assert premier < deuxieme < troisieme
+
 
 class TestDelete:
     async def test_delete_supprime_le_fil_et_ses_messages(self, session: AsyncSession) -> None:
