@@ -94,6 +94,31 @@ class TestTemplateName:
         assert dto.template_name == "PostgreSQL"
 
 
+class TestConnectionUsername:
+    def test_expose_le_username_de_connexion_pour_postgres(self) -> None:
+        dto = DeploymentResponse.from_entity(_deployment(), provisioning=_provisioning())
+
+        assert dto.connection_username == "postgres"
+
+    def test_username_absent_sans_descripteur(self) -> None:
+        dto = DeploymentResponse.from_entity(_deployment())
+
+        assert dto.connection_username is None
+
+    def test_username_absent_pour_image_sans_compte_par_defaut(self) -> None:
+        provisioning = TemplateProvisioning(
+            image_repository="nginx",
+            internal_port=80,
+            secret_env=None,
+            engine=EngineKind.DOCKER,
+            template_name="Nginx",
+        )
+
+        dto = DeploymentResponse.from_entity(_deployment(), provisioning=provisioning)
+
+        assert dto.connection_username is None
+
+
 class TestSecretMasking:
     def test_masque_la_valeur_d_un_param_secret(self) -> None:
         specs = (

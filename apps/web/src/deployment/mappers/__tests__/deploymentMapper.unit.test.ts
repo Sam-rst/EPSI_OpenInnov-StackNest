@@ -64,6 +64,18 @@ describe('mapDeploymentDto', () => {
 
     expect(model.templateName).toBeUndefined()
   })
+
+  it('reprend le nom d’utilisateur de connexion fourni par l’API', () => {
+    const model = mapDeploymentDto({ ...runningDto, connection_username: 'postgres' })
+
+    expect(model.connectionUsername).toBe('postgres')
+  })
+
+  it('laisse connectionUsername à null quand le champ est absent (défensif)', () => {
+    const model = mapDeploymentDto(runningDto)
+
+    expect(model.connectionUsername).toBeNull()
+  })
 })
 
 describe('mapDeploymentEventDto', () => {

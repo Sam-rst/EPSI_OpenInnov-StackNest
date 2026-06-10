@@ -26,6 +26,7 @@ export function mapDeploymentDto(dto: DeploymentDTO): Deployment {
     host: dto.host,
     port: dto.published_port,
     accessUrl: dto.access_url,
+    connectionUsername: dto.connection_username ?? null,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
   }

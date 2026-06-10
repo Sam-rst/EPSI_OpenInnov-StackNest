@@ -48,6 +48,14 @@ class DeploymentResponse(BaseModel):
     access_url: str | None = Field(
         None, description="Adresse d'acces `host:port` (une fois le port publie)."
     )
+    connection_username: str | None = Field(
+        None,
+        description=(
+            "Nom d'utilisateur de connexion par defaut de la ressource (ex. `postgres`). "
+            "Derive du descripteur du template ; non sensible (le mot de passe, lui, ne "
+            "transite que dans le flux SSE). `None` si le template n'a pas de compte par defaut."
+        ),
+    )
     created_at: datetime | None = Field(None, description="Date de creation.")
     updated_at: datetime | None = Field(None, description="Date de derniere mise a jour.")
 
@@ -77,6 +85,7 @@ class DeploymentResponse(BaseModel):
             host=deployment.host,
             published_port=deployment.published_port,
             access_url=cls._access_url(deployment),
+            connection_username=provisioning.connection_username() if provisioning else None,
             created_at=deployment.created_at,
             updated_at=deployment.updated_at,
         )

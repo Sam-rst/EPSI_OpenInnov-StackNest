@@ -5,6 +5,18 @@ from dataclasses import dataclass, field
 from app.catalog.domain.enums.engine_kind import EngineKind
 from app.deployment.domain.value_objects.template_param_spec import TemplateParamSpec
 
+# Nom du compte de connexion par defaut de chaque image de base de donnees, quand
+# StackNest ne fixe PAS de variable d'utilisateur (`POSTGRES_USER` & co. absentes
+# du provisioning) : le conteneur retombe alors sur le superutilisateur de l'image.
+# Sert a afficher le `username` dans les acces (le mot de passe seul ne suffit pas
+# a se connecter). Images hors de cette table : pas de compte par defaut connu.
+_DEFAULT_CONNECTION_USERNAMES = {
+    "postgres": "postgres",
+    "mysql": "root",
+    "mariadb": "root",
+    "mongo": "root",
+}
+
 
 @dataclass(frozen=True)
 class TemplateProvisioning:
@@ -56,3 +68,16 @@ class TemplateProvisioning:
     def secret_param_keys(self) -> frozenset[str]:
         """Cles des parametres de type `secret` (a masquer dans la reponse REST)."""
         return frozenset(spec.key for spec in self.params if spec.is_secret())
+
+    def connection_username(self) -> str | None:
+        """Compte de connexion par defaut de l'image, ou `None` si inconnu.
+
+        Le mot de passe genere seul ne suffit pas a se connecter a la ressource :
+        l'UI a besoin du nom d'utilisateur associe. Comme StackNest ne fixe pas de
+        variable d'utilisateur au provisioning, ce compte est le superutilisateur
+        par defaut de l'image (ex. `postgres` pour Postgres). Derive de l'image,
+        donc deterministe et non persiste.
+        """
+        if self.image_repository is None:
+            return None
+        return _DEFAULT_CONNECTION_USERNAMES.get(self.image_repository)

@@ -92,7 +92,9 @@ export function DeploymentDetailPage() {
         <StreamedLogs logs={events.logs} isDone={events.isDone} provisioning={provisioning} />
         <div className="space-y-4">
           <DetailsCard deployment={deployment} />
-          {showCredentials && events.access && <CredentialsCard access={events.access} />}
+          {showCredentials && events.access && (
+            <CredentialsCard access={events.access} username={deployment.connectionUsername} />
+          )}
           <LifecycleActions deploymentId={deployment.id} status={liveStatus} />
         </div>
       </div>
