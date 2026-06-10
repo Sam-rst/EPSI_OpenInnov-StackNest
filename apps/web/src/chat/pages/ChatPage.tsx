@@ -119,7 +119,11 @@ export function ChatPage() {
   const liveStatus = buildLiveStatus(stream.state)
 
   return (
-    <div className="grid h-[calc(100vh-3.5rem)] grid-cols-1 md:grid-cols-[260px_1fr] xl:grid-cols-[260px_1fr_280px]">
+    // h-full (et non une hauteur fixe en vh) : la page remplit EXACTEMENT la zone
+    // <main> de l'AppLayout (qui porte déjà le padding), sans la déborder — sinon
+    // le <main> scrollait toute la page. overflow-hidden ici + overflow-y-auto sur
+    // chacune des 3 colonnes ⇒ chaque colonne scrolle indépendamment, jamais la page.
+    <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[260px_1fr] xl:grid-cols-[260px_1fr_280px]">
       {/* Titre accessible : la mise en page 3 colonnes n'affiche pas de bandeau
           de titre, mais l'écran reste annoncé aux lecteurs d'écran. */}
       <h1 className="sr-only">Chat IA</h1>
