@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.catalog.domain.enums.param_type import ParamType
 from app.chat.application.__tests__.fakes import (
     FakeCatalogReader,
     make_param,
@@ -111,6 +112,54 @@ class TestDeployValidation:
 
         with pytest.raises(InvalidToolArgsException):
             await gate.validate(call, owner_id=uuid4())
+
+    async def test_deploy_param_secret_requis_n_est_pas_exige_ni_propose(self) -> None:
+        # Un param de type `secret` (genere au provisioning par le worker) ne doit
+        # ni etre exige a l'utilisateur, ni apparaitre dans la proposition.
+        template = make_template(
+            versions=["16"],
+            params=[
+                make_param(key="db_name", required=True),
+                make_param(key="password", param_type=ParamType.SECRET, required=True),
+            ],
+        )
+        gate = _gate(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="deploy_template",
+            args={
+                "template_id": str(template.id),
+                "version": "16",
+                "name": "db",
+                "params": {"db_name": "app"},  # password requis absent : ne doit PAS lever
+            },
+        )
+
+        proposal = await gate.validate(call, owner_id=uuid4())
+
+        assert "password" not in proposal.args["params"]
+        assert "password" not in proposal.recap["params"]
+        assert proposal.args["params"] == {"db_name": "app"}
+
+    async def test_deploy_strippe_un_param_secret_fourni_par_le_modele(self) -> None:
+        # Si le modele fournit malgre tout un secret, on le retire (jamais propage).
+        template = make_template(
+            versions=["16"],
+            params=[make_param(key="password", param_type=ParamType.SECRET, required=True)],
+        )
+        gate = _gate(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="deploy_template",
+            args={
+                "template_id": str(template.id),
+                "version": "16",
+                "name": "db",
+                "params": {"password": "secret123"},
+            },
+        )
+
+        proposal = await gate.validate(call, owner_id=uuid4())
+
+        assert "password" not in proposal.args["params"]
 
     async def test_deploy_nom_vide_leve_invalid_args(self) -> None:
         template = make_template(versions=["16"])
