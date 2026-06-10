@@ -53,11 +53,13 @@ class TestRequiredParams:
 
         DeploymentParamsValidator(specs).validate({})
 
-    def test_secret_requis_manquant_leve(self) -> None:
+    def test_secret_requis_manquant_ne_leve_pas(self) -> None:
+        # Un parametre de type `secret` est genere au provisioning par le worker :
+        # il n'est jamais saisi par l'utilisateur, donc son absence ne doit pas
+        # bloquer la creation (sinon le chat, qui n'envoie jamais de secret, casse).
         specs = (_spec("api_key", type=ParamType.SECRET, required=True),)
 
-        with pytest.raises(InvalidDeploymentParamsException):
-            DeploymentParamsValidator(specs).validate({})
+        DeploymentParamsValidator(specs).validate({})  # ne leve pas
 
 
 class TestTypeConformity:
