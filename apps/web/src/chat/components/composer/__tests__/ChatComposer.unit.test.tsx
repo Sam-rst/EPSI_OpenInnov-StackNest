@@ -59,4 +59,40 @@ describe('ChatComposer', () => {
 
     expect(screen.getByRole('button', { name: /Envoyer/ })).toBeDisabled()
   })
+
+  it('affiche un état « envoi… » et verrouille la saisie quand pending — A5', () => {
+    renderComposer({ pending: true })
+
+    expect(screen.getByRole('textbox')).toBeDisabled()
+    expect(screen.getByText(/Envoi/i)).toBeInTheDocument()
+  })
+
+  it('refocus le champ après un envoi — F2', async () => {
+    const user = userEvent.setup()
+    renderComposer()
+
+    const textarea = screen.getByRole('textbox')
+    await user.type(textarea, 'Un Postgres')
+    await user.click(screen.getByRole('button', { name: /Envoyer/ }))
+
+    expect(textarea).toHaveFocus()
+  })
+
+  it('vide le champ avec la touche Échap — F2', async () => {
+    const user = userEvent.setup()
+    const { onSend } = renderComposer()
+
+    const textarea = screen.getByRole('textbox')
+    await user.type(textarea, 'brouillon en cours')
+    await user.type(textarea, '{Escape}')
+
+    expect(textarea).toHaveValue('')
+    expect(onSend).not.toHaveBeenCalled()
+  })
+
+  it('affiche un indicateur discret du modèle (IA locale) — F4', () => {
+    renderComposer()
+
+    expect(screen.getByText(/IA locale/i)).toBeInTheDocument()
+  })
 })

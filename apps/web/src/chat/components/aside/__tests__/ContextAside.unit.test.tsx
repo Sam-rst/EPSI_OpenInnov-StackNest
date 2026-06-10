@@ -60,4 +60,37 @@ describe('ContextAside', () => {
 
     expect(screen.getByText(/indisponible/i)).toBeInTheDocument()
   })
+
+  it('exclut les déploiements supprimés (destroyed) — D1', () => {
+    renderAside({
+      deployments: [
+        deployment({ id: 'dep-running', name: 'pg-vivant' }),
+        deployment({
+          id: 'dep-gone',
+          name: 'pg-supprime',
+          status: DeploymentStatus.DESTROYED,
+          statusLabel: 'Supprimé',
+        }),
+      ],
+    })
+
+    expect(screen.getByText('pg-vivant')).toBeInTheDocument()
+    expect(screen.queryByText('pg-supprime')).toBeNull()
+  })
+
+  it('affiche l’état vide quand tous les déploiements sont supprimés — D1', () => {
+    renderAside({
+      deployments: [
+        deployment({
+          id: 'dep-gone',
+          name: 'pg-supprime',
+          status: DeploymentStatus.DESTROYED,
+          statusLabel: 'Supprimé',
+        }),
+      ],
+    })
+
+    expect(screen.queryByText('pg-supprime')).toBeNull()
+    expect(screen.getByText(/Aucun déploiement actif/)).toBeInTheDocument()
+  })
 })

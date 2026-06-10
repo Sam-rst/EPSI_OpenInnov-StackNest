@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import { Badge } from '../../../shared/components/ui'
-import { toneForStatus } from '../../../deployment/types/enums/DeploymentStatus'
+import { isTerminalStatus, toneForStatus } from '../../../deployment/types/enums/DeploymentStatus'
 import type { Deployment } from '../../../deployment/types/models/Deployment'
 
 interface ContextAsideProps {
@@ -39,6 +39,10 @@ function DeploymentCard({ deployment }: { deployment: Deployment }) {
  * rebondir vers le détail d'une ressource. États vide/chargement/erreur honnêtes.
  */
 export function ContextAside({ deployments, loading, isError }: ContextAsideProps) {
+  // D1 : l'aside ne montre que les déploiements actifs — on écarte ceux détruits
+  // (statut terminal `destroyed`/SUPPRIMÉ), qui ne sont plus un contexte utile.
+  const activeDeployments = deployments.filter((deployment) => !isTerminalStatus(deployment.status))
+
   return (
     <aside className="border-border bg-surface-elevated flex h-full flex-col overflow-y-auto border-l">
       <div className="border-border border-b p-4">
@@ -61,7 +65,7 @@ export function ContextAside({ deployments, loading, isError }: ContextAsideProp
           </p>
         )}
 
-        {!loading && !isError && deployments.length === 0 && (
+        {!loading && !isError && activeDeployments.length === 0 && (
           <p className="text-text-muted text-[12px]">
             Aucun déploiement actif. L'assistant pourra t'en proposer un.
           </p>
@@ -69,7 +73,7 @@ export function ContextAside({ deployments, loading, isError }: ContextAsideProp
 
         {!loading &&
           !isError &&
-          deployments.map((deployment) => (
+          activeDeployments.map((deployment) => (
             <DeploymentCard key={deployment.id} deployment={deployment} />
           ))}
       </div>

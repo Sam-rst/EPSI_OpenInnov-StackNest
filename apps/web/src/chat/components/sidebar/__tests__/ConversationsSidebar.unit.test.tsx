@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -77,5 +77,41 @@ describe('ConversationsSidebar', () => {
     renderSidebar({ conversations: [] })
 
     expect(screen.getByText(/Aucune conversation/)).toBeInTheDocument()
+  })
+
+  it('tronque un titre dérivé trop long pour rester lisible — D3', () => {
+    const longTitle =
+      'Je voudrais déployer un cluster PostgreSQL 16 hautement disponible avec réplication'
+    renderSidebar({
+      conversations: [conversation({ id: 'c-long', title: longTitle })],
+      activeId: 'c-long',
+    })
+
+    // Le libellé visible (span tronqué), distingué de l'aria-label du bouton.
+    const item = screen.getByRole('listitem')
+    const label = within(item).getByText(/^Je voudrais/)
+    expect(label.textContent).toMatch(/…$/)
+    expect(label.textContent).not.toBe(longTitle)
+    expect((label.textContent ?? '').length).toBeLessThan(longTitle.length)
+  })
+
+  it('retombe sur « Nouvelle conversation » quand aucun titre n’existe — D3', () => {
+    renderSidebar({
+      conversations: [conversation({ id: 'c-empty', title: '   ' })],
+      activeId: 'c-empty',
+    })
+
+    // Scopé à la ligne du fil (le bouton de création porte aussi ce libellé).
+    const item = screen.getByRole('listitem')
+    expect(within(item).getByText('Nouvelle conversation')).toBeInTheDocument()
+  })
+
+  it('affiche un titre court dérivé tel quel — D3', () => {
+    renderSidebar({
+      conversations: [conversation({ id: 'c-short', title: 'Postgres isolé' })],
+      activeId: 'c-short',
+    })
+
+    expect(screen.getByText('Postgres isolé')).toBeInTheDocument()
   })
 })
