@@ -14,6 +14,7 @@ from typing import Any
 
 import httpx
 
+from app.chat.domain.enums.message_role import MessageRole
 from app.chat.domain.interfaces.llm_provider import LLMProvider
 from app.chat.domain.value_objects.chat_message import ChatMessage
 from app.chat.domain.value_objects.llm_chunk import LLMChunk
@@ -97,12 +98,32 @@ class AnthropicProvider(LLMProvider):
         payload: dict[str, Any] = {
             "model": self._model,
             "max_tokens": self._max_tokens,
-            "messages": [{"role": m.role.value, "content": m.content} for m in messages],
+            "messages": self._anthropic_messages(messages),
             "stream": stream,
         }
         if tools:
             payload["tools"] = [self._to_anthropic_tool(tool) for tool in tools]
         return payload
+
+    @staticmethod
+    def _anthropic_messages(messages: Sequence[ChatMessage]) -> list[dict[str, str]]:
+        """Traduit l'historique vers le format Anthropic (roles + alternance stricte).
+
+        Anthropic n'accepte que les roles `user` / `assistant`, sans deux messages
+        consecutifs de meme role. On mappe donc `tool` -> `user` (les resultats
+        d'outils sont fournis comme contexte utilisateur), puis on **fusionne** les
+        messages consecutifs de meme role en concatenant leur contenu. Le prompt
+        systeme, injecte en `user` en tete par le use case, fusionne ainsi
+        naturellement avec le premier message utilisateur.
+        """
+        merged: list[dict[str, str]] = []
+        for message in messages:
+            role = "assistant" if message.role is MessageRole.ASSISTANT else "user"
+            if merged and merged[-1]["role"] == role:
+                merged[-1]["content"] = f"{merged[-1]['content']}\n\n{message.content}"
+            else:
+                merged.append({"role": role, "content": message.content})
+        return merged
 
     @staticmethod
     def _to_anthropic_tool(tool: ToolDefinition) -> dict[str, Any]:
