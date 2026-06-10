@@ -29,6 +29,15 @@ import type { Message } from '../types/models/Message'
 const CONVERSATIONS_PATH = '/chat/conversations'
 const ACTIONS_PATH = '/chat/actions'
 
+/**
+ * Timeout (ms) de l'envoi d'un message. Le back traite la passe LLM de façon
+ * synchrone avant son `202` ; un tour avec appel d'outil sur un LLM local CPU
+ * peut dépasser une minute. Le défaut axios (10 s) coupait alors le POST →
+ * « Connexion interrompue » à tort, alors que la réponse arrive ensuite par le
+ * flux SSE. On laisse donc une marge large mais bornée (3 min) propre à l'envoi.
+ */
+const SEND_MESSAGE_TIMEOUT_MS = 180_000
+
 /** Corps de renommage / création (titre du fil). */
 interface TitleBody {
   title: string
@@ -71,7 +80,11 @@ export async function deleteConversation(id: string): Promise<void> {
  * flux SSE de la conversation, déjà ouvert côté `useChatStream`.
  */
 export async function sendMessage(conversationId: string, content: string): Promise<void> {
-  await apiClient.post(`${CONVERSATIONS_PATH}/${conversationId}/messages`, { content })
+  await apiClient.post(
+    `${CONVERSATIONS_PATH}/${conversationId}/messages`,
+    { content },
+    { timeout: SEND_MESSAGE_TIMEOUT_MS },
+  )
 }
 
 /** Confirme une action proposée (`POST /chat/actions/{id}/confirm` → 202). */
