@@ -15,10 +15,12 @@ const DISCLAIMER =
   'StackNest IA peut produire des erreurs. Vérifie toujours le récap avant de confirmer.'
 
 /**
- * Libellé discret du modèle (F4). L'API n'expose pas le modèle exact côté front :
- * on affiche un libellé statique honnête (LLM local par défaut, cf. stack Ollama).
+ * Libellé discret de l'assistant (F4). Le fournisseur LLM est pluggable et choisi
+ * par configuration côté back (Ollama local, Anthropic/Claude, OpenAI…) : l'API ne
+ * l'expose pas au front, donc on affiche un libellé neutre et honnête (ni « local »
+ * ni un fournisseur précis qui pourrait être faux).
  */
-const MODEL_LABEL = 'IA locale'
+const MODEL_LABEL = 'Assistant IA'
 
 /**
  * Zone de saisie en langage naturel. Le bouton pièce-jointe (trombone) est

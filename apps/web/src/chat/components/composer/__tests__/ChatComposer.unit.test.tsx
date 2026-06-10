@@ -90,9 +90,9 @@ describe('ChatComposer', () => {
     expect(onSend).not.toHaveBeenCalled()
   })
 
-  it('affiche un indicateur discret du modèle (IA locale) — F4', () => {
+  it('affiche un indicateur discret de l’assistant (neutre, fournisseur-agnostique) — F4', () => {
     renderComposer()
 
-    expect(screen.getByText(/IA locale/i)).toBeInTheDocument()
+    expect(screen.getByText(/Assistant IA/i)).toBeInTheDocument()
   })
 })
