@@ -78,6 +78,12 @@ describe('MessageList', () => {
     expect(onStop).toHaveBeenCalledTimes(1)
   })
 
+  it('n’affiche pas le bouton « revenir en bas » quand on est collé au bas', () => {
+    renderList({ streamStatus: 'streaming', streamingText: 'Post' })
+
+    expect(screen.queryByRole('button', { name: /Revenir en bas/i })).toBeNull()
+  })
+
   it('rend la carte d’action attachée à un message', () => {
     renderList({
       messages: [
