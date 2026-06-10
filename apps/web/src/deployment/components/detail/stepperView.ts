@@ -41,6 +41,11 @@ export function stepperViewForStatus(status: DeploymentStatus): StepperView {
     case DeploymentStatus.FAILED:
       return { show: true, failed: true, completed: false, currentStep: DeploymentStep.VALIDATION }
     default:
-      return { show: false, failed: false, completed: false, currentStep: DeploymentStep.VALIDATION }
+      return {
+        show: false,
+        failed: false,
+        completed: false,
+        currentStep: DeploymentStep.VALIDATION,
+      }
   }
 }
