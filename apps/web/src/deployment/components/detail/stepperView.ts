@@ -11,6 +11,13 @@ export interface StepperView {
   show: boolean
   /** L'étape figée par l'échec (bandeaux rouges au lieu d'un spinner). */
   failed: boolean
+  /**
+   * Stepper entièrement complété (statut `running`) : toutes les étapes sont
+   * validées, AUCUN spinner sur « Prêt ». Sans ce drapeau, un déploiement déjà
+   * en ligne (ouvert après le provisioning, sans event SSE à rejouer) affichait
+   * « Prêt » en spinner perpétuel.
+   */
+  completed: boolean
   /** Étape de référence déduite du statut (la page peut affiner en provisioning). */
   currentStep: DeploymentStep
 }
@@ -26,14 +33,14 @@ export interface StepperView {
 export function stepperViewForStatus(status: DeploymentStatus): StepperView {
   switch (status) {
     case DeploymentStatus.PENDING:
-      return { show: true, failed: false, currentStep: DeploymentStep.VALIDATION }
+      return { show: true, failed: false, completed: false, currentStep: DeploymentStep.VALIDATION }
     case DeploymentStatus.PROVISIONING:
-      return { show: true, failed: false, currentStep: DeploymentStep.PULL_IMAGE }
+      return { show: true, failed: false, completed: false, currentStep: DeploymentStep.PULL_IMAGE }
     case DeploymentStatus.RUNNING:
-      return { show: true, failed: false, currentStep: DeploymentStep.READY }
+      return { show: true, failed: false, completed: true, currentStep: DeploymentStep.READY }
     case DeploymentStatus.FAILED:
-      return { show: true, failed: true, currentStep: DeploymentStep.VALIDATION }
+      return { show: true, failed: true, completed: false, currentStep: DeploymentStep.VALIDATION }
     default:
-      return { show: false, failed: false, currentStep: DeploymentStep.VALIDATION }
+      return { show: false, failed: false, completed: false, currentStep: DeploymentStep.VALIDATION }
   }
 }
