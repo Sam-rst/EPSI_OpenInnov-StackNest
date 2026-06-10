@@ -18,6 +18,7 @@ function deployment(overrides: Partial<Deployment> = {}): Deployment {
     host: '10.0.0.5',
     port: 32769,
     accessUrl: '10.0.0.5:32769',
+    connectionUsername: 'postgres',
     createdAt: '2026-06-08T10:00:00Z',
     updatedAt: '2026-06-08T11:00:00Z',
     ...overrides,

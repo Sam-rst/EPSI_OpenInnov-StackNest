@@ -6,15 +6,22 @@ import type { DeploymentAccess } from '../../types/models/DeploymentEvent'
 
 interface CredentialsCardProps {
   access: DeploymentAccess
+  /**
+   * Nom d'utilisateur de connexion (ex. « postgres »), fourni par l'API (non
+   * sensible). `null`/absent pour un template sans compte par défaut : la ligne
+   * n'est alors pas affichée. Complète le mot de passe, qui seul ne suffit pas.
+   */
+  username?: string | null
 }
 
 /**
  * Carte d'accès affichée une seule fois au passage « running ». L'adresse
- * (`host:port`) et le mot de passe généré proviennent du flux SSE réel. Le mot
- * de passe est masqué par défaut, révélable, et accompagné d'un avertissement
- * « non récupérable ensuite » (il ne transite qu'une seule fois).
+ * (`host:port`) et le mot de passe généré proviennent du flux SSE réel ; le nom
+ * d'utilisateur (non sensible) vient de la ressource (REST). Le mot de passe est
+ * masqué par défaut, révélable, et accompagné d'un avertissement « non
+ * récupérable ensuite » (il ne transite qu'une seule fois).
  */
-export function CredentialsCard({ access }: CredentialsCardProps) {
+export function CredentialsCard({ access, username }: CredentialsCardProps) {
   const [revealed, setRevealed] = useState(false)
 
   return (
@@ -28,6 +35,12 @@ export function CredentialsCard({ access }: CredentialsCardProps) {
           <dt className="text-text-muted">adresse</dt>
           <dd className="text-text-primary break-all">{access.url}</dd>
         </div>
+        {username && (
+          <div className="flex justify-between gap-2">
+            <dt className="text-text-muted">utilisateur</dt>
+            <dd className="text-text-primary break-all">{username}</dd>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2">
           <dt className="text-text-muted">mot de passe</dt>
           <dd className="text-text-primary flex items-center gap-2 break-all">

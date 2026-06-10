@@ -29,6 +29,12 @@ export interface Deployment {
   port: number | null
   /** Accès `host:port` fourni par l'API, ou `null` tant que non provisionné. */
   accessUrl: string | null
+  /**
+   * Nom d'utilisateur de connexion par défaut (ex. « postgres »), dérivé du
+   * template par l'API. `null` pour un template sans compte par défaut. Non
+   * sensible : complète le mot de passe (qui, lui, ne transite qu'en SSE).
+   */
+  connectionUsername: string | null
   /** Date de création ISO 8601, ou `null`. */
   createdAt: string | null
   /** Date de dernière mise à jour ISO 8601, ou `null`. */

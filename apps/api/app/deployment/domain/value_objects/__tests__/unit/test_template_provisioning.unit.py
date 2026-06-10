@@ -81,3 +81,44 @@ class TestTemplateProvisioning:
         )
 
         assert descriptor.requires_secret() is False
+
+    def test_connection_username_postgres(self) -> None:
+        descriptor = TemplateProvisioning(
+            image_repository="postgres",
+            internal_port=5432,
+            secret_env="POSTGRES_PASSWORD",
+            engine=EngineKind.DOCKER,
+        )
+
+        assert descriptor.connection_username() == "postgres"
+
+    def test_connection_username_mysql_et_mariadb_sont_root(self) -> None:
+        for image in ("mysql", "mariadb"):
+            descriptor = TemplateProvisioning(
+                image_repository=image,
+                internal_port=3306,
+                secret_env="MYSQL_ROOT_PASSWORD",
+                engine=EngineKind.DOCKER,
+            )
+
+            assert descriptor.connection_username() == "root"
+
+    def test_connection_username_none_pour_image_sans_compte_par_defaut(self) -> None:
+        descriptor = TemplateProvisioning(
+            image_repository="nginx",
+            internal_port=80,
+            secret_env=None,
+            engine=EngineKind.DOCKER,
+        )
+
+        assert descriptor.connection_username() is None
+
+    def test_connection_username_none_quand_aucune_image(self) -> None:
+        descriptor = TemplateProvisioning(
+            image_repository=None,
+            internal_port=None,
+            secret_env=None,
+            engine=EngineKind.TERRAFORM,
+        )
+
+        assert descriptor.connection_username() is None

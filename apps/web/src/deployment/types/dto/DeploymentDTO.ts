@@ -31,6 +31,13 @@ export interface DeploymentDTO {
   published_port: number | null
   /** Adresse d'accès `host:port` calculée par l'API, ou `null` tant que non publié. */
   access_url: string | null
+  /**
+   * Nom d'utilisateur de connexion par défaut de la ressource (ex. « postgres »),
+   * dérivé du template par l'API. Non sensible (le mot de passe, lui, ne transite
+   * que dans l'event SSE). Optionnel/`null` : absent d'un back plus ancien ou pour
+   * un template sans compte par défaut — mappé défensivement.
+   */
+  connection_username?: string | null
   /** Date de création ISO 8601, ou `null`. */
   created_at: string | null
   /** Date de dernière mise à jour ISO 8601, ou `null`. */
