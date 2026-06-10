@@ -8,6 +8,7 @@ import {
 } from '../services/chatService'
 import type { Conversation } from '../types/models/Conversation'
 import { CHAT_QUERY_KEYS } from './chatQueryKeys'
+import { sortConversationsByRecent } from './sortConversationsByRecent'
 
 export interface UseConversationsResult {
   conversations: readonly Conversation[]
@@ -53,7 +54,9 @@ export function useConversations(): UseConversationsResult {
   })
 
   return {
-    conversations: data ?? [],
+    // Récents en tête : la sidebar les affiche dans cet ordre et `ChatPage` ouvre
+    // le premier (= le plus récent) par défaut.
+    conversations: sortConversationsByRecent(data ?? []),
     loading: isLoading,
     isError,
     create: (title) => createMutation.mutateAsync(title),
