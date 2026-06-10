@@ -52,10 +52,12 @@ describe('Message', () => {
     expect(screen.getByText(/à l’instant/)).toBeInTheDocument()
   })
 
-  it('affiche l’avatar utilisateur pour un message user', () => {
+  it('affiche l’avatar du vrai utilisateur courant pour un message user', () => {
+    // Hors AuthProvider, useCurrentUser retombe sur l'utilisateur neutre
+    // (« Utilisateur ») — jamais un « Vous » codé en dur.
     renderMessage({ role: MessageRole.USER, content: 'Salut' })
 
-    expect(screen.getByRole('img', { name: /Vous/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Utilisateur/ })).toBeInTheDocument()
   })
 
   it('remplace un bloc JSON de déploiement par un CTA (fallback C2)', () => {

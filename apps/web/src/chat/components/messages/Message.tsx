@@ -1,4 +1,3 @@
-import { Avatar } from '../../../shared/components/ui'
 import { cn } from '../../../shared/lib/cn'
 import { MessageRole } from '../../types/enums/MessageRole'
 import type { Message as MessageModel } from '../../types/models/Message'
@@ -8,6 +7,7 @@ import { DeploymentActionCta } from './DeploymentActionCta'
 import { MarkdownContent } from './MarkdownContent'
 import { parseDeploymentAction } from './parseDeploymentAction'
 import { relativeTime } from './relativeTime'
+import { UserAvatar } from './UserAvatar'
 
 interface MessageProps {
   message: MessageModel
@@ -78,7 +78,7 @@ export function Message({ message, onConfirmAction, onRejectAction }: MessagePro
           </div>
         )}
       </div>
-      {isUser && <Avatar name="Vous" color="#fea21f" size={32} />}
+      {isUser && <UserAvatar />}
     </div>
   )
 }

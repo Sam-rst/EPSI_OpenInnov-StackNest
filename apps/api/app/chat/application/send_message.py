@@ -47,9 +47,25 @@ _MAX_TOOL_PASSES = 5
 
 _SYSTEM_PROMPT = (
     "Tu es l'assistant de StackNest, une plateforme de provisioning interne. "
-    "Tu n'utilises QUE les outils fournis et ne references QUE des ressources "
-    "reelles renvoyees par ces outils. Tu ne deploies jamais directement : tu "
-    "proposes une action que l'utilisateur confirme. Tu ne divulgues aucun secret."
+    "Tu reponds en francais, de facon concise. Tu n'utilises QUE les outils fournis "
+    "et ne references QUE des ressources reelles renvoyees par ces outils : tu "
+    "n'inventes jamais un identifiant, une version ou une valeur. Tu ne divulgues "
+    "aucun secret.\n"
+    "Tu es un assistant GUIDE : avant de proposer un deploiement, tu recueilles le "
+    "besoin en posant des questions. Procede ainsi :\n"
+    "1. Identifie le template voulu (appelle list_catalog ou get_template au besoin) ; "
+    "si c'est ambigu, demande a l'utilisateur de preciser.\n"
+    "2. Appelle get_template pour connaitre ses parametres, puis pose les questions "
+    "necessaires (1 a 3 a la fois) : usage, nom du deploiement, version souhaitee, et "
+    "chaque parametre requis. Ne devine jamais une valeur : en cas de doute, demande.\n"
+    "3. Des que tu as reuni le nom et tous les parametres requis, APPELLE directement "
+    "l'outil deploy_template. N'ecris JAMAIS la proposition en texte et ne redemande "
+    "pas une enieme confirmation : c'est l'outil lui-meme qui produit la carte de "
+    "proposition que l'utilisateur confirmera. Tu ne declenches donc jamais un "
+    "deploiement reel, tu emets seulement l'appel d'outil.\n"
+    "Si un outil signale une information manquante ou invalide, pose la question "
+    "correspondante a l'utilisateur (ou propose une alternative reelle du catalogue) "
+    "plutot que de rappeler l'outil a l'aveugle."
 )
 
 
@@ -101,8 +117,11 @@ class SendMessage:
             if self._is_read_tool(tool_call):
                 await self._inject_read_result(conversation_id, owner_id, history, tool_call)
                 continue
-            await self._propose_action(conversation_id, owner_id, tool_call)
-            return
+            if await self._try_propose_action(conversation_id, owner_id, history, tool_call):
+                return
+            # Action refusee par la gate (info manquante / hallucination) : le feedback
+            # a ete reinjecte dans l'historique -> l'IA redemande ou reformule (passe
+            # suivante), au lieu d'une erreur terminale. C'est le coeur de l'elicitation.
         # Boucle bornee atteinte : on conclut proprement sans message assistant.
         await self._publisher.publish(
             conversation_id, "error", {"message": "Trop d'appels d'outils enchaines."}
@@ -140,12 +159,26 @@ class SendMessage:
         await self._persist_message(conversation_id, MessageRole.TOOL, tool_message)
         history.append(ChatMessage(role=MessageRole.TOOL, content=tool_message))
 
-    async def _propose_action(self, conversation_id: UUID, owner_id: UUID, call: ToolCall) -> None:
+    async def _try_propose_action(
+        self, conversation_id: UUID, owner_id: UUID, history: list[ChatMessage], call: ToolCall
+    ) -> bool:
+        """Tente de proposer l'action ; renvoie True si la proposition a ete publiee.
+
+        Si la gate refuse l'appel (parametre requis manquant, nom absent, entite hors
+        catalogue), on **ne publie pas d'erreur terminale** : on reinjecte le motif
+        comme feedback (message `tool` transitoire, non persiste) pour que l'IA
+        redemande l'information a l'utilisateur a la passe suivante. Renvoie False.
+        """
         try:
             proposal = await self._gate.validate(call, owner_id=owner_id)
         except (InvalidToolArgsException, UnknownTemplateException) as error:
-            await self._publisher.publish(conversation_id, "error", {"message": error.message})
-            return
+            history.append(
+                ChatMessage(
+                    role=MessageRole.TOOL,
+                    content=self._clarification_feedback(call.name, error.message),
+                )
+            )
+            return False
         assistant = await self._persist_message(
             conversation_id, MessageRole.ASSISTANT, proposal.restatement
         )
@@ -167,6 +200,17 @@ class SendMessage:
                 "restatement": proposal.restatement,
                 "recap": proposal.recap,
             },
+        )
+        return True
+
+    @staticmethod
+    def _clarification_feedback(tool_name: str, reason: str) -> str:
+        """Message `tool` guidant l'IA a redemander l'info plutot qu'a reessayer."""
+        return (
+            f"[{tool_name}] Action non proposable : {reason} "
+            "Demande a l'utilisateur, en langage naturel, les informations manquantes "
+            "(ou propose une alternative reelle du catalogue). Ne rappelle pas cet "
+            "outil tant que tu n'as pas obtenu ces informations."
         )
 
     async def _persist_message(
