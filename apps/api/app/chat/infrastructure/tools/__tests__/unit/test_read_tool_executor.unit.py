@@ -11,7 +11,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.chat.application.__tests__.fakes import FakeCatalogReader, make_template
+from app.catalog.domain.enums.param_type import ParamType
+from app.chat.application.__tests__.fakes import FakeCatalogReader, make_param, make_template
 from app.chat.domain.exceptions.invalid_tool_args import InvalidToolArgsException
 from app.chat.domain.value_objects.tool_call import ToolCall
 from app.chat.infrastructure.tools.read_tool_executor import ReadToolExecutor
@@ -47,6 +48,25 @@ class TestGetTemplate:
 
         assert result["template"]["id"] == str(template.id)
         assert "16" in [v["version"] for v in result["template"]["versions"]]
+
+    async def test_exclut_les_params_secret_du_detail(self) -> None:
+        # Les params `secret` (mot de passe genere au provisioning) ne sont pas
+        # exposes au modele : il ne doit ni les connaitre ni les demander.
+        template = make_template(
+            versions=["16"],
+            params=[
+                make_param(key="db_name", required=True),
+                make_param(key="password", param_type=ParamType.SECRET, required=True),
+            ],
+        )
+        executor = _executor(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(name=ToolName.GET_TEMPLATE.value, args={"template_id": str(template.id)})
+
+        result = await executor.execute(call, owner_id=uuid4())
+
+        keys = [p["key"] for p in result["template"]["params"]]
+        assert "db_name" in keys
+        assert "password" not in keys
 
     async def test_template_inconnu_renvoie_un_resultat_non_trouve(self) -> None:
         executor = _executor(FakeCatalogReader([]), FakeDeploymentRepository())

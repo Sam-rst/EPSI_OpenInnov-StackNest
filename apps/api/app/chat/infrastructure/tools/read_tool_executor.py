@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID
 
 from app.catalog.domain.entities.template import Template
+from app.catalog.domain.enums.param_type import ParamType
 from app.chat.domain.exceptions.invalid_tool_args import InvalidToolArgsException
 from app.chat.domain.interfaces.catalog_reader import CatalogReader
 from app.chat.domain.value_objects.tool_call import ToolCall
@@ -98,6 +99,8 @@ class ReadToolExecutor:
             {"version": v.version, "is_default": v.is_default, "is_lts": v.is_lts}
             for v in template.versions
         ]
+        # Les params `secret` (mot de passe genere au provisioning) ne sont pas
+        # exposes au modele : il ne doit ni les connaitre ni les demander.
         summary["params"] = [
             {
                 "key": param.key,
@@ -106,6 +109,7 @@ class ReadToolExecutor:
                 "required": param.required,
             }
             for param in template.params
+            if param.type is not ParamType.SECRET
         ]
         return summary
 

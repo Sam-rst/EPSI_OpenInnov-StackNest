@@ -19,6 +19,7 @@ from typing import Any
 from uuid import UUID
 
 from app.catalog.domain.entities.template import Template
+from app.catalog.domain.enums.param_type import ParamType
 from app.chat.domain.enums.action_kind import ActionKind
 from app.chat.domain.exceptions.invalid_tool_args import InvalidToolArgsException
 from app.chat.domain.exceptions.unknown_template import UnknownTemplateException
@@ -146,12 +147,18 @@ class ActionArgsGate:
         unknown = set(raw_params) - allowed
         if unknown:
             raise InvalidToolArgsException(f"Parametres inconnus : {sorted(unknown)}.")
+        # Les parametres `secret` (ex. mot de passe) sont generes au provisioning par
+        # le worker : on ne les exige jamais de l'utilisateur et on ne les propage
+        # pas dans la proposition (jamais saisis, affiches, ni persistes cote chat).
+        secret_keys = {param.key for param in template.params if param.type is ParamType.SECRET}
         missing = {
-            param.key for param in template.params if param.required and param.key not in raw_params
+            param.key
+            for param in template.params
+            if param.required and param.type is not ParamType.SECRET and param.key not in raw_params
         }
         if missing:
             raise InvalidToolArgsException(f"Parametres requis manquants : {sorted(missing)}.")
-        return dict(raw_params)
+        return {key: value for key, value in raw_params.items() if key not in secret_keys}
 
     @staticmethod
     def _lifecycle_restatement(kind: ActionKind, deployment: Deployment) -> str:
