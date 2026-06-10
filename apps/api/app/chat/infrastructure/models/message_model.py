@@ -20,11 +20,17 @@ class MessageModel(Base):
       suppression d'un fil emporte ses messages), indexee pour `list_messages`.
     - `role`            : enum Postgres `message_role` (user / assistant / tool).
     - `content`         : texte du message (TEXT, eventuellement vide).
-    - `created_at`      : horodatage de creation (gere cote base), sert d'ordre
-      chronologique de relecture.
+    - `created_at`      : horodatage de creation (gere cote base via
+      `clock_timestamp()`), sert d'ordre chronologique de relecture.
 
     Pas de `TimestampMixin` : un message est immuable une fois ecrit, seul
     `created_at` est pertinent (pas d'`updated_at`).
+
+    `clock_timestamp()` (et non `now()`) : un tour de chat persiste plusieurs
+    messages (user, assistant, tool) dans la MEME transaction. `now()` renvoie
+    l'heure de DEBUT de transaction (constante), ce qui donnerait des `created_at`
+    identiques et un ordre de relecture non deterministe. `clock_timestamp()`
+    s'evalue a chaque insertion -> horodatage reel distinct, ordre stable.
     """
 
     __tablename__ = "messages"
@@ -47,6 +53,6 @@ class MessageModel(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
+        server_default=func.clock_timestamp(),
         nullable=False,
     )
