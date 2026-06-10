@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { afterEach, describe, expect, it } from 'vitest'
 
-import { resetConversationStore } from '../../data/conversations.fixtures'
+import { server } from '../../../../tests/mocks/server'
+import type { ConversationDetailDTO } from '../../types/dto/ConversationDetailDTO'
+import type { ConversationDTO } from '../../types/dto/ConversationDTO'
 import { MessageRole } from '../../types/enums/MessageRole'
 import {
   confirmAction,
@@ -8,62 +11,148 @@ import {
   deleteConversation,
   getConversationMessages,
   listConversations,
+  rejectAction,
   renameConversation,
   sendMessage,
 } from '../chatService'
 
-describe('chatService (seam display-only)', () => {
-  beforeEach(() => {
-    resetConversationStore()
+function conversationDto(overrides: Partial<ConversationDTO> = {}): ConversationDTO {
+  return {
+    id: 'c1',
+    title: 'Env de dev Node + Postgres',
+    created_at: '2026-06-08T10:00:00Z',
+    updated_at: '2026-06-08T11:30:00Z',
+    ...overrides,
+  }
+}
+
+describe('chatService (API REST /chat)', () => {
+  afterEach(() => {
+    server.resetHandlers()
   })
 
-  it('liste des fils d’exemple mappés en modèles', async () => {
+  it('liste les fils et les mappe en modèles', async () => {
+    server.use(
+      http.get('*/chat/conversations', () =>
+        HttpResponse.json([conversationDto(), conversationDto({ id: 'c2', title: 'Redis' })]),
+      ),
+    )
+
     const conversations = await listConversations()
 
-    expect(conversations.length).toBeGreaterThan(0)
-    expect(conversations[0]?.title).toContain('Exemple')
+    expect(conversations).toHaveLength(2)
+    expect(conversations[0]?.title).toBe('Env de dev Node + Postgres')
     expect(conversations[0]?.relativeWhen).toBeTruthy()
   })
 
-  it('renvoie les messages d’amorce d’un fil', async () => {
+  it('récupère les messages d’amorce d’un fil (detail → messages)', async () => {
+    const detail: ConversationDetailDTO = {
+      conversation: conversationDto(),
+      messages: [
+        { id: 'm1', role: 'assistant', content: 'Bonjour', created_at: '2026-06-08T10:01:00Z' },
+        { id: 'm2', role: 'user', content: 'Salut', created_at: '2026-06-08T10:02:00Z' },
+      ],
+    }
+    server.use(http.get('*/chat/conversations/c1', () => HttpResponse.json(detail)))
+
     const messages = await getConversationMessages('c1')
 
-    expect(messages.length).toBeGreaterThan(0)
+    expect(messages).toHaveLength(2)
     expect(messages[0]?.role).toBe(MessageRole.ASSISTANT)
+    expect(messages[0]?.content).toBe('Bonjour')
   })
 
-  it('renvoie une liste vide pour un fil sans amorce', async () => {
-    const messages = await getConversationMessages('c2')
+  it('propage une erreur 404 pour un fil introuvable', async () => {
+    server.use(
+      http.get('*/chat/conversations/inconnu', () => new HttpResponse(null, { status: 404 })),
+    )
 
-    expect(messages).toEqual([])
+    await expect(getConversationMessages('inconnu')).rejects.toThrow()
   })
 
-  it('crée un fil et renvoie un modèle avec identifiant', async () => {
-    const conversation = await createConversation('Nouveau besoin')
+  it('crée un fil (201) et renvoie le modèle', async () => {
+    let received: Record<string, unknown> | undefined
+    server.use(
+      http.post('*/chat/conversations', async ({ request }) => {
+        received = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json(conversationDto({ id: 'c-new', title: 'Nouveau' }), {
+          status: 201,
+        })
+      }),
+    )
 
-    expect(conversation.id).toBeTruthy()
-    expect(conversation.title).toBe('Nouveau besoin')
+    const conversation = await createConversation('Nouveau')
+
+    expect(conversation.id).toBe('c-new')
+    expect(conversation.title).toBe('Nouveau')
+    expect(received).toEqual({ title: 'Nouveau' })
   })
 
-  it('renomme un fil (renvoie le titre mis à jour)', async () => {
-    const conversation = await renameConversation('c1', 'Titre renommé')
+  it('renomme un fil via PATCH et renvoie le titre à jour', async () => {
+    let received: Record<string, unknown> | undefined
+    server.use(
+      http.patch('*/chat/conversations/c1', async ({ request }) => {
+        received = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json(conversationDto({ title: 'Renommé' }))
+      }),
+    )
 
-    expect(conversation.id).toBe('c1')
-    expect(conversation.title).toBe('Titre renommé')
+    const conversation = await renameConversation('c1', 'Renommé')
+
+    expect(conversation.title).toBe('Renommé')
+    expect(received).toEqual({ title: 'Renommé' })
   })
 
-  it('supprime un fil sans erreur', async () => {
+  it('supprime un fil via DELETE (204)', async () => {
+    let called = false
+    server.use(
+      http.delete('*/chat/conversations/c1', () => {
+        called = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+
     await expect(deleteConversation('c1')).resolves.toBeUndefined()
+    expect(called).toBe(true)
   })
 
-  it('envoie un message utilisateur et le renvoie mappé', async () => {
-    const message = await sendMessage('c1', 'Je veux un Postgres isolé')
+  it('envoie un message (202) sans corps de réponse', async () => {
+    let received: Record<string, unknown> | undefined
+    server.use(
+      http.post('*/chat/conversations/c1/messages', async ({ request }) => {
+        received = (await request.json()) as Record<string, unknown>
+        return new HttpResponse(null, { status: 202 })
+      }),
+    )
 
-    expect(message.role).toBe(MessageRole.USER)
-    expect(message.content).toBe('Je veux un Postgres isolé')
+    await expect(sendMessage('c1', 'Je veux un Postgres')).resolves.toBeUndefined()
+    expect(received).toEqual({ content: 'Je veux un Postgres' })
   })
 
-  it('confirme une action sans erreur', async () => {
-    await expect(confirmAction('act-1')).resolves.toBeUndefined()
+  it('confirme et rejette une action sur les bons endpoints (202)', async () => {
+    const calls: string[] = []
+    server.use(
+      http.post('*/chat/actions/act-1/confirm', () => {
+        calls.push('confirm')
+        return new HttpResponse(null, { status: 202 })
+      }),
+      http.post('*/chat/actions/act-1/reject', () => {
+        calls.push('reject')
+        return new HttpResponse(null, { status: 202 })
+      }),
+    )
+
+    await confirmAction('act-1')
+    await rejectAction('act-1')
+
+    expect(calls).toEqual(['confirm', 'reject'])
+  })
+
+  it('propage une erreur 409 sur une action invalide', async () => {
+    server.use(
+      http.post('*/chat/actions/act-1/confirm', () => new HttpResponse(null, { status: 409 })),
+    )
+
+    await expect(confirmAction('act-1')).rejects.toThrow()
   })
 })

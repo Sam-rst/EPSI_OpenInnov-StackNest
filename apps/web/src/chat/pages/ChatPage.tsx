@@ -17,12 +17,13 @@ const NEW_CONVERSATION_TITLE = 'Nouvelle conversation'
 /**
  * Écran Chat IA — assistant guidé avec confirmation. Layout 3 colonnes :
  * `ConversationsSidebar` (fils) | `MessageList` + `ChatComposer` (échange) |
- * `ContextAside` (déploiements actifs). Display-only : le tour de conversation
- * est alimenté par un seam REST + SSE (fixtures), pas par un vrai backend.
+ * `ContextAside` (déploiements actifs). Branché sur l'API REST `/chat` + le flux
+ * SSE de la conversation (tokens, message, action proposée puis résolue).
  *
  * Les messages d'amorce du fil (`useConversation`) sont fusionnés avec les
  * messages live du tour courant (`useChatStream`). Confirmer/Annuler une action
- * pilote la carte inline puis met à jour son statut (résultat scripté du seam).
+ * délègue au back ; le résultat (« Exécutée » / « Échec » / « Annulée ») revient
+ * par le flux SSE (`action_result`), qui met à jour le statut de la carte.
  */
 export function ChatPage() {
   const conversations = useConversations()
@@ -63,12 +64,18 @@ export function ChatPage() {
     })
   }
 
+  // Confirmer délègue au back (202) ; le résultat (« Exécutée » / « Échec »)
+  // revient par le flux SSE (`action_result`), sans optimisme local trompeur.
   const handleConfirmAction = (actionId: string): void => {
-    void confirm(actionId).then(() => stream.applyActionResult(actionId))
+    void confirm(actionId)
   }
 
+  // Annuler est la décision propre de l'utilisateur : on marque « Annulée » dès le
+  // clic (honnête) et on délègue au back. Le `action_result` qui suivra ne
+  // redégrade pas une action déjà annulée (cf. réducteur de `useChatStream`).
   const handleRejectAction = (actionId: string): void => {
-    void reject(actionId).then(() => stream.rejectActionLocally(actionId))
+    stream.rejectActionLocally(actionId)
+    void reject(actionId)
   }
 
   return (

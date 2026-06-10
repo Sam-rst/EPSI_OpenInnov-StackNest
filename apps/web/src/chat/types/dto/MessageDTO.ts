@@ -1,12 +1,10 @@
-import type { ActionProposalDTO } from './ActionProposalDTO'
-
 /**
- * Miroir EXACT d'un message d'un fil de discussion
- * (`GET /chat/conversations/{id}`, `POST /chat/conversations/{id}/messages`).
+ * Miroir EXACT d'un message d'un fil de discussion, tel que renvoyé par
+ * `GET /chat/conversations/{id}` (`MessageResponse` côté back).
  *
- * `role` est une valeur brute (`user` / `assistant` / `tool`), normalisée en
- * enum par le mapper. Un message assistant peut porter une `action` (proposition
- * de confirmation avancée) ; les autres en sont dépourvus (`null`).
+ * `role` est une valeur brute (`user` / `assistant` / `tool`), normalisée en enum
+ * par le mapper. L'API REST ne porte PAS la proposition d'action sur le message :
+ * une action proposée arrive uniquement par l'événement SSE `action_proposed`.
  */
 export interface MessageDTO {
   id: string
@@ -14,8 +12,6 @@ export interface MessageDTO {
   role: string
   /** Contenu textuel (langage naturel, jamais d'HTML). */
   content: string
-  /** Date d'envoi ISO 8601. */
-  created_at: string
-  /** Proposition d'action attachée (confirmation avancée), ou `null`. */
-  action: ActionProposalDTO | null
+  /** Date d'envoi ISO 8601, ou `null`. */
+  created_at: string | null
 }
