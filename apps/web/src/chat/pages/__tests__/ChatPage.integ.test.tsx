@@ -205,6 +205,25 @@ describe('ChatPage (parcours chat IA → API REST + SSE)', () => {
     })
   })
 
+  it('annonce courtoisement la réflexion (aria-live) et verrouille le composer — F1/A5', async () => {
+    const user = userEvent.setup()
+    renderChat()
+    await screen.findByText(/Décris-moi ton besoin/)
+    await waitFor(() => expect(fetchEventSourceMock).toHaveBeenCalled())
+
+    const textarea = screen.getByRole('textbox')
+    await user.type(textarea, 'Je veux un Postgres')
+    await user.click(screen.getByRole('button', { name: /Envoyer/ }))
+
+    // F1 : la région polie annonce le statut « réfléchit » sans relire le fil.
+    await waitFor(() => {
+      const live = document.querySelector('[aria-live="polite"]')
+      expect(live?.textContent).toMatch(/réfléchit/i)
+    })
+    // A5 : la saisie est verrouillée tant que la génération est en cours.
+    expect(textarea).toBeDisabled()
+  })
+
   it('crée une nouvelle conversation', async () => {
     const user = userEvent.setup()
     const newConversation = {

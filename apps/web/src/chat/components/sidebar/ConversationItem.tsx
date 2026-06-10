@@ -1,6 +1,7 @@
 import { Icon } from '../../../shared/components/ui'
 import { cn } from '../../../shared/lib/cn'
 import type { Conversation } from '../../types/models/Conversation'
+import { displayConversationTitle } from './conversationTitle'
 
 interface ConversationItemProps {
   conversation: Conversation
@@ -24,6 +25,10 @@ export function ConversationItem({
   onRename,
   onDelete,
 }: ConversationItemProps) {
+  // D3 : libellé dérivé (titre du 1er message, tronqué) ou repli « Nouvelle
+  // conversation ». Le titre brut reste utilisé pour renommer (préremplissage).
+  const title = displayConversationTitle(conversation.title)
+
   return (
     <li className={cn(BASE_ROW, active ? ACTIVE_ROW : 'hover:bg-surface-sunken')}>
       <button
@@ -37,7 +42,7 @@ export function ConversationItem({
             active ? 'text-cyan' : 'text-text-primary',
           )}
         >
-          {conversation.title}
+          {title}
         </span>
         <span className="text-text-muted mt-0.5 block text-[10.5px]">
           {conversation.relativeWhen}
@@ -47,7 +52,7 @@ export function ConversationItem({
       <div className="absolute top-2 right-1.5 flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
         <button
           type="button"
-          aria-label={`Renommer « ${conversation.title} »`}
+          aria-label={`Renommer « ${title} »`}
           onClick={() => onRename(conversation.id, conversation.title)}
           className="text-text-muted hover:text-cyan hover:bg-surface inline-flex h-6 w-6 items-center justify-center rounded"
         >
@@ -55,7 +60,7 @@ export function ConversationItem({
         </button>
         <button
           type="button"
-          aria-label={`Supprimer « ${conversation.title} »`}
+          aria-label={`Supprimer « ${title} »`}
           onClick={() => onDelete(conversation.id)}
           className="text-text-muted hover:text-error hover:bg-surface inline-flex h-6 w-6 items-center justify-center rounded"
         >

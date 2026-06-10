@@ -12,9 +12,32 @@ import { useConfirmAction } from '../hooks/useConfirmAction'
 import { useConversation } from '../hooks/useConversation'
 import { useConversations } from '../hooks/useConversations'
 import { useRejectAction } from '../hooks/useRejectAction'
+import type { ChatStreamState } from '../types/models/ChatStreamState'
 
 /** Titre par défaut d'un fil créé sans saisie explicite. */
 const NEW_CONVERSATION_TITLE = 'Nouvelle conversation'
+
+/**
+ * Construit l'annonce courtoise pour la région `aria-live` (F1) à partir de l'état
+ * du tour. On reste au niveau du *statut* (réflexion / réponse / erreur) sans
+ * relire le contenu du fil, qui est l'affaire des messages eux-mêmes. Chaîne vide
+ * = rien à annoncer (repos), pour ne pas polluer le lecteur d'écran.
+ */
+function buildLiveStatus(state: ChatStreamState): string {
+  if (state.isReconnecting) {
+    return 'Reconnexion au chat en cours.'
+  }
+  switch (state.status) {
+    case 'thinking':
+      return "L'assistant réfléchit…"
+    case 'streaming':
+      return "L'assistant rédige sa réponse…"
+    case 'error':
+      return state.error?.message ?? 'Une erreur est survenue.'
+    default:
+      return ''
+  }
+}
 
 /**
  * Écran Chat IA — assistant guidé avec confirmation. Layout 3 colonnes :
@@ -88,6 +111,13 @@ export function ChatPage() {
 
   const isThreadEmpty = activeId !== undefined && messages.length === 0
 
+  // A5 : une réponse est en cours de génération (composer verrouillé + « Envoi… »).
+  const isGenerating = stream.state.status === 'thinking' || stream.state.status === 'streaming'
+
+  // F1 : statut courtois annoncé aux lecteurs d'écran sans dupliquer le fil
+  // (MESSAGES annonce le contenu) — on se limite aux transitions du tour.
+  const liveStatus = buildLiveStatus(stream.state)
+
   return (
     <div className="grid h-[calc(100vh-3.5rem)] grid-cols-1 md:grid-cols-[260px_1fr] xl:grid-cols-[260px_1fr_280px]">
       {/* Titre accessible : la mise en page 3 colonnes n'affiche pas de bandeau
@@ -119,6 +149,11 @@ export function ChatPage() {
             onRejectAction={handleRejectAction}
           />
         )}
+        {/* F1 : annonce courtoise de l'état du tour aux lecteurs d'écran. Visuellement
+            masquée — le feedback visible est porté par la bulle « réfléchit » et `ChatError`. */}
+        <div role="status" aria-live="polite" className="sr-only">
+          {liveStatus}
+        </div>
         <div className="mx-auto w-full max-w-[760px] px-6">
           <ChatError
             error={stream.state.error}
@@ -126,7 +161,11 @@ export function ChatPage() {
             isReconnecting={stream.state.isReconnecting}
           />
         </div>
-        <ChatComposer onSend={stream.send} disabled={activeId === undefined || !stream.canSend} />
+        <ChatComposer
+          onSend={stream.send}
+          disabled={activeId === undefined || !stream.canSend}
+          pending={isGenerating}
+        />
       </div>
 
       <div className="hidden xl:block">
