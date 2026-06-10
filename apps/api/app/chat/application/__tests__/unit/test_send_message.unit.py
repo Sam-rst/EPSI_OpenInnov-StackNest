@@ -17,6 +17,7 @@ from app.chat.application.__tests__.fakes import (
     FakeChatActionRepository,
     FakeChatEventPublisher,
     FakeConversationRepository,
+    make_param,
     make_template,
 )
 from app.chat.application.commands.send_message_command import SendMessageCommand
@@ -234,12 +235,102 @@ class TestActionTool:
         proposed = next(p for c, n, p in publisher.events if n == "action_proposed")
         assert proposed["action_id"] == str(actions.added[0].id)
 
-    async def test_action_invalide_publie_une_erreur_sans_persister_d_action(self) -> None:
+    async def test_deploy_incomplet_fait_redemander_l_ia_sans_erreur(self) -> None:
+        # Elicitation guidee : un deploy sans le param requis (db_name) ne doit PAS
+        # produire une erreur terminale ni une proposition ; la gate refuse, le
+        # feedback est reinjecte, et l'IA redemande l'info manquante (texte).
+        owner = uuid4()
+        conversation = _conversation(owner)
+        template = make_template(versions=["16"], params=[make_param(key="db_name", required=True)])
+        actions = FakeChatActionRepository()
+        publisher = FakeChatEventPublisher()
+        provider = _ScriptedProvider(
+            [
+                ToolCall(
+                    name=ToolName.DEPLOY_TEMPLATE.value,
+                    args={
+                        "template_id": str(template.id),
+                        "version": "16",
+                        "name": "db",
+                        "params": {},
+                    },
+                ),
+                "Quel nom de base de donnees veux-tu (db_name) ?",
+            ]
+        )
+        send = _build_send_message(
+            provider=provider,
+            conversations=FakeConversationRepository([conversation]),
+            actions=actions,
+            publisher=publisher,
+            catalog=FakeCatalogReader([template]),
+            deployments=FakeDeploymentRepository(),
+        )
+
+        await send.execute(
+            SendMessageCommand(
+                conversation_id=conversation.id, owner_id=owner, content="Deploie un postgres"
+            )
+        )
+
+        assert actions.added == []
+        assert "error" not in publisher.names()
+        assert "action_proposed" not in publisher.names()
+        assert publisher.tokens() == "Quel nom de base de donnees veux-tu (db_name) ?"
+        # Le feedback de la gate a ete reinjecte : la 2e passe a vu un message tool.
+        assert any(m.role == MessageRole.TOOL for m in provider.calls[-1])
+
+    async def test_template_hallucine_fait_redemander_sans_erreur(self) -> None:
+        # Hallucination pure : la gate rejette un template hors catalogue ; au lieu
+        # d'une erreur terminale, on reboucle avec un feedback honnete -> l'IA
+        # reformule en s'appuyant sur le catalogue reel.
+        owner = uuid4()
+        conversation = _conversation(owner)
+        template = make_template()
+        actions = FakeChatActionRepository()
+        publisher = FakeChatEventPublisher()
+        provider = _ScriptedProvider(
+            [
+                ToolCall(
+                    name=ToolName.DEPLOY_TEMPLATE.value,
+                    args={
+                        "template_id": str(uuid4()),
+                        "version": "16",
+                        "name": "db",
+                        "params": {},
+                    },
+                ),
+                "Ce template n'existe pas dans le catalogue ; je peux deployer PostgreSQL.",
+            ]
+        )
+        send = _build_send_message(
+            provider=provider,
+            conversations=FakeConversationRepository([conversation]),
+            actions=actions,
+            publisher=publisher,
+            catalog=FakeCatalogReader([template]),
+            deployments=FakeDeploymentRepository(),
+        )
+
+        await send.execute(
+            SendMessageCommand(
+                conversation_id=conversation.id, owner_id=owner, content="Deploie le truc X"
+            )
+        )
+
+        assert actions.added == []
+        assert "error" not in publisher.names()
+        assert publisher.tokens().startswith("Ce template")
+        assert any(m.role == MessageRole.TOOL for m in provider.calls[-1])
+
+    async def test_boucle_bornee_si_le_modele_insiste_sur_un_appel_invalide(self) -> None:
+        # Garde-fou anti-emballement : si le modele rappelle sans fin un outil
+        # invalide (jamais de question, jamais de correction), la boucle bornee
+        # finit par publier une erreur honnete, sans jamais proposer d'action.
         owner = uuid4()
         conversation = _conversation(owner)
         actions = FakeChatActionRepository()
         publisher = FakeChatEventPublisher()
-        # template_id hallucine -> gate leve UnknownTemplate.
         provider = FakeLLMProvider(
             tool_call=ToolCall(
                 name=ToolName.DEPLOY_TEMPLATE.value,
@@ -262,6 +353,7 @@ class TestActionTool:
         )
 
         assert actions.added == []
+        assert "action_proposed" not in publisher.names()
         assert "error" in publisher.names()
 
 
