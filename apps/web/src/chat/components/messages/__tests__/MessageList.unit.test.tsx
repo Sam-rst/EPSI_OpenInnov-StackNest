@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -21,9 +22,9 @@ function message(overrides: Partial<Message> = {}): Message {
 function renderList(overrides: Partial<Parameters<typeof MessageList>[0]> = {}) {
   const props = {
     messages: [message()],
+    streamStatus: 'idle' as const,
     streamingText: '',
-    isStreaming: false,
-    error: undefined,
+    onStop: vi.fn(),
     onConfirmAction: vi.fn(),
     onRejectAction: vi.fn(),
     ...overrides,
@@ -56,10 +57,25 @@ describe('MessageList', () => {
     expect(document.querySelector('b')).toBeNull()
   })
 
+  it('affiche la bulle de réflexion dès l’envoi (thinking)', () => {
+    renderList({ streamStatus: 'thinking' })
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
+  })
+
   it('affiche la bulle de streaming pendant la génération', () => {
-    renderList({ streamingText: 'Post', isStreaming: true })
+    renderList({ streamStatus: 'streaming', streamingText: 'Post' })
 
     expect(screen.getByText('Post')).toBeInTheDocument()
+  })
+
+  it('propose d’arrêter la génération et appelle onStop', async () => {
+    const user = userEvent.setup()
+    const { onStop } = renderList({ streamStatus: 'streaming', streamingText: 'Post' })
+
+    await user.click(screen.getByRole('button', { name: /Arrêter la génération/ }))
+
+    expect(onStop).toHaveBeenCalledTimes(1)
   })
 
   it('rend la carte d’action attachée à un message', () => {
@@ -82,11 +98,5 @@ describe('MessageList', () => {
     })
 
     expect(screen.getByRole('button', { name: /Confirmer/ })).toBeInTheDocument()
-  })
-
-  it('affiche une erreur honnête', () => {
-    renderList({ error: 'Quota dépassé' })
-
-    expect(screen.getByText(/Quota dépassé/)).toBeInTheDocument()
   })
 })

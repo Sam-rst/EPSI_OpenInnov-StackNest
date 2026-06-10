@@ -36,6 +36,15 @@ function neverResolves(): Promise<void> {
   return new Promise<void>(() => undefined)
 }
 
+/** Réponse HTTP minimale acceptée par `onopen` (200 = flux ouvert). */
+function openOkResponse(): Response {
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: (name: string) => (name === 'content-type' ? 'text/event-stream' : null) },
+  } as unknown as Response
+}
+
 function emit(event: string, data: unknown): void {
   const frame: EventSourceMessage = { id: '', event, data: JSON.stringify(data), retry: undefined }
   capturedInit?.onmessage?.(frame)
@@ -79,6 +88,9 @@ describe('ChatPage (parcours chat IA → API REST + SSE)', () => {
     getAccessTokenMock.mockReturnValue('access-jwt')
     fetchEventSourceMock.mockImplementation((_url: string, init: FetchEventSourceInit) => {
       capturedInit = init
+      // Le flux s'ouvre immédiatement (onopen 200) : la porte d'envoi (E1) se
+      // résout, donc le POST /messages peut partir. Le flux reste ensuite ouvert.
+      void init.onopen?.(openOkResponse())
       return neverResolves()
     })
 

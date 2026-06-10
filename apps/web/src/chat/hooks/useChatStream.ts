@@ -1,5 +1,5 @@
 import { type EventSourceMessage, fetchEventSource } from '@microsoft/fetch-event-source'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { apiClient } from '../../core/api/apiClient'
 import { refreshAccessToken } from '../../core/api/refreshSession'
@@ -9,6 +9,12 @@ import { sendMessage } from '../services/chatService'
 import { ActionStatus } from '../types/enums/ActionStatus'
 import { MessageRole } from '../types/enums/MessageRole'
 import type { ChatStreamEvent } from '../types/models/ChatStreamEvent'
+import type {
+  ChatErrorKind,
+  ChatStreamError,
+  ChatStreamState,
+  ChatStreamStatus,
+} from '../types/models/ChatStreamState'
 import type { Message } from '../types/models/Message'
 
 /** Code HTTP signalant un access token absent/expiré sur le flux SSE. */
@@ -17,8 +23,23 @@ const UNAUTHORIZED = 401
 /** Nombre maximal de refresh + reconnexion sur 401 (borne la boucle de retry). */
 const MAX_REFRESH_RETRIES = 1
 
-/** Message d'erreur honnête affiché quand le flux échoue de façon non récupérable. */
-const STREAM_ERROR_MESSAGE = 'La connexion au chat a été perdue. Réessaie dans un instant.'
+/** Nombre maximal de reconnexions réseau bornées avant de basculer en erreur (B4). */
+const MAX_RECONNECT_ATTEMPTS = 4
+
+/** Délai de base du backoff exponentiel borné entre deux reconnexions (ms). */
+const RECONNECT_BASE_DELAY_MS = 1000
+
+/** Plafond du backoff exponentiel : au-delà, on garde un délai constant (ms). */
+const RECONNECT_MAX_DELAY_MS = 8000
+
+/** Messages d'erreur honnêtes affichés selon la catégorie d'échec du tour. */
+const ERROR_MESSAGES: Record<ChatErrorKind, string> = {
+  network: 'La connexion au chat a été perdue. Réessaie dans un instant.',
+  timeout: "L'assistant met trop de temps à répondre. Réessaie dans un instant.",
+  business: "L'assistant n'a pas pu traiter ta demande.",
+  auth: 'Ta session a expiré. Reconnecte-toi pour continuer.',
+  unknown: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
+}
 
 /**
  * Amorce de la bulle assistant qui porte une proposition d'action. La
@@ -27,18 +48,45 @@ const STREAM_ERROR_MESSAGE = 'La connexion au chat a été perdue. Réessaie dan
  */
 const ACTION_BUBBLE_LEAD_IN = 'Voici ce que je te propose :'
 
-/** État accumulé du tour de conversation en cours, étiqueté par le fil actif. */
-interface StreamState {
+/** Statuts où l'envoi d'un nouveau message est autorisé (verrou E2). */
+const SENDABLE_STATUSES: ReadonlySet<ChatStreamStatus> = new Set<ChatStreamStatus>([
+  'idle',
+  'done',
+  'error',
+])
+
+export interface UseChatStreamResult {
+  /** État riche du tour courant (contrat : status, streamingText, error, isReconnecting). */
+  state: ChatStreamState
   /** Messages figés du fil (utilisateur + assistant finalisés). */
   messages: readonly Message[]
-  /** Texte de la réponse assistant en cours (buffer de tokens). */
-  streamingText: string
-  /** Un flux est ouvert et une réponse est en cours de génération. */
-  isStreaming: boolean
-  /** Erreur métier honnête remontée par le flux, ou `undefined`. */
-  error: string | undefined
   /** Identifiant du dernier déploiement créé par une action confirmée. */
   lastDeploymentId: string | undefined
+  /** Envoie un message utilisateur (POST 202) ; la réponse arrive par le flux SSE. */
+  send: (content: string) => void
+  /** Abandonne la génération en cours (AbortController) et repasse au repos. */
+  stop: () => void
+  /** Réémet le dernier message utilisateur (après une erreur, sans le retaper). */
+  retry: () => void
+  /** `false` pendant `thinking`/`streaming` : verrouille l'envoi (E2). */
+  canSend: boolean
+  /**
+   * Marque localement une action comme « annulée » dès le clic « Annuler » de
+   * l'utilisateur (sa propre décision, honnête). Le back republie un
+   * `action_result` indistinct d'un échec : ce repère local préserve l'intitulé
+   * « Annulée » sans attendre — et le réducteur ne le redégrade jamais.
+   */
+  rejectActionLocally: (actionId: string) => void
+}
+
+/** État accumulé du tour de conversation en cours, étiqueté par le fil actif. */
+interface StreamState extends ChatStreamState {
+  /** Messages figés du fil (utilisateur + assistant finalisés). */
+  messages: readonly Message[]
+  /** Identifiant du dernier déploiement créé par une action confirmée. */
+  lastDeploymentId: string | undefined
+  /** Dernier message utilisateur envoyé — réémis tel quel par `retry` (B2). */
+  lastUserContent: string | undefined
 }
 
 /** État interne : la progression accumulée, étiquetée par le fil courant. */
@@ -48,27 +96,22 @@ interface KeyedStreamState extends StreamState {
 }
 
 const EMPTY_PROGRESS: StreamState = {
-  messages: [],
+  status: 'idle',
   streamingText: '',
-  isStreaming: false,
-  error: undefined,
+  error: null,
+  isReconnecting: false,
+  messages: [],
   lastDeploymentId: undefined,
+  lastUserContent: undefined,
 }
 
 function initialState(conversationId: string): KeyedStreamState {
   return { ...EMPTY_PROGRESS, keyedId: conversationId }
 }
 
-export interface UseChatStreamResult extends StreamState {
-  /** Envoie un message utilisateur (POST 202) ; la réponse arrive par le flux SSE. */
-  send: (content: string) => void
-  /**
-   * Marque localement une action comme « annulée » dès le clic « Annuler » de
-   * l'utilisateur (sa propre décision, honnête). Le back republie un
-   * `action_result` indistinct d'un échec : ce repère local préserve l'intitulé
-   * « Annulée » sans attendre — et le réducteur ne le redégrade jamais.
-   */
-  rejectActionLocally: (actionId: string) => void
+/** Construit une erreur typée à partir de sa catégorie (message honnête associé). */
+function buildError(kind: ChatErrorKind, message?: string): ChatStreamError {
+  return { kind, message: message ?? ERROR_MESSAGES[kind] }
 }
 
 /**
@@ -85,19 +128,6 @@ function buildUserMessage(content: string): Message {
     content,
     createdAt: new Date().toISOString(),
   }
-}
-
-/** Applique un statut au message portant l'action ; sans toucher aux autres. */
-function withActionStatus(
-  messages: readonly Message[],
-  actionId: string,
-  status: ActionStatus,
-): readonly Message[] {
-  return messages.map((message) =>
-    message.action?.id === actionId
-      ? { ...message, action: { ...message.action, status } }
-      : message,
-  )
 }
 
 /**
@@ -120,25 +150,34 @@ function applyActionResult(
   })
 }
 
+/** Applique un statut au message portant l'action ; sans toucher aux autres. */
+function withActionStatus(
+  messages: readonly Message[],
+  actionId: string,
+  status: ActionStatus,
+): readonly Message[] {
+  return messages.map((message) =>
+    message.action?.id === actionId
+      ? { ...message, action: { ...message.action, status } }
+      : message,
+  )
+}
+
 /**
- * Réduit un événement SSE déjà mappé sur l'état accumulé du fil. Générique sur le
- * type d'état (chaque branche spread `...state`) pour préserver l'étiquette
- * `keyedId` portée par l'état interne.
- *
- * `action_proposed` matérialise une nouvelle bulle assistant porteuse de l'action :
- * le back persiste un message assistant = reformulation (`intent`) et n'émet que
- * cet événement (pas de `message` séparé), on reproduit donc fidèlement ce tour.
+ * Réduit un événement SSE déjà mappé sur l'état accumulé du fil. `token` fait
+ * basculer en `streaming` (la bulle se remplit) ; `message`/`action_proposed`
+ * figent le tour en `done` ; `error` porte une erreur métier honnête (`business`).
  */
-function reduceEvent<S extends StreamState>(state: S, event: ChatStreamEvent): S {
+function reduceEvent(state: KeyedStreamState, event: ChatStreamEvent): KeyedStreamState {
   switch (event.type) {
     case 'token':
-      return { ...state, streamingText: state.streamingText + event.delta }
+      return { ...state, status: 'streaming', streamingText: state.streamingText + event.delta }
     case 'message':
       return {
         ...state,
+        status: 'done',
         messages: [...state.messages, event.message],
         streamingText: '',
-        isStreaming: false,
       }
     case 'action_proposed': {
       const assistant: Message = {
@@ -150,9 +189,9 @@ function reduceEvent<S extends StreamState>(state: S, event: ChatStreamEvent): S
       }
       return {
         ...state,
+        status: 'done',
         messages: [...state.messages, assistant],
         streamingText: '',
-        isStreaming: false,
       }
     }
     case 'action_result':
@@ -162,7 +201,7 @@ function reduceEvent<S extends StreamState>(state: S, event: ChatStreamEvent): S
         lastDeploymentId: event.deploymentId ?? state.lastDeploymentId,
       }
     case 'error':
-      return { ...state, error: event.message, isStreaming: false }
+      return { ...state, status: 'error', error: buildError('business', event.message) }
     default:
       return state
   }
@@ -180,17 +219,44 @@ function buildHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+/** Délai de backoff exponentiel borné pour la n-ième tentative de reconnexion. */
+function backoffDelay(attempt: number): number {
+  return Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS)
+}
+
+/** Porte d'ouverture résoluble manuellement : réveille `send` à l'ouverture (E1). */
+interface OpenGate {
+  promise: Promise<void>
+  resolve: () => void
+}
+
+function createOpenGate(): OpenGate {
+  let resolve = (): void => undefined
+  const promise = new Promise<void>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
 /**
  * Pilote le tour de conversation contre le flux SSE réel
- * `GET /chat/conversations/{id}/stream`, calqué sur `useDeploymentEvents` :
- * ouverture par `fetchEventSource` (header `Authorization: Bearer`, refresh borné
- * sur 401), chaque trame mappée puis réduite (tokens accumulés, message figé,
- * action proposée puis résolue). Le flux reste ouvert tant que le fil est actif :
- * `send` ne fait qu'un `POST .../messages` (202), la réponse arrivant par ce canal.
- * Un `AbortController` borne la vie du flux (changement de fil, démontage).
+ * `GET /chat/conversations/{id}/stream`, calqué sur `useDeploymentEvents` mais doté
+ * d'une machine d'état riche (`ChatStreamState`) et d'une résilience renforcée :
+ *
+ *   - **E1 (course)** : `send` attend l'ouverture effective du flux (`onopen` 200)
+ *     avant d'émettre le `POST .../messages`, pour ne jamais perdre la réponse d'un
+ *     fil neuf dont le canal n'était pas encore abonné.
+ *   - **B4 (reconnexion)** : sur coupure réseau, reconnexion avec backoff borné
+ *     (`isReconnecting`), avant de basculer en `error{kind:'network'}`.
+ *   - **A3 (stop)** : abandonne le flux courant et le rouvre frais (toujours abonné).
+ *   - **401** : refresh borné puis réouverture avec le nouveau Bearer (`auth` si épuisé).
  */
 export function useChatStream(conversationId: string): UseChatStreamResult {
   const [state, setState] = useState<KeyedStreamState>(() => initialState(conversationId))
+  // Bump pour rouvrir un flux frais sans changer de fil (stop, redémarrage manuel).
+  const [connectionNonce, setConnectionNonce] = useState(0)
+  // Porte d'ouverture du flux courant : `send` l'attend avant de poster (E1).
+  const openGateRef = useRef<OpenGate>(createOpenGate())
 
   useEffect(() => {
     if (conversationId === '') {
@@ -198,6 +264,8 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
     }
 
     const controller = new AbortController()
+    const gate = createOpenGate()
+    openGateRef.current = gate
 
     // Repart d'un état vierge au premier event d'un nouveau fil, sans setState
     // synchrone dans l'effet (pattern « état étiqueté » de `useDeploymentEvents`).
@@ -209,11 +277,21 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
       setState((previous) => reduceEvent(baseFor(previous), event))
     }
 
-    const markError = (): void => {
+    const markConnected = (): void => {
+      gate.resolve()
+      setState((previous) => ({ ...baseFor(previous), isReconnecting: false }))
+    }
+
+    const markReconnecting = (): void => {
+      setState((previous) => ({ ...baseFor(previous), isReconnecting: true }))
+    }
+
+    const failWith = (kind: ChatErrorKind): void => {
       setState((previous) => ({
         ...baseFor(previous),
-        error: STREAM_ERROR_MESSAGE,
-        isStreaming: false,
+        status: 'error',
+        isReconnecting: false,
+        error: buildError(kind),
       }))
     }
 
@@ -231,6 +309,7 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
           if (!response.ok) {
             throw new Error(`Flux SSE en erreur (HTTP ${response.status}).`)
           }
+          markConnected()
           return Promise.resolve()
         },
         onmessage: applyEvent,
@@ -241,35 +320,85 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
         },
       })
 
-    /** Boucle d'ouverture : rafraîchit puis rouvre sur 401, borné par `retries`. */
-    const run = async (retries: number): Promise<void> => {
+    /** Attend `delay` ms, résolu d'office si le flux est abandonné entre-temps. */
+    const wait = (delay: number): Promise<void> =>
+      new Promise((resolve) => {
+        const timer = setTimeout(resolve, delay)
+        controller.signal.addEventListener('abort', () => {
+          clearTimeout(timer)
+          resolve()
+        })
+      })
+
+    const handleUnauthorized = async (refreshes: number, reconnects: number): Promise<void> => {
+      if (refreshes <= 0) {
+        failWith('auth')
+        return
+      }
+      try {
+        await refreshAccessToken(apiClient)
+      } catch {
+        failWith('auth')
+        return
+      }
+      await run(refreshes - 1, reconnects)
+    }
+
+    const handleNetworkError = async (reconnects: number): Promise<void> => {
+      if (reconnects <= 0) {
+        failWith('network')
+        return
+      }
+      markReconnecting()
+      await wait(backoffDelay(MAX_RECONNECT_ATTEMPTS - reconnects))
+      if (controller.signal.aborted) {
+        return
+      }
+      await run(MAX_REFRESH_RETRIES, reconnects - 1)
+    }
+
+    /**
+     * Boucle d'ouverture résiliente : refresh borné sur 401, reconnexion bornée
+     * avec backoff sur coupure réseau. `refreshes`/`reconnects` bornent chaque voie.
+     */
+    async function run(refreshes: number, reconnects: number): Promise<void> {
       try {
         await openStream()
       } catch (error) {
         if (controller.signal.aborted) {
           return
         }
-        const canRefresh = error instanceof UnauthorizedStreamError && retries > 0
-        if (!canRefresh) {
-          markError()
+        if (error instanceof UnauthorizedStreamError) {
+          await handleUnauthorized(refreshes, reconnects)
           return
         }
-        try {
-          await refreshAccessToken(apiClient)
-        } catch {
-          markError()
-          return
-        }
-        await run(retries - 1)
+        await handleNetworkError(reconnects)
       }
     }
 
-    void run(MAX_REFRESH_RETRIES)
+    void run(MAX_REFRESH_RETRIES, MAX_RECONNECT_ATTEMPTS)
 
     return () => {
       controller.abort()
     }
-  }, [conversationId])
+  }, [conversationId, connectionNonce])
+
+  /** Lance le POST d'envoi après ouverture du flux (E1) ; échec → erreur réseau (B3). */
+  const postWhenReady = useCallback(
+    async (content: string): Promise<void> => {
+      await openGateRef.current.promise
+      try {
+        await sendMessage(conversationId, content)
+      } catch {
+        setState((previous) =>
+          previous.keyedId === conversationId
+            ? { ...previous, status: 'error', error: buildError('network') }
+            : previous,
+        )
+      }
+    },
+    [conversationId],
+  )
 
   const send = useCallback(
     (content: string): void => {
@@ -280,25 +409,42 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
 
       setState((previous) => {
         const base = previous.keyedId === conversationId ? previous : initialState(conversationId)
+        if (!SENDABLE_STATUSES.has(base.status)) {
+          return previous
+        }
+        void postWhenReady(trimmed)
         return {
           ...base,
-          messages: [...base.messages, buildUserMessage(trimmed)],
+          status: 'thinking',
           streamingText: '',
-          isStreaming: true,
-          error: undefined,
+          error: null,
+          messages: [...base.messages, buildUserMessage(trimmed)],
+          lastUserContent: trimmed,
         }
       })
-
-      void sendMessage(conversationId, trimmed).catch(() => {
-        setState((previous) =>
-          previous.keyedId === conversationId
-            ? { ...previous, isStreaming: false, error: STREAM_ERROR_MESSAGE }
-            : previous,
-        )
-      })
     },
-    [conversationId],
+    [conversationId, postWhenReady],
   )
+
+  const retry = useCallback((): void => {
+    setState((previous) => {
+      if (previous.keyedId !== conversationId || previous.lastUserContent === undefined) {
+        return previous
+      }
+      void postWhenReady(previous.lastUserContent)
+      return { ...previous, status: 'thinking', streamingText: '', error: null }
+    })
+  }, [conversationId, postWhenReady])
+
+  const stop = useCallback((): void => {
+    setState((previous) =>
+      previous.keyedId === conversationId
+        ? { ...previous, status: 'done', streamingText: '' }
+        : previous,
+    )
+    // Rouvre un flux frais : on abandonne la génération mais reste abonné au fil.
+    setConnectionNonce((nonce) => nonce + 1)
+  }, [conversationId])
 
   const rejectActionLocally = useCallback(
     (actionId: string): void => {
@@ -317,14 +463,21 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
   // Tant que la progression stockée ne correspond pas au fil demandé (changement
   // d'id, avant la réinitialisation par l'effet), on expose un état vierge.
   const progress = state.keyedId === conversationId ? state : initialState(conversationId)
+  const canSend = SENDABLE_STATUSES.has(progress.status)
 
   return {
+    state: {
+      status: progress.status,
+      streamingText: progress.streamingText,
+      error: progress.error,
+      isReconnecting: progress.isReconnecting,
+    },
     messages: progress.messages,
-    streamingText: progress.streamingText,
-    isStreaming: progress.isStreaming,
-    error: progress.error,
     lastDeploymentId: progress.lastDeploymentId,
     send,
+    stop,
+    retry,
+    canSend,
     rejectActionLocally,
   }
 }
