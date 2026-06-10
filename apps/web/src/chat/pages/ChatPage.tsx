@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { useDeployments } from '../../deployment/hooks/useDeployments'
 import { ContextAside } from '../components/aside/ContextAside'
 import { ChatComposer } from '../components/composer/ChatComposer'
+import { ChatEmptyState } from '../components/empty/ChatEmptyState'
+import { ChatError } from '../components/errors/ChatError'
 import { MessageList } from '../components/messages/MessageList'
 import { ConversationsSidebar } from '../components/sidebar/ConversationsSidebar'
 import { useChatStream } from '../hooks/useChatStream'
@@ -19,6 +21,12 @@ const NEW_CONVERSATION_TITLE = 'Nouvelle conversation'
  * `ConversationsSidebar` (fils) | `MessageList` + `ChatComposer` (échange) |
  * `ContextAside` (déploiements actifs). Branché sur l'API REST `/chat` + le flux
  * SSE de la conversation (tokens, message, action proposée puis résolue).
+ *
+ * Le tour de conversation est piloté par la machine d'état riche de `useChatStream`
+ * (`state.status` : idle → thinking → streaming → done | error). `MessageList`
+ * affiche le feedback de génération, `ChatError` l'échec contextualisé + la
+ * reconnexion, et `ChatEmptyState` accueille un fil encore vide. Le composer est
+ * verrouillé pendant la génération (`canSend`).
  *
  * Les messages d'amorce du fil (`useConversation`) sont fusionnés avec les
  * messages live du tour courant (`useChatStream`). Confirmer/Annuler une action
@@ -78,6 +86,8 @@ export function ChatPage() {
     void reject(actionId)
   }
 
+  const isThreadEmpty = activeId !== undefined && messages.length === 0
+
   return (
     <div className="grid h-[calc(100vh-3.5rem)] grid-cols-1 md:grid-cols-[260px_1fr] xl:grid-cols-[260px_1fr_280px]">
       {/* Titre accessible : la mise en page 3 colonnes n'affiche pas de bandeau
@@ -95,18 +105,28 @@ export function ChatPage() {
       />
 
       <div className="flex min-w-0 flex-col">
-        <MessageList
-          messages={messages}
-          streamingText={stream.streamingText}
-          isStreaming={stream.isStreaming}
-          error={stream.error}
-          onConfirmAction={handleConfirmAction}
-          onRejectAction={handleRejectAction}
-        />
-        <ChatComposer
-          onSend={stream.send}
-          disabled={activeId === undefined || stream.isStreaming}
-        />
+        {isThreadEmpty ? (
+          <div className="flex flex-1 items-center justify-center p-6">
+            <ChatEmptyState onSuggestion={stream.send} />
+          </div>
+        ) : (
+          <MessageList
+            messages={messages}
+            streamStatus={stream.state.status}
+            streamingText={stream.state.streamingText}
+            onStop={stream.stop}
+            onConfirmAction={handleConfirmAction}
+            onRejectAction={handleRejectAction}
+          />
+        )}
+        <div className="mx-auto w-full max-w-[760px] px-6">
+          <ChatError
+            error={stream.state.error}
+            onRetry={stream.retry}
+            isReconnecting={stream.state.isReconnecting}
+          />
+        </div>
+        <ChatComposer onSend={stream.send} disabled={activeId === undefined || !stream.canSend} />
       </div>
 
       <div className="hidden xl:block">

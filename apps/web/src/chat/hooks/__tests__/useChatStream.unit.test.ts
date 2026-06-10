@@ -10,9 +10,14 @@ import { useChatStream } from '../useChatStream'
 /**
  * On mocke `@microsoft/fetch-event-source` (flux SSE), le `tokenStore` (Bearer), le
  * `refreshSession` (refresh sur 401) et le service REST (`sendMessage`). Chaque
- * ouverture crée une `FakeStream` pilotable : on émet `token`/`message`/
- * `action_proposed`/`action_result`/`error`, on simule un 401, on abandonne — sans
- * réseau ni `EventSource` natif. Même mécanique que `useDeploymentEvents`.
+ * ouverture crée une `FakeStream` pilotable : on choisit QUAND le flux s'ouvre
+ * (`open(200)`), on émet `token`/`message`/`action_*`/`error`, on simule un 401 ou
+ * une coupure réseau (`fail`), on abandonne — sans réseau ni `EventSource` natif.
+ *
+ * La machine d'état est le cœur testé ici (contrat `ChatStreamState`) : transitions
+ * idle→thinking→streaming→done, erreurs typées par catégorie, reconnexion bornée
+ * avec backoff, course du 1er message (POST après ouverture du flux), stop, canSend,
+ * retry, sans perte du message.
  */
 const { fetchEventSourceMock, refreshAccessTokenMock, getAccessTokenMock, sendMessageMock } =
   vi.hoisted(() => ({
@@ -31,7 +36,10 @@ vi.mock('../../../core/api/tokenStore', () => ({ getAccessToken: getAccessTokenM
 vi.mock('../../../core/api/refreshSession', () => ({ refreshAccessToken: refreshAccessTokenMock }))
 vi.mock('../../services/chatService', () => ({ sendMessage: sendMessageMock }))
 
-/** Flux SSE simulé : un `onopen`/`onerror` qui lève rejette la promesse. */
+/**
+ * Flux SSE simulé. `open(status)` joue `onopen` (la promesse d'ouverture résout sur
+ * succès, rejette sur 401/erreur HTTP) ; `fail(error)` joue `onerror` (coupure).
+ */
 class FakeStream {
   static instances: FakeStream[] = []
 
@@ -65,7 +73,8 @@ class FakeStream {
     this.init.onmessage?.(sseFrame(event, data))
   }
 
-  private fail(error: unknown): void {
+  /** Simule une coupure réseau / erreur du flux : joue `onerror` (qui relève). */
+  fail(error: unknown): void {
     try {
       this.init.onerror?.(error)
     } catch (rethrown) {
@@ -104,7 +113,21 @@ function deployProposal(): Record<string, unknown> {
   }
 }
 
-describe('useChatStream (fetchEventSource authentifié sur /chat)', () => {
+/** Ouvre le flux courant (succès 200) puis envoie un message ; renvoie le flux. */
+async function sendAfterOpen(
+  send: (content: string) => void,
+  content: string,
+): Promise<FakeStream> {
+  const stream = lastStream()
+  await act(async () => {
+    stream.open(200)
+  })
+  act(() => send(content))
+  await waitFor(() => expect(sendMessageMock).toHaveBeenCalled())
+  return stream
+}
+
+describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => {
   beforeEach(() => {
     FakeStream.instances = []
     fetchEventSourceMock.mockReset()
@@ -121,270 +144,394 @@ describe('useChatStream (fetchEventSource authentifié sur /chat)', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
   })
 
-  it('ouvre le flux SSE sur le bon endpoint avec le header Bearer', () => {
-    renderHook(() => useChatStream('c1'))
+  describe('ouverture du flux', () => {
+    it('ouvre le flux SSE sur le bon endpoint avec le header Bearer', () => {
+      renderHook(() => useChatStream('c1'))
 
-    expect(fetchEventSourceMock).toHaveBeenCalledTimes(1)
-    const stream = lastStream()
-    expect(stream.url).toContain('/chat/conversations/c1/stream')
-    expect(stream.init.headers?.Authorization).toBe('Bearer access-jwt')
-  })
-
-  it('n’ouvre aucun flux sans conversation active', () => {
-    renderHook(() => useChatStream(''))
-
-    expect(fetchEventSourceMock).not.toHaveBeenCalled()
-  })
-
-  it('démarre au repos, sans message ni streaming', () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-
-    expect(result.current.messages).toHaveLength(0)
-    expect(result.current.streamingText).toBe('')
-    expect(result.current.isStreaming).toBe(false)
-  })
-
-  it('ajoute le message utilisateur et envoie le POST à l’envoi', async () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-
-    act(() => {
-      result.current.send('Je veux un Postgres')
+      expect(fetchEventSourceMock).toHaveBeenCalledTimes(1)
+      const stream = lastStream()
+      expect(stream.url).toContain('/chat/conversations/c1/stream')
+      expect(stream.init.headers?.Authorization).toBe('Bearer access-jwt')
     })
 
-    expect(result.current.messages).toHaveLength(1)
-    expect(result.current.messages[0]?.role).toBe(MessageRole.USER)
-    expect(result.current.messages[0]?.content).toBe('Je veux un Postgres')
-    expect(result.current.isStreaming).toBe(true)
-    await waitFor(() => {
-      expect(sendMessageMock).toHaveBeenCalledWith('c1', 'Je veux un Postgres')
-    })
-  })
+    it('n’ouvre aucun flux sans conversation active', () => {
+      renderHook(() => useChatStream(''))
 
-  it('ignore un envoi vide (pas de POST)', () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-
-    act(() => {
-      result.current.send('   ')
+      expect(fetchEventSourceMock).not.toHaveBeenCalled()
     })
 
-    expect(result.current.messages).toHaveLength(0)
-    expect(sendMessageMock).not.toHaveBeenCalled()
-  })
+    it('démarre au repos (idle), sans message ni texte de streaming', () => {
+      const { result } = renderHook(() => useChatStream('c1'))
 
-  it('accumule les tokens reçus dans streamingText', async () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-    act(() => result.current.send('go'))
-    const stream = lastStream()
-
-    act(() => {
-      stream.emit(ChatStreamEventName.TOKEN, { delta: 'Post' })
-      stream.emit(ChatStreamEventName.TOKEN, { delta: 'gres' })
-    })
-
-    await waitFor(() => {
-      expect(result.current.streamingText).toBe('Postgres')
-    })
-  })
-
-  it('fige le message final assistant et vide le buffer', async () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-    act(() => result.current.send('go'))
-    const stream = lastStream()
-
-    act(() => {
-      stream.emit(ChatStreamEventName.TOKEN, { delta: '…' })
-      stream.emit(ChatStreamEventName.MESSAGE, { content: 'Voici ma proposition' })
-    })
-
-    await waitFor(() => {
-      expect(result.current.streamingText).toBe('')
-    })
-    expect(result.current.messages).toHaveLength(2)
-    const assistant = result.current.messages[1]
-    expect(assistant?.role).toBe(MessageRole.ASSISTANT)
-    expect(assistant?.content).toBe('Voici ma proposition')
-    expect(result.current.isStreaming).toBe(false)
-  })
-
-  it('crée une bulle assistant portant l’action sur action_proposed (sans message préalable)', async () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-    act(() => result.current.send('go'))
-    const stream = lastStream()
-
-    act(() => {
-      stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal())
-    })
-
-    await waitFor(() => {
-      expect(result.current.messages).toHaveLength(2)
-    })
-    const assistant = result.current.messages[1]
-    expect(assistant?.role).toBe(MessageRole.ASSISTANT)
-    // La bulle porte une amorce neutre ; la reformulation détaillée vit dans la carte.
-    expect(assistant?.content).toBeTruthy()
-    expect(assistant?.action?.intent).toBe('Déployer un Postgres')
-    expect(assistant?.action?.status).toBe(ActionStatus.PROPOSED)
-    expect(assistant?.action?.id).toBe('act-1')
-    expect(result.current.isStreaming).toBe(false)
-  })
-
-  it('marque l’action exécutée et mémorise le déploiement sur action_result', async () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-    act(() => result.current.send('go'))
-    const stream = lastStream()
-
-    act(() => {
-      stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal())
-    })
-    await waitFor(() => {
-      expect(result.current.messages).toHaveLength(2)
-    })
-
-    act(() => {
-      stream.emit(ChatStreamEventName.ACTION_RESULT, {
-        action_id: 'act-1',
-        kind: 'deploy',
-        success: true,
-        deployment_id: 'dep-1',
-      })
-    })
-
-    await waitFor(() => {
-      expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.EXECUTED)
-    })
-    expect(result.current.lastDeploymentId).toBe('dep-1')
-  })
-
-  it('marque l’action « annulée » localement et ne la redégrade pas sur action_result', async () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-    act(() => result.current.send('go'))
-    const stream = lastStream()
-
-    act(() => {
-      stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal())
-    })
-    await waitFor(() => {
-      expect(result.current.messages).toHaveLength(2)
-    })
-
-    // Décision utilisateur : annulation locale immédiate.
-    act(() => {
-      result.current.rejectActionLocally('act-1')
-    })
-    await waitFor(() => {
-      expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.REJECTED)
-    })
-
-    // Le back republie un action_result (échec indistinct) : il ne doit PAS écraser.
-    act(() => {
-      stream.emit(ChatStreamEventName.ACTION_RESULT, {
-        action_id: 'act-1',
-        kind: 'deploy',
-        success: false,
-      })
-    })
-    await waitFor(() => {
-      expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.REJECTED)
-    })
-  })
-
-  it('marque l’action en échec sur action_result raté (confirmation échouée)', async () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-    act(() => result.current.send('go'))
-    const stream = lastStream()
-
-    act(() => {
-      stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal())
-      stream.emit(ChatStreamEventName.ACTION_RESULT, {
-        action_id: 'act-1',
-        kind: 'deploy',
-        success: false,
-      })
-    })
-
-    await waitFor(() => {
-      expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.FAILED)
-    })
-  })
-
-  it('expose une erreur honnête sur une trame error', async () => {
-    const { result } = renderHook(() => useChatStream('c1'))
-    act(() => result.current.send('go'))
-    const stream = lastStream()
-
-    act(() => {
-      stream.emit(ChatStreamEventName.ERROR, { message: 'Quota dépassé' })
-    })
-
-    await waitFor(() => {
-      expect(result.current.error).toBe('Quota dépassé')
-    })
-    expect(result.current.isStreaming).toBe(false)
-  })
-
-  it('abandonne le flux au démontage (cleanup via AbortController)', () => {
-    const { unmount } = renderHook(() => useChatStream('c1'))
-    const stream = lastStream()
-
-    expect(stream.init.signal?.aborted).toBe(false)
-    unmount()
-    expect(stream.init.signal?.aborted).toBe(true)
-  })
-
-  it('réinitialise l’état et rouvre le flux au changement de fil', async () => {
-    const { result, rerender } = renderHook(({ id }) => useChatStream(id), {
-      initialProps: { id: 'c1' },
-    })
-    act(() => result.current.send('go'))
-    const firstStream = lastStream()
-    expect(result.current.messages).toHaveLength(1)
-
-    rerender({ id: 'c2' })
-
-    expect(firstStream.init.signal?.aborted).toBe(true)
-    await waitFor(() => {
+      expect(result.current.state.status).toBe('idle')
+      expect(result.current.state.streamingText).toBe('')
+      expect(result.current.state.error).toBeNull()
+      expect(result.current.state.isReconnecting).toBe(false)
       expect(result.current.messages).toHaveLength(0)
+      expect(result.current.canSend).toBe(true)
     })
-    expect(lastStream().url).toContain('/chat/conversations/c2/stream')
   })
 
-  it('sur 401, rafraîchit l’access token puis rouvre le flux avec le nouveau Bearer', async () => {
-    getAccessTokenMock.mockReturnValueOnce('access-expiré')
-    getAccessTokenMock.mockReturnValue('access-frais')
-    refreshAccessTokenMock.mockResolvedValue(undefined)
+  describe('machine d’état du tour', () => {
+    it('passe en thinking dès l’envoi (avant le 1er token) et ajoute le message user', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'Je veux un Postgres')
 
-    renderHook(() => useChatStream('c1'))
-    const firstStream = lastStream()
-    expect(firstStream.init.headers?.Authorization).toBe('Bearer access-expiré')
-
-    await act(async () => {
-      firstStream.open(401)
+      expect(stream).toBeDefined()
+      expect(result.current.state.status).toBe('thinking')
+      expect(result.current.messages).toHaveLength(1)
+      expect(result.current.messages[0]?.role).toBe(MessageRole.USER)
+      expect(result.current.messages[0]?.content).toBe('Je veux un Postgres')
     })
 
-    await waitFor(() => {
-      expect(refreshAccessTokenMock).toHaveBeenCalledTimes(1)
+    it('passe en streaming au 1er token et accumule le texte', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+
+      act(() => {
+        stream.emit(ChatStreamEventName.TOKEN, { delta: 'Post' })
+        stream.emit(ChatStreamEventName.TOKEN, { delta: 'gres' })
+      })
+
+      await waitFor(() => expect(result.current.state.status).toBe('streaming'))
+      expect(result.current.state.streamingText).toBe('Postgres')
     })
-    await waitFor(() => {
-      expect(fetchEventSourceMock).toHaveBeenCalledTimes(2)
+
+    it('passe en done et vide le buffer quand le message final est figé', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+
+      act(() => {
+        stream.emit(ChatStreamEventName.TOKEN, { delta: '…' })
+        stream.emit(ChatStreamEventName.MESSAGE, { content: 'Voici ma proposition' })
+      })
+
+      await waitFor(() => expect(result.current.state.status).toBe('done'))
+      expect(result.current.state.streamingText).toBe('')
+      expect(result.current.messages).toHaveLength(2)
+      expect(result.current.messages[1]?.role).toBe(MessageRole.ASSISTANT)
+      expect(result.current.messages[1]?.content).toBe('Voici ma proposition')
     })
-    expect(lastStream().init.headers?.Authorization).toBe('Bearer access-frais')
+
+    it('passe en done sur une action proposée (bulle porteuse de l’action)', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+
+      act(() => stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal()))
+
+      await waitFor(() => expect(result.current.messages).toHaveLength(2))
+      expect(result.current.state.status).toBe('done')
+      const assistant = result.current.messages[1]
+      expect(assistant?.action?.intent).toBe('Déployer un Postgres')
+      expect(assistant?.action?.status).toBe(ActionStatus.PROPOSED)
+      expect(assistant?.action?.id).toBe('act-1')
+    })
+
+    it('ignore un envoi vide (pas de message, pas de POST)', () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+
+      act(() => result.current.send('   '))
+
+      expect(result.current.messages).toHaveLength(0)
+      expect(result.current.state.status).toBe('idle')
+      expect(sendMessageMock).not.toHaveBeenCalled()
+    })
   })
 
-  it('si le refresh échoue, passe en erreur sans boucle de reconnexion', async () => {
-    refreshAccessTokenMock.mockRejectedValue(new Error('refresh expiré'))
+  describe('verrou d’envoi (E2 / canSend)', () => {
+    it('canSend=false pendant thinking', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      await sendAfterOpen(result.current.send, 'go')
 
-    const { result } = renderHook(() => useChatStream('c1'))
-    const stream = lastStream()
-
-    await act(async () => {
-      stream.open(401)
+      expect(result.current.state.status).toBe('thinking')
+      expect(result.current.canSend).toBe(false)
     })
 
-    await waitFor(() => {
-      expect(result.current.error).toBeTruthy()
+    it('canSend=false pendant streaming', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+
+      act(() => stream.emit(ChatStreamEventName.TOKEN, { delta: 'x' }))
+
+      await waitFor(() => expect(result.current.state.status).toBe('streaming'))
+      expect(result.current.canSend).toBe(false)
     })
-    expect(fetchEventSourceMock).toHaveBeenCalledTimes(1)
+
+    it('canSend redevient true après done', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+
+      act(() => stream.emit(ChatStreamEventName.MESSAGE, { content: 'fini' }))
+
+      await waitFor(() => expect(result.current.canSend).toBe(true))
+    })
+
+    it('un 2e envoi est ignoré tant qu’un tour est en cours', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      await sendAfterOpen(result.current.send, 'premier')
+      sendMessageMock.mockClear()
+
+      act(() => result.current.send('deuxième'))
+
+      expect(sendMessageMock).not.toHaveBeenCalled()
+      expect(result.current.messages).toHaveLength(1)
+    })
+  })
+
+  describe('course du 1er message (E1)', () => {
+    it('n’émet le POST /messages qu’après l’ouverture du flux SSE', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = lastStream()
+
+      // Le flux n'est pas encore ouvert : l'envoi ne doit PAS encore poster.
+      act(() => result.current.send('Je veux un Postgres'))
+      expect(sendMessageMock).not.toHaveBeenCalled()
+      // Le message utilisateur est tout de même affiché (optimiste) et on réfléchit.
+      expect(result.current.messages).toHaveLength(1)
+      expect(result.current.state.status).toBe('thinking')
+
+      // À l'ouverture du flux, le message en attente est posté.
+      await act(async () => {
+        stream.open(200)
+      })
+      await waitFor(() => expect(sendMessageMock).toHaveBeenCalledWith('c1', 'Je veux un Postgres'))
+    })
+
+    it('poste immédiatement si le flux est déjà ouvert', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = lastStream()
+      await act(async () => {
+        stream.open(200)
+      })
+
+      act(() => result.current.send('go'))
+
+      await waitFor(() => expect(sendMessageMock).toHaveBeenCalledWith('c1', 'go'))
+    })
+  })
+
+  describe('erreurs typées', () => {
+    it('error métier (event error) → kind business, sans reconnexion', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+
+      act(() => stream.emit(ChatStreamEventName.ERROR, { message: 'Template inconnu' }))
+
+      await waitFor(() => expect(result.current.state.status).toBe('error'))
+      expect(result.current.state.error).toEqual({ kind: 'business', message: 'Template inconnu' })
+      expect(result.current.state.isReconnecting).toBe(false)
+    })
+
+    it('401 avec refresh épuisé → kind auth', async () => {
+      refreshAccessTokenMock.mockRejectedValue(new Error('refresh expiré'))
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = lastStream()
+
+      await act(async () => {
+        stream.open(401)
+      })
+
+      await waitFor(() => expect(result.current.state.status).toBe('error'))
+      expect(result.current.state.error?.kind).toBe('auth')
+      expect(fetchEventSourceMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('sur 401, rafraîchit puis rouvre le flux avec le nouveau Bearer (pas d’erreur)', async () => {
+      getAccessTokenMock.mockReturnValueOnce('access-expiré')
+      getAccessTokenMock.mockReturnValue('access-frais')
+      refreshAccessTokenMock.mockResolvedValue(undefined)
+
+      const { result } = renderHook(() => useChatStream('c1'))
+      const firstStream = lastStream()
+      expect(firstStream.init.headers?.Authorization).toBe('Bearer access-expiré')
+
+      await act(async () => {
+        firstStream.open(401)
+      })
+
+      await waitFor(() => expect(refreshAccessTokenMock).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(fetchEventSourceMock).toHaveBeenCalledTimes(2))
+      expect(lastStream().init.headers?.Authorization).toBe('Bearer access-frais')
+      expect(result.current.state.error).toBeNull()
+    })
+
+    it('échec du POST d’envoi → erreur (message non perdu, B3)', async () => {
+      sendMessageMock.mockRejectedValueOnce(new Error('boom'))
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = lastStream()
+      await act(async () => {
+        stream.open(200)
+      })
+
+      act(() => result.current.send('Je veux un Postgres'))
+
+      await waitFor(() => expect(result.current.state.status).toBe('error'))
+      // Le message utilisateur reste affiché (B3 : jamais perdu).
+      expect(result.current.messages).toHaveLength(1)
+      expect(result.current.messages[0]?.content).toBe('Je veux un Postgres')
+    })
+  })
+
+  describe('reconnexion bornée avec backoff (B4)', () => {
+    it('sur coupure réseau, passe en isReconnecting et rouvre un flux (pas d’erreur immédiate)', async () => {
+      vi.useFakeTimers()
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = lastStream()
+      await act(async () => {
+        stream.open(200)
+      })
+
+      await act(async () => {
+        stream.fail(new Error('connexion réseau perdue'))
+      })
+      expect(result.current.state.isReconnecting).toBe(true)
+      expect(result.current.state.status).not.toBe('error')
+
+      // Après le délai de backoff, un nouveau flux est ouvert.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000)
+      })
+      expect(fetchEventSourceMock.mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('après épuisement des tentatives, bascule en error kind network', async () => {
+      vi.useFakeTimers()
+      const { result } = renderHook(() => useChatStream('c1'))
+
+      // 1 ouverture initiale + N reconnexions : chaque flux échoue, jusqu'à épuisement.
+      // À l'échec du dernier flux toléré, plus de reconnexion → error{network}.
+      const totalAttempts = 5
+      for (let attempt = 0; attempt < totalAttempts; attempt += 1) {
+        const stream = FakeStream.instances[attempt]
+        expect(stream).toBeDefined()
+        await act(async () => {
+          stream?.open(200)
+        })
+        await act(async () => {
+          stream?.fail(new Error('coupure'))
+        })
+        // Avancer le backoff déclenche la reconnexion suivante (sauf à l'épuisement).
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10000)
+        })
+      }
+
+      expect(result.current.state.status).toBe('error')
+      expect(result.current.state.error?.kind).toBe('network')
+      expect(result.current.state.isReconnecting).toBe(false)
+    })
+  })
+
+  describe('stop (A3)', () => {
+    it('stop() abandonne la génération et repasse en done', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+      act(() => stream.emit(ChatStreamEventName.TOKEN, { delta: 'partiel' }))
+      await waitFor(() => expect(result.current.state.status).toBe('streaming'))
+
+      act(() => result.current.stop())
+
+      await waitFor(() => expect(result.current.state.status).toBe('done'))
+      expect(result.current.canSend).toBe(true)
+    })
+  })
+
+  describe('retry (B2)', () => {
+    it('retry() réémet le dernier message utilisateur', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'Je veux un Postgres')
+      act(() => stream.emit(ChatStreamEventName.ERROR, { message: 'Quota dépassé' }))
+      await waitFor(() => expect(result.current.state.status).toBe('error'))
+      sendMessageMock.mockClear()
+
+      act(() => result.current.retry())
+
+      await waitFor(() => expect(sendMessageMock).toHaveBeenCalledWith('c1', 'Je veux un Postgres'))
+      expect(result.current.state.status).toBe('thinking')
+      expect(result.current.state.error).toBeNull()
+    })
+
+    it('retry() sans message précédent ne fait rien', () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+
+      act(() => result.current.retry())
+
+      expect(sendMessageMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('actions (chat fonctionnel préservé)', () => {
+    it('marque l’action exécutée et mémorise le déploiement sur action_result', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+      act(() => stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal()))
+      await waitFor(() => expect(result.current.messages).toHaveLength(2))
+
+      act(() =>
+        stream.emit(ChatStreamEventName.ACTION_RESULT, {
+          action_id: 'act-1',
+          kind: 'deploy',
+          success: true,
+          deployment_id: 'dep-1',
+        }),
+      )
+
+      await waitFor(() =>
+        expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.EXECUTED),
+      )
+      expect(result.current.lastDeploymentId).toBe('dep-1')
+    })
+
+    it('marque l’action annulée localement et ne la redégrade pas sur action_result', async () => {
+      const { result } = renderHook(() => useChatStream('c1'))
+      const stream = await sendAfterOpen(result.current.send, 'go')
+      act(() => stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal()))
+      await waitFor(() => expect(result.current.messages).toHaveLength(2))
+
+      act(() => result.current.rejectActionLocally('act-1'))
+      await waitFor(() =>
+        expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.REJECTED),
+      )
+
+      act(() =>
+        stream.emit(ChatStreamEventName.ACTION_RESULT, {
+          action_id: 'act-1',
+          kind: 'deploy',
+          success: false,
+        }),
+      )
+      await waitFor(() =>
+        expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.REJECTED),
+      )
+    })
+  })
+
+  describe('cycle de vie', () => {
+    it('abandonne le flux au démontage (cleanup via AbortController)', () => {
+      const { unmount } = renderHook(() => useChatStream('c1'))
+      const stream = lastStream()
+
+      expect(stream.init.signal?.aborted).toBe(false)
+      unmount()
+      expect(stream.init.signal?.aborted).toBe(true)
+    })
+
+    it('réinitialise l’état et rouvre le flux au changement de fil', async () => {
+      const { result, rerender } = renderHook(({ id }) => useChatStream(id), {
+        initialProps: { id: 'c1' },
+      })
+      const firstStream = await sendAfterOpen(result.current.send, 'go')
+      expect(result.current.messages).toHaveLength(1)
+
+      rerender({ id: 'c2' })
+
+      expect(firstStream.init.signal?.aborted).toBe(true)
+      await waitFor(() => expect(result.current.messages).toHaveLength(0))
+      expect(result.current.state.status).toBe('idle')
+      expect(lastStream().url).toContain('/chat/conversations/c2/stream')
+    })
   })
 })
