@@ -77,6 +77,78 @@ class TestComplete:
         assert chunk.tool_call.args == {"template_id": "abc", "name": "db"}
 
 
+class TestMessageMapping:
+    """Anthropic n'accepte que les roles user/assistant, en alternance stricte.
+
+    Notre flux porte des messages `tool` (resultats d'outils reinjectes) et un
+    prompt systeme injecte en `user` en tete. L'adaptateur doit donc mapper
+    `tool`->`user` et fusionner les messages consecutifs de meme role, sinon
+    l'API renvoie une 400 des le 1er tour guide.
+    """
+
+    async def test_mappe_le_role_tool_vers_user(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+        provider = _provider(httpx.MockTransport(handle))
+        messages = [
+            ChatMessage(role=MessageRole.USER, content="Q"),
+            ChatMessage(role=MessageRole.ASSISTANT, content="A"),
+            ChatMessage(role=MessageRole.TOOL, content="[get_template] {...}"),
+        ]
+
+        await provider.complete(messages, [])
+
+        roles = [m["role"] for m in captured["body"]["messages"]]
+        assert "tool" not in roles
+        assert set(roles) <= {"user", "assistant"}
+
+    async def test_fusionne_les_messages_consecutifs_de_meme_role(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+        provider = _provider(httpx.MockTransport(handle))
+        messages = [
+            ChatMessage(role=MessageRole.USER, content="SYSTEME"),
+            ChatMessage(role=MessageRole.USER, content="Deploie un postgres"),
+        ]
+
+        await provider.complete(messages, [])
+
+        body = captured["body"]
+        assert len(body["messages"]) == 1
+        assert body["messages"][0]["role"] == "user"
+        assert "SYSTEME" in body["messages"][0]["content"]
+        assert "Deploie un postgres" in body["messages"][0]["content"]
+
+    async def test_garantit_l_alternance_stricte_user_assistant(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
+
+        provider = _provider(httpx.MockTransport(handle))
+        messages = [
+            ChatMessage(role=MessageRole.USER, content="SYSTEME"),
+            ChatMessage(role=MessageRole.USER, content="Q1"),
+            ChatMessage(role=MessageRole.TOOL, content="resultat outil"),
+            ChatMessage(role=MessageRole.ASSISTANT, content="Reponse"),
+        ]
+
+        await provider.complete(messages, [])
+
+        roles = [m["role"] for m in captured["body"]["messages"]]
+        assert all(roles[i] != roles[i + 1] for i in range(len(roles) - 1))
+        assert roles[0] == "user"
+
+
 class TestStream:
     async def test_streame_les_deltas_de_texte(self) -> None:
         async def stream_body() -> AsyncIterator[bytes]:
