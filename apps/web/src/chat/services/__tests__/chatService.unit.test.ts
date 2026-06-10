@@ -1,6 +1,7 @@
 import { HttpResponse, http } from 'msw'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { apiClient } from '../../../core/api/apiClient'
 import { server } from '../../../../tests/mocks/server'
 import type { ConversationDetailDTO } from '../../types/dto/ConversationDetailDTO'
 import type { ConversationDTO } from '../../types/dto/ConversationDTO'
@@ -29,6 +30,7 @@ function conversationDto(overrides: Partial<ConversationDTO> = {}): Conversation
 describe('chatService (API REST /chat)', () => {
   afterEach(() => {
     server.resetHandlers()
+    vi.restoreAllMocks()
   })
 
   it('liste les fils et les mappe en modèles', async () => {
@@ -127,6 +129,21 @@ describe('chatService (API REST /chat)', () => {
 
     await expect(sendMessage('c1', 'Je veux un Postgres')).resolves.toBeUndefined()
     expect(received).toEqual({ content: 'Je veux un Postgres' })
+  })
+
+  it('laisse au LLM le temps de répondre : timeout généreux sur l’envoi (≠ défaut 10 s)', async () => {
+    // Le back traite la passe LLM de façon synchrone avant son 202 (un tour avec
+    // appel d'outil sur un LLM local CPU dépasse 60 s) : avec le timeout axios par
+    // défaut (10 s), le POST échouait toujours → « Connexion interrompue », alors
+    // que la réponse arrive bien ensuite par le flux SSE. L'envoi doit donc poser
+    // un timeout largement supérieur.
+    const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: undefined } as never)
+
+    await sendMessage('c1', 'Déploie un Postgres')
+
+    const config = postSpy.mock.calls[0]?.[2] as { timeout?: number } | undefined
+    expect(config?.timeout).toBeGreaterThanOrEqual(120_000)
+    postSpy.mockRestore()
   })
 
   it('confirme et rejette une action sur les bons endpoints (202)', async () => {

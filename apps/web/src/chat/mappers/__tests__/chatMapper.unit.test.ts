@@ -187,7 +187,16 @@ describe('chatMapper', () => {
       expect(event).toEqual({ type: 'error', message: 'Quota dépassé' })
     })
 
-    it('lève sur un événement inconnu', () => {
+    it('ignore une trame keepalive vide (heartbeat SSE) sans lever', () => {
+      // @microsoft/fetch-event-source dispatche un message au nom/données vides
+      // sur la ligne blanche qui termine le commentaire « : keepalive ». Sans ce
+      // no-op explicite, chaque heartbeat (~15 s) ferait planter le flux SSE
+      // (« Connexion interrompue ») dès que le LLM reste muet plus de 15 s.
+      expect(() => mapStreamEvent('', '')).not.toThrow()
+      expect(mapStreamEvent('', '')).toEqual({ type: 'keepalive' })
+    })
+
+    it('lève sur un événement nommé inconnu', () => {
       expect(() => mapStreamEvent('inconnu', '{}')).toThrow()
     })
   })

@@ -43,12 +43,23 @@ export interface ErrorEvent {
   message: string
 }
 
+/**
+ * Trame SSE inerte (`keepalive`) : `@microsoft/fetch-event-source` dispatche un
+ * message au nom/données vides sur la ligne blanche qui termine un commentaire
+ * SSE (`: keepalive`). On la modélise en no-op explicite pour la distinguer d'un
+ * événement métier — le réducteur l'ignore (aucun effet sur le tour en cours).
+ */
+export interface KeepaliveEvent {
+  type: 'keepalive'
+}
+
 export type ChatStreamEvent =
   | TokenEvent
   | MessageEvent
   | ActionProposedEvent
   | ActionResultEvent
   | ErrorEvent
+  | KeepaliveEvent
 
 /** Noms d'événements SSE (champ `event:`), partagés mapper ↔ seam ↔ hook. */
 export const ChatStreamEventName = {
