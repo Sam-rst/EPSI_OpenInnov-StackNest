@@ -15,8 +15,10 @@ from app.stack.application.commands.stack_service_command import StackServiceCom
 from app.stack.domain.entities.stack import Stack
 from app.stack.domain.entities.stack_link import StackLink
 from app.stack.domain.entities.stack_service import StackService
+from app.stack.domain.interfaces.stack_job_queue import StackJobQueue
 from app.stack.domain.interfaces.stack_repository import StackRepository
 from app.stack.domain.interfaces.stack_template_reader import StackTemplateReader
+from app.stack.domain.value_objects.stack_job import StackJob
 from app.stack.domain.value_objects.stack_template_ref import StackTemplateRef
 
 
@@ -36,6 +38,8 @@ class FakeStackRepository(StackRepository):
         self.added_stacks: list[Stack] = []
         self.added_services: list[StackService] = []
         self.added_links: list[StackLink] = []
+        self.updated_stacks: list[Stack] = []
+        self.updated_services: list[StackService] = []
         self.deleted: list[UUID] = []
 
     async def add(self, stack: Stack) -> Stack:
@@ -45,6 +49,14 @@ class FakeStackRepository(StackRepository):
 
     async def get_by_id(self, stack_id: UUID) -> Stack | None:
         return self._stacks.get(stack_id)
+
+    async def update_stack(self, stack: Stack) -> None:
+        self._stacks[stack.id] = stack
+        self.updated_stacks.append(stack)
+
+    async def update_service(self, service: StackService) -> None:
+        self._services[service.id] = service
+        self.updated_services.append(service)
 
     async def list_by_owner(self, owner_id: UUID) -> list[Stack]:
         return [s for s in self._stacks.values() if s.owner_id == owner_id]
@@ -73,6 +85,16 @@ class FakeStackRepository(StackRepository):
 
     async def list_links(self, stack_id: UUID) -> list[StackLink]:
         return [link for link in self._links.values() if link.stack_id == stack_id]
+
+
+class FakeStackJobQueue(StackJobQueue):
+    """File de jobs de stack en memoire : enregistre les jobs enfiles pour assertion."""
+
+    def __init__(self) -> None:
+        self.enqueued: list[StackJob] = []
+
+    async def enqueue(self, job: StackJob) -> None:
+        self.enqueued.append(job)
 
 
 class FakeStackTemplateReader(StackTemplateReader):

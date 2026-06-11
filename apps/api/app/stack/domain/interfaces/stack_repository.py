@@ -38,6 +38,19 @@ class StackRepository(ABC):
         """Renvoie la stack par son id, ou None si elle n'existe pas."""
 
     @abstractmethod
+    async def update_stack(self, stack: Stack) -> None:
+        """Persiste l'etat mutable d'une stack (statut global) via l'ORM.
+
+        La mise a jour passe par le modele charge (pas un UPDATE brut) afin que
+        l'`onupdate` ORM de `updated_at` se declenche (cf. lot 1 : `updated_at`
+        n'a pas de trigger base, c'est l'ORM qui le rafraichit).
+        """
+
+    @abstractmethod
+    async def update_service(self, service: StackService) -> None:
+        """Persiste l'etat mutable d'un service (statut, port publie, ref conteneur)."""
+
+    @abstractmethod
     async def list_by_owner(self, owner_id: UUID) -> list[Stack]:
         """Renvoie toutes les stacks appartenant a cet utilisateur."""
 

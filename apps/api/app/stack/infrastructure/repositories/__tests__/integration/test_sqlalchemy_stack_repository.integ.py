@@ -266,6 +266,51 @@ class TestLinks:
         assert links[0].var_mappings == {"DB_HOST": "{to.alias}", "DB_PASSWORD": "{to.secret}"}
 
 
+class TestUpdate:
+    async def test_update_stack_change_le_statut_et_rafraichit_updated_at(
+        self, session: AsyncSession
+    ) -> None:
+        repository = SqlAlchemyStackRepository(session)
+        owner_id = await _seed_user(session)
+        stack = await repository.add(_stack(owner_id=owner_id))
+        await session.commit()
+        before = await repository.get_by_id(stack.id)
+        assert before is not None
+
+        stack.status = StackStatus.RUNNING
+        await repository.update_stack(stack)
+        await session.commit()
+
+        reloaded = await repository.get_by_id(stack.id)
+        assert reloaded is not None
+        assert reloaded.status is StackStatus.RUNNING
+        # `updated_at` est rafraichi par l'ORM (onupdate), pas fige a la creation.
+        assert reloaded.updated_at is not None
+        assert reloaded.updated_at >= before.updated_at  # type: ignore[operator]
+
+    async def test_update_service_persiste_port_ref_et_statut(self, session: AsyncSession) -> None:
+        repository = SqlAlchemyStackRepository(session)
+        owner_id = await _seed_user(session)
+        template_id = await _seed_template(session)
+        stack = await repository.add(_stack(owner_id=owner_id))
+        await session.commit()
+        service = await repository.add_service(
+            _service(stack_id=stack.id, template_id=template_id, alias="db")
+        )
+        await session.commit()
+
+        service.service_status = ServiceStatus.RUNNING
+        service.published_port = 32768
+        service.container_ref = "stack_x-db-1"
+        await repository.update_service(service)
+        await session.commit()
+
+        services = await repository.list_services(stack.id)
+        assert services[0].service_status is ServiceStatus.RUNNING
+        assert services[0].published_port == 32768
+        assert services[0].container_ref == "stack_x-db-1"
+
+
 class TestDelete:
     async def test_delete_supprime_la_stack_ses_services_et_liens(
         self, session: AsyncSession

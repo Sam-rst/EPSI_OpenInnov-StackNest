@@ -7,11 +7,14 @@ from app.stack.domain.entities.stack import Stack
 from app.stack.domain.entities.stack_link import StackLink
 from app.stack.domain.entities.stack_service import StackService
 from app.stack.domain.enums.service_status import ServiceStatus
+from app.stack.domain.enums.stack_job_kind import StackJobKind
 from app.stack.domain.enums.stack_status import StackStatus
 from app.stack.domain.exceptions.invalid_stack import InvalidStackException
+from app.stack.domain.interfaces.stack_job_queue import StackJobQueue
 from app.stack.domain.interfaces.stack_repository import StackRepository
 from app.stack.domain.interfaces.stack_template_reader import StackTemplateReader
 from app.stack.domain.services.stack_validator import StackValidator
+from app.stack.domain.value_objects.stack_job import StackJob
 
 
 class CreateStack:
@@ -27,9 +30,14 @@ class CreateStack:
        bloques) — sinon 422.
 
     Puis persiste la stack, ses services (status `pending`, alias -> id memorise)
-    et ses liens (alias resolus en ids de services). **Aucun provisioning n'est
-    lance au lot 2** : la stack reste `pending` ; le worker `compose up` viendra au
-    lot 3. Le repository ne commit pas (unit of work par requete cote appelant).
+    et ses liens (alias resolus en ids de services). Le repository ne commit pas
+    (unit of work par requete cote appelant).
+
+    **Provisioning (lot 3)** : si une `queue` est injectee, un job PROVISION est
+    enfile apres la persistance — le worker generera le compose-file et lancera
+    `docker compose up`. La stack reste `pending` jusqu'a ce que le worker la
+    bascule en `provisioning`/`running`. Sans `queue` (ex. tests de persistance
+    pure), aucun job n'est enfile.
     """
 
     def __init__(
@@ -37,10 +45,12 @@ class CreateStack:
         *,
         repository: StackRepository,
         reader: StackTemplateReader,
+        queue: StackJobQueue | None = None,
         validator: StackValidator | None = None,
     ) -> None:
         self._repository = repository
         self._reader = reader
+        self._queue = queue
         self._validator = validator or StackValidator()
 
     async def execute(self, command: StackCreateCommand) -> Stack:
@@ -50,7 +60,8 @@ class CreateStack:
         stack = await self._repository.add(self._new_stack(command))
         alias_to_id = await self._persist_services(stack.id, command)
         await self._persist_links(stack.id, command, alias_to_id)
-        # TODO lot 3 : enfiler le provisioning (worker `compose up`) ici.
+        if self._queue is not None:
+            await self._queue.enqueue(StackJob(kind=StackJobKind.PROVISION, stack_id=stack.id))
         return stack
 
     async def _ensure_templates_addable(self, command: StackCreateCommand) -> None:

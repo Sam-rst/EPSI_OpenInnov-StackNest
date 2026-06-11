@@ -42,6 +42,25 @@ class SqlAlchemyStackRepository(StackRepository):
             return None
         return StackMapper.to_entity(model)
 
+    async def update_stack(self, stack: Stack) -> None:
+        # Charge le modele puis mute le champ : `updated_at` se rafraichit via
+        # l'`onupdate` ORM (pas de trigger base — cf. lot 1). Un UPDATE brut ne
+        # le declencherait pas.
+        model = await self._session.get(StackModel, stack.id)
+        if model is None:
+            return
+        model.status = stack.status
+        await self._session.flush()
+
+    async def update_service(self, service: StackService) -> None:
+        model = await self._session.get(StackServiceModel, service.id)
+        if model is None:
+            return
+        model.service_status = service.service_status
+        model.published_port = service.published_port
+        model.container_ref = service.container_ref
+        await self._session.flush()
+
     async def list_by_owner(self, owner_id: UUID) -> list[Stack]:
         result = await self._session.execute(
             select(StackModel)

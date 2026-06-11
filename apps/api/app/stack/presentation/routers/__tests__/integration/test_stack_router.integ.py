@@ -26,13 +26,16 @@ from app.auth.presentation.dependencies.current_user import (
 )
 from app.main import create_app
 from app.stack.application.__tests__.fakes import (
+    FakeStackJobQueue,
     FakeStackRepository,
     FakeStackTemplateReader,
     docker_ref,
     terraform_ref,
 )
+from app.stack.domain.enums.stack_job_kind import StackJobKind
 from app.stack.domain.value_objects.stack_template_ref import StackTemplateRef
 from app.stack.presentation.dependencies.stack_providers import (
+    get_stack_job_queue,
     get_stack_repository,
     get_stack_template_reader,
 )
@@ -84,11 +87,14 @@ async def context() -> AsyncIterator[dict[str, object]]:
         }
     )
 
+    queue = FakeStackJobQueue()
+
     app = create_app()
     app.dependency_overrides[get_token_service] = lambda: JwtTokenService(secret=_SECRET)
     app.dependency_overrides[get_user_repository] = lambda: _FakeUserRepository([user, other])
     app.dependency_overrides[get_stack_repository] = lambda: repository
     app.dependency_overrides[get_stack_template_reader] = lambda: reader
+    app.dependency_overrides[get_stack_job_queue] = lambda: queue
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="https://test") as http:
@@ -98,6 +104,7 @@ async def context() -> AsyncIterator[dict[str, object]]:
             "user": user,
             "other": other,
             "repository": repository,
+            "queue": queue,
         }
 
 
@@ -150,6 +157,18 @@ class TestCreate:
         assert len(repository.added_stacks) == 1
         assert len(repository.added_services) == 2
         assert len(repository.added_links) == 1
+
+    async def test_creation_enfile_un_job_provision(self, context: dict[str, object]) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        queue: FakeStackJobQueue = context["queue"]  # type: ignore[assignment]
+
+        response = await http.post("/stacks", json=_create_body(), headers=_auth(user))
+
+        assert response.status_code == 201, response.text
+        assert len(queue.enqueued) == 1
+        assert queue.enqueued[0].kind is StackJobKind.PROVISION
+        assert str(queue.enqueued[0].stack_id) == response.json()["id"]
 
     async def test_creation_alias_duplique_renvoie_422(self, context: dict[str, object]) -> None:
         http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
@@ -347,19 +366,53 @@ class TestSecretMasking:
 
 
 class TestDelete:
-    async def test_suppression_renvoie_204(self, context: dict[str, object]) -> None:
+    async def test_suppression_renvoie_204_et_enfile_un_job_destroy(
+        self, context: dict[str, object]
+    ) -> None:
         http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
         user: User = context["user"]  # type: ignore[assignment]
+        queue: FakeStackJobQueue = context["queue"]  # type: ignore[assignment]
         created = await http.post("/stacks", json=_create_body(), headers=_auth(user))
         stack_id = created.json()["id"]
+        queue.enqueued.clear()  # on isole le job de destruction du job de creation
 
         response = await http.delete(f"/stacks/{stack_id}", headers=_auth(user))
 
         assert response.status_code == 204
-        # La stack n'est plus accessible.
-        assert (await http.get(f"/stacks/{stack_id}", headers=_auth(user))).status_code == 404
+        # La destruction est asynchrone : un job DESTROY est enfile pour la stack.
+        assert len(queue.enqueued) == 1
+        assert queue.enqueued[0].kind is StackJobKind.DESTROY
+        assert str(queue.enqueued[0].stack_id) == stack_id
 
-    async def test_suppression_d_une_stack_d_autrui_renvoie_404(
+    async def test_suppression_d_une_stack_d_autrui_renvoie_404_sans_enfiler(
+        self, context: dict[str, object]
+    ) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        other: User = context["other"]  # type: ignore[assignment]
+        queue: FakeStackJobQueue = context["queue"]  # type: ignore[assignment]
+        created = await http.post("/stacks", json=_create_body(), headers=_auth(other))
+        stack_id = created.json()["id"]
+        queue.enqueued.clear()
+
+        response = await http.delete(f"/stacks/{stack_id}", headers=_auth(user))
+
+        assert response.status_code == 404
+        assert queue.enqueued == []
+
+
+class TestEvents:
+    async def test_flux_evenements_d_une_stack_inexistante_renvoie_404(
+        self, context: dict[str, object]
+    ) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+
+        response = await http.get(f"/stacks/{uuid4()}/events", headers=_auth(user))
+
+        assert response.status_code == 404
+
+    async def test_flux_evenements_d_une_stack_d_autrui_renvoie_404(
         self, context: dict[str, object]
     ) -> None:
         http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
@@ -368,6 +421,6 @@ class TestDelete:
         created = await http.post("/stacks", json=_create_body(), headers=_auth(other))
         stack_id = created.json()["id"]
 
-        response = await http.delete(f"/stacks/{stack_id}", headers=_auth(user))
+        response = await http.get(f"/stacks/{stack_id}/events", headers=_auth(user))
 
         assert response.status_code == 404

@@ -27,6 +27,22 @@ RUN uv sync --frozen --no-dev
 
 FROM python:3.13-slim AS runtime
 
+# CLI Docker + plugin `docker compose` : requis par le worker de stack
+# (ComposeCliProvisioner lance `docker compose -p stack_{id} up -d` via le socket
+# Docker monte). L'image `python:3.13-slim` n'en embarque aucun (spike STN-stack
+# lot 3). On installe le client uniquement (pas le demon) depuis le depot apt
+# officiel Docker. Sans impact pour l'API/le worker de deploiement (Docker SDK).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
+    && chmod a+r /etc/apt/keyrings/docker.asc \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+       > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
+    && rm -rf /var/lib/apt/lists/*
+
 # Utilisateur non-root
 RUN groupadd --system app && useradd --system --gid app --home /app app
 
