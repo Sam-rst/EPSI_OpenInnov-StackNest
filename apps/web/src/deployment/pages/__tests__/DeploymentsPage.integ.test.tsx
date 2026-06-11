@@ -53,8 +53,9 @@ describe('DeploymentsPage (liste)', () => {
 
     renderList()
 
-    expect(await screen.findByText('postgres-prod')).toBeInTheDocument()
-    expect(screen.getByText('redis-cache')).toBeInTheDocument()
+    // Chaque déploiement est rendu deux fois (table large + carte mobile responsive).
+    expect(await screen.findAllByText('postgres-prod')).toHaveLength(2)
+    expect(screen.getAllByText('redis-cache')).toHaveLength(2)
     expect(screen.getByRole('button', { name: /Nouveau déploiement/ })).toBeInTheDocument()
   })
 

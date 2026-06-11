@@ -1,5 +1,7 @@
-import { Link } from 'react-router-dom'
+import type { KeyboardEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 
+import { formatDeploymentDate } from './formatDeploymentDate'
 import { Badge, Icon } from '../../../shared/components/ui'
 import { toneForStatus } from '../../types/enums/DeploymentStatus'
 import type { Deployment } from '../../types/models/Deployment'
@@ -8,26 +10,42 @@ interface DeploymentRowProps {
   deployment: Deployment
 }
 
-function formatDate(iso: string | null): string {
-  if (iso === null) {
-    return '—'
-  }
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString('fr-FR')
-}
+/** Touches qui activent un lien accessible (parité avec un clic). */
+const ACTIVATION_KEYS: ReadonlySet<string> = new Set(['Enter', ' '])
 
-/** Ligne de la table des déploiements : nom · template+version · statut · accès · date. */
+/**
+ * Ligne de la table des déploiements : nom · template+version · statut · accès · date.
+ * Toute la ligne est un lien accessible vers le détail (clic + clavier Enter/Espace).
+ */
 export function DeploymentRow({ deployment }: DeploymentRowProps) {
+  const navigate = useNavigate()
+  const detailPath = `/deployments/${deployment.id}`
+
+  function goToDetail() {
+    navigate(detailPath)
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTableRowElement>) {
+    if (ACTIVATION_KEYS.has(event.key)) {
+      event.preventDefault()
+      goToDetail()
+    }
+  }
+
   return (
-    <tr className="border-border hover:bg-surface-sunken border-t transition">
+    <tr
+      role="link"
+      tabIndex={0}
+      aria-label={`Voir le déploiement ${deployment.name}`}
+      onClick={goToDetail}
+      onKeyDown={handleKeyDown}
+      className="border-border hover:bg-surface-sunken focus-visible:ring-cyan cursor-pointer border-t transition outline-none focus-visible:ring-2 focus-visible:ring-inset"
+    >
       <td className="px-4 py-3">
-        <Link
-          to={`/deployments/${deployment.id}`}
-          className="text-text-primary hover:text-cyan inline-flex items-center gap-2 font-medium transition"
-        >
+        <span className="text-text-primary inline-flex items-center gap-2 font-medium">
           <Icon name="box" size={15} className="text-cyan" />
           {deployment.name}
-        </Link>
+        </span>
       </td>
       <td className="px-4 py-3">
         <span className="text-text-secondary font-mono text-[12px]">
@@ -41,15 +59,14 @@ export function DeploymentRow({ deployment }: DeploymentRowProps) {
       <td className="text-text-secondary px-4 py-3 font-mono text-[12px]">
         {deployment.accessUrl ?? '—'}
       </td>
-      <td className="text-text-muted px-4 py-3 text-[12px]">{formatDate(deployment.createdAt)}</td>
+      <td className="text-text-muted px-4 py-3 text-[12px]">
+        {formatDeploymentDate(deployment.createdAt)}
+      </td>
       <td className="px-4 py-3 text-right">
-        <Link
-          to={`/deployments/${deployment.id}`}
-          className="text-cyan inline-flex items-center gap-1 text-[12.5px] font-medium hover:underline"
-        >
+        <span className="text-cyan inline-flex items-center gap-1 text-[12.5px] font-medium">
           Voir
           <Icon name="arrow-right" size={13} />
-        </Link>
+        </span>
       </td>
     </tr>
   )
