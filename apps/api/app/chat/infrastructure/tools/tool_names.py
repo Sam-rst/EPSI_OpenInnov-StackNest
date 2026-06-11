@@ -41,6 +41,13 @@ ACTION_TOOL_KINDS: dict[ToolName, ActionKind] = {
     ToolName.REGENERATE_PASSWORD: ActionKind.REGENERATE,
 }
 
+# Correspondance inverse nature d'action -> outil : permet de reconstruire le
+# `ToolCall` d'une action persistee pour rejouer sa proposition via la gate
+# (recap public au rechargement d'un fil).
+ACTION_KIND_TOOLS: dict[ActionKind, ToolName] = {
+    kind: tool for tool, kind in ACTION_TOOL_KINDS.items()
+}
+
 # Outils de lecture (executes immediatement par le moteur).
 READ_TOOLS: frozenset[ToolName] = frozenset(
     {ToolName.LIST_CATALOG, ToolName.GET_TEMPLATE, ToolName.LIST_MY_DEPLOYMENTS}

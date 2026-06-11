@@ -35,6 +35,7 @@ from app.chat.domain.interfaces.conversation_repository import ConversationRepos
 from app.chat.domain.interfaces.deployment_actions import DeploymentActions
 from app.chat.domain.interfaces.llm_provider import LLMProvider
 from app.chat.infrastructure.tools.action_args_gate import ActionArgsGate
+from app.chat.infrastructure.tools.gate_proposed_action_reader import GateProposedActionReader
 from app.chat.infrastructure.tools.read_tool_executor import ReadToolExecutor
 from app.chat.infrastructure.tools.tool_catalog_builder import ToolCatalogBuilder
 from app.chat.presentation.dependencies.chat_providers import (
@@ -104,15 +105,34 @@ async def create_conversation(
     summary="Detail d'un fil possede (avec ses messages)",
 )
 async def get_conversation(
-    conversation_id: UUID, conversations: ConversationsDep, user: CurrentUserDep
+    conversation_id: UUID,
+    conversations: ConversationsDep,
+    actions: ActionsDep,
+    catalog: CatalogDep,
+    deployments: DeploymentsDep,
+    user: CurrentUserDep,
 ) -> ConversationDetailResponse:
-    """Renvoie le fil et ses messages (404 si inconnu ou non possede)."""
-    use_case = GetConversation(conversations)
+    """Renvoie le fil et ses messages (404 si inconnu ou non possede).
+
+    Les messages assistant porteurs d'une proposition encore `proposed`
+    ressortent avec leur recap PUBLIC rattache (carte rejouable au rechargement).
+    """
+    reader = GateProposedActionReader(
+        actions=actions,
+        gate=ActionArgsGate(catalog=catalog, deployments=deployments),
+        owner_id=user.id,
+    )
+    use_case = GetConversation(conversations, proposed_reader=reader)
     fil = await use_case.execute(conversation_id=conversation_id, owner_id=user.id)
-    messages = await use_case.list_messages(conversation_id=conversation_id, owner_id=user.id)
+    messages = await use_case.list_messages_with_proposals(
+        conversation_id=conversation_id, owner_id=user.id
+    )
     return ConversationDetailResponse(
         conversation=ConversationResponse.from_entity(fil),
-        messages=[MessageResponse.from_entity(message) for message in messages],
+        messages=[
+            MessageResponse.from_entity(message, proposal=proposal)
+            for message, proposal in messages
+        ],
     )
 
 

@@ -90,4 +90,23 @@ describe('ActionCard', () => {
     expect(screen.getByText('Exécutée')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Confirmer/ })).toBeDisabled()
   })
+
+  it('affiche un CTA « Voir le déploiement » une fois exécutée avec un déploiement', async () => {
+    const user = userEvent.setup()
+    renderCard({
+      action: proposal({ status: ActionStatus.EXECUTED, deploymentId: 'dep-7' }),
+    })
+
+    const cta = screen.getByRole('button', { name: /Voir le déploiement/ })
+    expect(cta).toBeInTheDocument()
+
+    await user.click(cta)
+    expect(navigateMock).toHaveBeenCalledWith('/deployments/dep-7')
+  })
+
+  it('n’affiche pas le CTA déploiement tant que l’action n’est pas exécutée', () => {
+    renderCard({ action: proposal({ status: ActionStatus.PROPOSED }) })
+
+    expect(screen.queryByRole('button', { name: /Voir le déploiement/ })).toBeNull()
+  })
 })

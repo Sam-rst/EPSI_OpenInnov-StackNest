@@ -29,4 +29,9 @@ export interface ActionProposal {
   params: readonly ActionRecapEntry[]
   /** Récap des quotas/limites (clé/valeur ordonnés). */
   quotas: readonly ActionRecapEntry[]
+  /**
+   * Déploiement créé une fois l'action `deploy` exécutée avec succès, ou
+   * `null`/absent. Alimente le CTA « Voir le déploiement → » de la carte.
+   */
+  deploymentId?: string | null
 }

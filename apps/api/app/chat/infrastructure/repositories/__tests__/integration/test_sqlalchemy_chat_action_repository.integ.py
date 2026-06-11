@@ -143,14 +143,19 @@ async def _seed_deployment(session: AsyncSession, owner_id: UUID, template_id: U
     return deployment.id
 
 
-def _action(*, conversation_id: UUID, message_id: UUID) -> ChatAction:
+def _action(
+    *,
+    conversation_id: UUID,
+    message_id: UUID,
+    status: ActionStatus = ActionStatus.PROPOSED,
+) -> ChatAction:
     return ChatAction(
         id=uuid4(),
         conversation_id=conversation_id,
         message_id=message_id,
         kind=ActionKind.DEPLOY,
         args={"template_id": "abc", "version": "16"},
-        status=ActionStatus.PROPOSED,
+        status=status,
     )
 
 
@@ -179,6 +184,41 @@ class TestAddAndGet:
         repository = SqlAlchemyChatActionRepository(session)
 
         assert await repository.get_by_id(uuid4()) is None
+
+
+class TestListProposedByConversation:
+    async def test_ne_renvoie_que_les_actions_proposed_du_fil(self, session: AsyncSession) -> None:
+        repository = SqlAlchemyChatActionRepository(session)
+        owner_id = await _seed_user(session)
+        conversation_id, message_id = await _seed_message(session, owner_id)
+        proposed = await repository.add(
+            _action(conversation_id=conversation_id, message_id=message_id)
+        )
+        # Une action terminee (rejetee) ne doit PAS ressortir comme rejouable.
+        await repository.add(
+            _action(
+                conversation_id=conversation_id,
+                message_id=message_id,
+                status=ActionStatus.REJECTED,
+            )
+        )
+        await session.commit()
+
+        result = await repository.list_proposed_by_conversation(conversation_id)
+
+        assert [action.id for action in result] == [proposed.id]
+
+    async def test_isole_par_conversation(self, session: AsyncSession) -> None:
+        repository = SqlAlchemyChatActionRepository(session)
+        owner_id = await _seed_user(session)
+        mine_conversation, _mine_message = await _seed_message(session, owner_id)
+        other_conversation, other_message = await _seed_message(session, owner_id)
+        await repository.add(_action(conversation_id=other_conversation, message_id=other_message))
+        await session.commit()
+
+        result = await repository.list_proposed_by_conversation(mine_conversation)
+
+        assert result == []
 
 
 class TestUpdate:

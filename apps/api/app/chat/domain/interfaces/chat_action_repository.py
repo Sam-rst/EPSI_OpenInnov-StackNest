@@ -23,5 +23,9 @@ class ChatActionRepository(ABC):
         """Renvoie l'action par son id, ou None si elle n'existe pas."""
 
     @abstractmethod
+    async def list_proposed_by_conversation(self, conversation_id: UUID) -> list[ChatAction]:
+        """Renvoie les actions encore `proposed` du fil (pour rejouer leur carte)."""
+
+    @abstractmethod
     async def update(self, action: ChatAction) -> ChatAction:
         """Met a jour une action (status, deployment_id) puis la renvoie."""

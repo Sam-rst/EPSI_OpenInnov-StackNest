@@ -9,6 +9,7 @@ import {
 } from '../../types/enums/ActionStatus'
 import type { ActionProposal } from '../../types/models/ActionProposal'
 import { ActionRecap } from './ActionRecap'
+import { DeploymentResultCta } from './DeploymentResultCta'
 
 interface ActionCardProps {
   action: ActionProposal
@@ -47,6 +48,12 @@ function ImageLine({ action }: { action: ActionProposal }) {
 export function ActionCard({ action, onConfirm, onReject }: ActionCardProps) {
   const navigate = useNavigate()
   const isPending = action.status === ActionStatus.PROPOSED
+  // Action `deploy` exécutée avec succès : on propose un CTA vers le suivi du
+  // déploiement créé (item #7) — visible, jamais une redirection automatique.
+  const executedDeploymentId =
+    action.status === ActionStatus.EXECUTED && action.deploymentId != null
+      ? action.deploymentId
+      : null
 
   return (
     <div className="border-border bg-surface mt-3 rounded-lg border p-3.5">
@@ -99,6 +106,8 @@ export function ActionCard({ action, onConfirm, onReject }: ActionCardProps) {
           Annuler
         </Button>
       </div>
+
+      {executedDeploymentId !== null && <DeploymentResultCta deploymentId={executedDeploymentId} />}
     </div>
   )
 }

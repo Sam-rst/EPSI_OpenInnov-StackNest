@@ -47,6 +47,8 @@ export const routes: RouteObject[] = [
       { path: 'deployments/:id', element: requireAuth(<DeploymentDetailPage />) },
       { path: 'deployments/config', element: requireAuth(<ConfigPage />) },
       { path: 'chat', element: requireAuth(<ChatPage />) },
+      // Fil actif porté par l'URL : un fil sélectionné est partageable / rechargeable.
+      { path: 'chat/:id', element: requireAuth(<ChatPage />) },
       { path: 'team', element: requireAuth(<TeamPage />) },
       { path: 'settings', element: requireAuth(<SettingsPage />) },
     ],

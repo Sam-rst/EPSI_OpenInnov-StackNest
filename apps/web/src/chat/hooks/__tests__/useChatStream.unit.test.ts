@@ -523,6 +523,9 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
         expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.EXECUTED),
       )
       expect(result.current.lastDeploymentId).toBe('dep-1')
+      // Le déploiement créé est aussi rattaché à l'action elle-même : la carte peut
+      // afficher un CTA « Voir le déploiement → » sans dépendre de l'état global.
+      expect(result.current.messages[1]?.action?.deploymentId).toBe('dep-1')
     })
 
     it('marque l’action annulée localement et ne la redégrade pas sur action_result', async () => {

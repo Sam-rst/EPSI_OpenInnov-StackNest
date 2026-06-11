@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { Drawer } from '../../shared/components/Drawer'
 import { Icon } from '../../shared/components/ui'
@@ -60,8 +61,10 @@ function buildLiveStatus(state: ChatStreamState): string {
  */
 export function ChatPage() {
   const conversations = useConversations()
-  // Sélection explicite de l'utilisateur (undefined tant qu'il n'a rien choisi).
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+  const navigate = useNavigate()
+  // Fil actif porté par l'URL (`/chat/:id`) : un fil ouvert est partageable et
+  // rechargeable. `/chat` sans id ouvre le fil le plus récent (redirection ci-dessous).
+  const { id: routeId } = useParams<{ id: string }>()
   // Tiroir mobile ouvert : la sidebar (conversations) et l'aside (déploiements)
   // deviennent des tiroirs sous leur breakpoint inline (cf. rendu). null = fermé.
   const [openDrawer, setOpenDrawer] = useState<'conversations' | 'deployments' | null>(null)
@@ -69,9 +72,19 @@ export function ChatPage() {
   const { reject } = useRejectAction()
   const deployments = useDeployments()
 
-  // Fil effectif : la sélection explicite prime, sinon le premier fil chargé.
-  // Dérivé au rendu (pas d'effet/setState) — pattern « you might not need an effect ».
-  const activeId = selectedId ?? conversations.conversations[0]?.id
+  // Fil le plus récent (liste déjà triée par `useConversations`) : ouvert par
+  // défaut quand l'URL ne porte pas d'id.
+  const mostRecentId = conversations.conversations[0]?.id
+  // Fil effectif : l'id de l'URL prime ; sinon on retombe sur le plus récent.
+  const activeId = routeId ?? mostRecentId
+
+  // `/chat` sans id → on aligne l'URL sur le fil le plus récent (redirection douce,
+  // `replace` pour ne pas empiler une entrée d'historique parasite).
+  useEffect(() => {
+    if (routeId === undefined && mostRecentId !== undefined) {
+      navigate(`/chat/${mostRecentId}`, { replace: true })
+    }
+  }, [routeId, mostRecentId, navigate])
 
   const { seedMessages } = useConversation(activeId ?? '')
   const stream = useChatStream(activeId ?? '')
@@ -81,8 +94,15 @@ export function ChatPage() {
     [seedMessages, stream.messages],
   )
 
+  // Sélectionner un fil = naviguer vers son URL (le fil actif suit l'URL).
+  const handleSelect = (id: string): void => {
+    navigate(`/chat/${id}`)
+  }
+
   const handleCreate = (): void => {
-    void conversations.create(NEW_CONVERSATION_TITLE).then((created) => setSelectedId(created.id))
+    void conversations.create(NEW_CONVERSATION_TITLE).then((created) => {
+      navigate(`/chat/${created.id}`)
+    })
   }
 
   // Le renommage est saisi inline dans la sidebar (ConversationItem) : on reçoit
@@ -93,8 +113,9 @@ export function ChatPage() {
 
   const handleDelete = (id: string): void => {
     void conversations.remove(id).then(() => {
-      if (selectedId === id) {
-        setSelectedId(undefined)
+      // On quitte le fil supprimé : retour à `/chat`, qui rouvrira le plus récent.
+      if (activeId === id) {
+        navigate('/chat')
       }
     })
   }
@@ -132,7 +153,7 @@ export function ChatPage() {
       activeId={activeId}
       loading={conversations.loading}
       onSelect={(id) => {
-        setSelectedId(id)
+        handleSelect(id)
         closeDrawer()
       }}
       onCreate={() => {

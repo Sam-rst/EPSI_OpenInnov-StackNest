@@ -30,16 +30,21 @@ export function mapConversationDto(dto: ConversationDTO): Conversation {
 }
 
 /**
- * Mappe un message REST (`MessageDTO`) vers le modèle UI `Message`. L'API ne porte
- * jamais d'action sur le message : une proposition arrive par l'événement SSE
- * `action_proposed`, attaché au tour assistant côté réducteur (`useChatStream`).
+ * Mappe un message REST (`MessageDTO`) vers le modèle UI `Message`. Un message
+ * assistant peut porter une proposition encore `proposed` (`dto.action`) : on la
+ * reconstruit en `ActionProposal` via `mapActionProposed` (même logique que
+ * l'événement SSE `action_proposed`), pour rejouer la carte au rechargement du
+ * fil. Pendant un tour live, la proposition arrive plutôt par le flux SSE et est
+ * attachée par le réducteur de `useChatStream`.
  */
 export function mapMessageDto(dto: MessageDTO): Message {
+  const action = dto.action != null ? mapActionProposed(dto.action) : undefined
   return {
     id: dto.id,
     role: toMessageRole(dto.role),
     content: dto.content,
     createdAt: dto.created_at ?? new Date().toISOString(),
+    ...(action !== undefined && { action }),
   }
 }
 
