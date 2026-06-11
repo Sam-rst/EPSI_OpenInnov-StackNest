@@ -30,6 +30,16 @@ class TestTemplateParamValide:
         assert param.key == "db_name"
         assert param.type is ParamType.STRING
 
+    def test_env_var_optionnel_defaut_none(self) -> None:
+        param = _param()
+
+        assert param.env_var is None
+
+    def test_env_var_renseigne(self) -> None:
+        param = _param(env_var="POSTGRES_DB")
+
+        assert param.env_var == "POSTGRES_DB"
+
     def test_select_avec_options(self) -> None:
         param = _param(
             type=ParamType.SELECT,

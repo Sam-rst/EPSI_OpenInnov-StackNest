@@ -2,6 +2,7 @@
 
 from uuid import uuid4
 
+from app.catalog.domain.enums.param_type import ParamType
 from app.deployment.application.__tests__.fakes import (
     FakeDeploymentRepository,
     FakeTemplateProvisioningReader,
@@ -12,6 +13,7 @@ from app.deployment.application.__tests__.fakes import (
 from app.deployment.domain.enums.deployment_status import DeploymentStatus
 from app.deployment.domain.enums.job_kind import JobKind
 from app.deployment.domain.value_objects.deployment_job import DeploymentJob
+from app.deployment.domain.value_objects.template_param_spec import TemplateParamSpec
 from app.deployment.infrastructure.provisioner.provisioning_exception import (
     ProvisioningException,
 )
@@ -231,6 +233,51 @@ class TestProvision:
         await handler.handle(DeploymentJob(JobKind.PROVISION, uuid4()))
 
         assert publisher.events == []
+
+
+class TestProvisionInjectionParams:
+    async def test_env_du_conteneur_contient_la_config_saisie(self) -> None:
+        # Un deploiement postgres avec db_name="mabase" doit produire un conteneur
+        # dont l'env porte POSTGRES_DB=mabase (sinon la base nommee n'est pas creee).
+        template_id = uuid4()
+        deployment = make_deployment(
+            template_id=template_id,
+            status=DeploymentStatus.PENDING,
+            container_ref=None,
+            extra_params={"db_name": "mabase", "memory_mb": "256"},
+        )
+        repository = FakeDeploymentRepository([deployment])
+        provisioner = FakeProvisioner()
+        reader = FakeTemplateProvisioningReader(
+            {
+                (template_id, deployment.template_version): docker_descriptor(
+                    params=(
+                        TemplateParamSpec(
+                            key="db_name",
+                            type=ParamType.STRING,
+                            required=True,
+                            options=None,
+                            env_var="POSTGRES_DB",
+                        ),
+                    )
+                )
+            }
+        )
+        handler = _handler(
+            repository=repository,
+            provisioner=provisioner,
+            publisher=FakeEventPublisher(),
+            reader=reader,
+            secret_generator=StubSecretGenerator("s3cr3t"),
+        )
+
+        await handler.handle(DeploymentJob(JobKind.PROVISION, deployment.id))
+
+        spec = provisioner.created[0]
+        assert spec.env["POSTGRES_DB"] == "mabase"
+        assert spec.env["POSTGRES_PASSWORD"] == "s3cr3t"
+        # memory_mb pilote la limite memoire, pas une variable d'env.
+        assert spec.mem_limit == "256m"
 
 
 class TestStop:

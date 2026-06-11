@@ -96,4 +96,8 @@ class TestTemplateParamModel:
             "default_value",
             "options",
             "order_index",
+            "env_var",
         }
+
+    def test_env_var_nullable(self) -> None:
+        assert TemplateParamModel.__table__.columns["env_var"].nullable is True

@@ -116,6 +116,7 @@ def _template(
                 default_value="app",
                 options=None,
                 order_index=0,
+                env_var="POSTGRES_DB",
             ),
             TemplateParam(
                 id=uuid4(),
@@ -189,6 +190,19 @@ class TestAddAndGet:
         assert reloaded.image_repository is None
         assert reloaded.internal_port is None
         assert reloaded.secret_env is None
+
+    async def test_env_var_des_parametres_persiste(self, session: AsyncSession) -> None:
+        repository = SqlAlchemyTemplateRepository(session)
+
+        created = await repository.add(_template(slug="mysql"))
+        await session.commit()
+
+        reloaded = await repository.get_by_id(created.id)
+        assert reloaded is not None
+        by_key = {param.key: param for param in reloaded.params}
+        assert by_key["db_name"].env_var == "POSTGRES_DB"
+        # Un parametre sans mapping conserve env_var=None apres aller-retour BDD.
+        assert by_key["size"].env_var is None
 
 
 class TestEngine:

@@ -19,6 +19,9 @@ class TemplateParam:
     - `default_value` : valeur par defaut serialisee en texte (nullable).
     - `options`       : choix possibles d'un parametre `SELECT` (JSON, nullable).
     - `order_index`   : ordre d'affichage dans le formulaire (>= 0).
+    - `env_var`       : variable d'environnement du conteneur recevant la valeur du
+      parametre (ex. `POSTGRES_DB`), ou `None` si le parametre ne configure aucune
+      variable d'env (port, memoire, ou service sans variable upstream connue).
     """
 
     id: UUID
@@ -29,6 +32,7 @@ class TemplateParam:
     default_value: str | None
     options: dict[str, Any] | None
     order_index: int
+    env_var: str | None = None
 
     def __post_init__(self) -> None:
         if not self.key.strip():

@@ -13,6 +13,22 @@ class TestTemplateParamSpec:
         assert spec.required is True
         assert spec.options is None
 
+    def test_env_var_optionnel_defaut_none(self) -> None:
+        spec = TemplateParamSpec(key="db_name", type=ParamType.STRING, required=True, options=None)
+
+        assert spec.env_var is None
+
+    def test_env_var_renseigne(self) -> None:
+        spec = TemplateParamSpec(
+            key="db_name",
+            type=ParamType.STRING,
+            required=True,
+            options=None,
+            env_var="POSTGRES_DB",
+        )
+
+        assert spec.env_var == "POSTGRES_DB"
+
     def test_is_secret_vrai_pour_un_param_secret(self) -> None:
         spec = TemplateParamSpec(key="api_key", type=ParamType.SECRET, required=True, options=None)
 

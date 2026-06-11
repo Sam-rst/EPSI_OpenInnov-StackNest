@@ -26,7 +26,12 @@ class VersionSpec:
 
 @dataclass(frozen=True)
 class ParamSpec:
-    """Specification d'un parametre a creer/mettre a jour sur un template."""
+    """Specification d'un parametre a creer/mettre a jour sur un template.
+
+    `env_var` (optionnel) : variable d'environnement du conteneur recevant la
+    valeur du parametre (ex. `POSTGRES_DB`), ou `None` si le parametre ne
+    configure aucune variable d'env (port, memoire, service sans variable connue).
+    """
 
     key: str
     label: str
@@ -35,6 +40,7 @@ class ParamSpec:
     default_value: str | None
     options: dict[str, Any] | None
     order_index: int
+    env_var: str | None = None
 
 
 @dataclass(frozen=True)
