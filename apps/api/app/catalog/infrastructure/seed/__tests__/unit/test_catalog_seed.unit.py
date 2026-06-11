@@ -8,6 +8,7 @@ from app.catalog.infrastructure.seed.catalog_seed import CATALOG_SEED
 _BY_SLUG = {item.slug: item for item in CATALOG_SEED}
 
 _EXPECTED_SLUGS = {
+    # Socle historique (12)
     "postgresql-16",
     "redis-7",
     "minio",
@@ -20,12 +21,55 @@ _EXPECTED_SLUGS = {
     "ollama",
     "vpc",
     "s3",
+    # Bases & data
+    "mysql",
+    "mariadb",
+    "mongodb",
+    "couchdb",
+    "meilisearch",
+    "influxdb",
+    "neo4j",
+    "clickhouse",
+    # Cache & messaging
+    "memcached",
+    "rabbitmq",
+    "nats",
+    "mosquitto",
+    "kafka",
+    # Runtimes & web / proxy
+    "traefik",
+    "caddy",
+    "php",
+    "golang",
+    "adminer",
+    "gitea",
+    "n8n",
+    # Observabilite & securite
+    "grafana",
+    "prometheus",
+    "loki",
+    "jaeger",
+    "uptime-kuma",
+    "mailhog",
+    "keycloak",
+    # Infra / cloud — Terraform (bloques)
+    "kubernetes",
+    "managed-database",
+    "load-balancer",
+    "dns-zone",
+    "cdn",
+    "serverless-function",
 }
+
+_EXPECTED_COUNT = 45
 
 
 class TestSeedDataset:
-    def test_contient_douze_templates(self) -> None:
-        assert len(CATALOG_SEED) == 12
+    def test_contient_le_compte_attendu_de_templates(self) -> None:
+        assert len(CATALOG_SEED) == _EXPECTED_COUNT
+
+    def test_compte_coherent_avec_les_slugs_attendus(self) -> None:
+        assert len(CATALOG_SEED) == len(_EXPECTED_SLUGS)
 
     def test_slugs_attendus(self) -> None:
         assert {item.slug for item in CATALOG_SEED} == _EXPECTED_SLUGS
@@ -123,6 +167,70 @@ class TestSeedDescripteurProvisioning:
         assert item.internal_port is None
         assert item.secret_env is None
 
+    def test_mysql_pointe_image_mysql_avec_secret(self) -> None:
+        item = _BY_SLUG["mysql"]
+
+        assert item.image_repository == "mysql"
+        assert item.internal_port == 3306
+        assert item.secret_env == "MYSQL_ROOT_PASSWORD"
+
+    def test_mongodb_pointe_image_mongo_avec_secret(self) -> None:
+        item = _BY_SLUG["mongodb"]
+
+        assert item.image_repository == "mongo"
+        assert item.internal_port == 27017
+        assert item.secret_env == "MONGO_INITDB_ROOT_PASSWORD"
+
+    def test_meilisearch_image_avec_namespace_et_cle(self) -> None:
+        item = _BY_SLUG["meilisearch"]
+
+        assert item.image_repository == "getmeili/meilisearch"
+        assert item.internal_port == 7700
+        assert item.secret_env == "MEILI_MASTER_KEY"
+
+    def test_kafka_expose_port_sans_secret(self) -> None:
+        item = _BY_SLUG["kafka"]
+
+        assert item.image_repository == "apache/kafka"
+        assert item.internal_port == 9092
+        assert item.secret_env is None
+
+    def test_rabbitmq_image_avec_secret(self) -> None:
+        item = _BY_SLUG["rabbitmq"]
+
+        assert item.image_repository == "rabbitmq"
+        assert item.internal_port == 5672
+        assert item.secret_env == "RABBITMQ_DEFAULT_PASS"
+
+    def test_grafana_image_avec_namespace_et_secret(self) -> None:
+        item = _BY_SLUG["grafana"]
+
+        assert item.image_repository == "grafana/grafana"
+        assert item.internal_port == 3000
+        assert item.secret_env == "GF_SECURITY_ADMIN_PASSWORD"
+
+    def test_keycloak_image_quay_avec_secret(self) -> None:
+        item = _BY_SLUG["keycloak"]
+
+        assert item.image_repository == "quay.io/keycloak/keycloak"
+        assert item.internal_port == 8080
+        assert item.secret_env == "KEYCLOAK_ADMIN_PASSWORD"
+
+    def test_golang_sans_port_ni_secret(self) -> None:
+        item = _BY_SLUG["golang"]
+
+        assert item.image_repository == "golang"
+        assert item.internal_port is None
+        assert item.secret_env is None
+
+    def test_kubernetes_terraform_sans_image(self) -> None:
+        item = _BY_SLUG["kubernetes"]
+
+        assert item.image_repository is None
+        assert item.internal_port is None
+        assert item.secret_env is None
+        assert item.provider == "Terraform"
+
     def test_un_secret_implique_une_image(self) -> None:
         for item in CATALOG_SEED:
             if item.secret_env is not None:
@@ -134,7 +242,18 @@ class TestSeedDescripteurProvisioning:
                 assert item.image_repository is not None, item.slug
 
 
-_EXPECTED_TERRAFORM_SLUGS = {"ubuntu-24-04", "elk", "vpc", "s3"}
+_EXPECTED_TERRAFORM_SLUGS = {
+    "ubuntu-24-04",
+    "elk",
+    "vpc",
+    "s3",
+    "kubernetes",
+    "managed-database",
+    "load-balancer",
+    "dns-zone",
+    "cdn",
+    "serverless-function",
+}
 
 
 class TestSeedEngine:

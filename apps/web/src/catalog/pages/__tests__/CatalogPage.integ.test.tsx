@@ -17,6 +17,7 @@ const cards: TemplateCardDTO[] = [
     icon: 'database',
     category: 'database',
     provider: 'Docker',
+    engine: 'docker',
     tags: ['SQL'],
     description: 'Base relationnelle managée.',
     popular: true,
@@ -28,9 +29,22 @@ const cards: TemplateCardDTO[] = [
     icon: 'server',
     category: 'cache',
     provider: 'Docker',
+    engine: 'docker',
     tags: ['Cache'],
     description: 'Store clé-valeur ultra-rapide.',
     popular: true,
+  },
+  {
+    id: 'k8s',
+    slug: 'kubernetes',
+    name: 'Cluster Kubernetes',
+    icon: 'boxes',
+    category: 'vm',
+    provider: 'Terraform',
+    engine: 'terraform',
+    tags: ['K8s'],
+    description: 'Cluster Kubernetes managé.',
+    popular: false,
   },
 ]
 
@@ -98,5 +112,18 @@ describe('CatalogPage (branchée API)', () => {
     await userEvent.click(card)
 
     expect(screen.getByTestId('pathname')).toHaveTextContent('/catalog/pg16')
+  })
+
+  it('affiche la carte Terraform bloquée et ne navigue pas à son clic', async () => {
+    server.use(http.get('*/catalog/templates', () => HttpResponse.json(cards)))
+
+    renderPage()
+    await screen.findByText('Cluster Kubernetes')
+
+    expect(screen.getByText('Bientôt disponible')).toBeInTheDocument()
+    await userEvent.click(screen.getByText('Cluster Kubernetes'))
+
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/catalog')
+    expect(screen.getByTestId('pathname')).not.toHaveTextContent('/catalog/k8s')
   })
 })

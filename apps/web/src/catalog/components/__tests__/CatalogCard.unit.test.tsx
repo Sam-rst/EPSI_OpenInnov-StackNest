@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { CatalogItem } from '../../domain/models/CatalogItem'
+import { EngineKind } from '../../types/enums/EngineKind'
 import { CatalogCard } from '../CatalogCard'
 
 const ITEM: CatalogItem = {
@@ -11,9 +12,22 @@ const ITEM: CatalogItem = {
   icon: 'database',
   category: 'Database',
   provider: 'Docker',
+  engine: EngineKind.DOCKER,
   tags: ['SQL', 'Persistant'],
   description: 'Base relationnelle managée.',
   popular: true,
+}
+
+const TERRAFORM_ITEM: CatalogItem = {
+  id: 'k8s',
+  name: 'Cluster Kubernetes',
+  icon: 'boxes',
+  category: 'Machine virtuelle',
+  provider: 'Terraform',
+  engine: EngineKind.TERRAFORM,
+  tags: ['K8s', 'Cluster'],
+  description: 'Cluster Kubernetes managé.',
+  popular: false,
 }
 
 describe('CatalogCard', () => {
@@ -89,5 +103,66 @@ describe('CatalogCard — responsivité (anti-débordement)', () => {
     render(<CatalogCard item={ITEM} onSelect={vi.fn()} />)
 
     expect(screen.getByText('Populaire')).toHaveClass('shrink-0')
+  })
+})
+
+describe('CatalogCard — moteur Docker (carte active)', () => {
+  it('rend un bouton activé et cliquable', () => {
+    render(<CatalogCard item={ITEM} onSelect={vi.fn()} />)
+
+    const button = screen.getByRole('button')
+    expect(button).not.toBeDisabled()
+    expect(button).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('affiche le CTA « Configurer » et pas de bandeau de blocage', () => {
+    render(<CatalogCard item={ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByText('Configurer →')).toBeInTheDocument()
+    expect(screen.queryByText('Bientôt disponible')).not.toBeInTheDocument()
+  })
+})
+
+describe('CatalogCard — moteur Terraform (carte bloquée)', () => {
+  it('affiche le bandeau « Bientôt disponible »', () => {
+    render(<CatalogCard item={TERRAFORM_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByText('Bientôt disponible')).toBeInTheDocument()
+  })
+
+  it('marque la carte comme désactivée (aria-disabled)', () => {
+    render(<CatalogCard item={TERRAFORM_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it("n'appelle pas onSelect au clic", async () => {
+    const onSelect = vi.fn()
+    render(<CatalogCard item={TERRAFORM_ITEM} onSelect={onSelect} />)
+
+    await userEvent.click(screen.getByRole('button'))
+
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('expose un tooltip explicatif au survol', () => {
+    render(<CatalogCard item={TERRAFORM_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByRole('button')).toHaveAttribute(
+      'title',
+      'Déploiements Terraform bientôt disponibles',
+    )
+  })
+
+  it('grise visuellement la carte', () => {
+    render(<CatalogCard item={TERRAFORM_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByRole('button').className).toMatch(/opacity-/)
+  })
+
+  it("masque le CTA « Configurer » d'une carte active", () => {
+    render(<CatalogCard item={TERRAFORM_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.queryByText('Configurer →')).not.toBeInTheDocument()
   })
 })

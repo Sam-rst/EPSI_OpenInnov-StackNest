@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { CatalogItem } from '../../domain/models/CatalogItem'
+import { EngineKind } from '../../types/enums/EngineKind'
 import { useCatalogFilters } from '../useCatalogFilters'
 
 const ITEMS: readonly CatalogItem[] = [
@@ -11,6 +12,7 @@ const ITEMS: readonly CatalogItem[] = [
     icon: 'database',
     category: 'Database',
     provider: 'Docker',
+    engine: EngineKind.DOCKER,
     tags: ['SQL'],
     description: 'Base relationnelle managée.',
   },
@@ -20,6 +22,7 @@ const ITEMS: readonly CatalogItem[] = [
     icon: 'server',
     category: 'Cache',
     provider: 'Docker',
+    engine: EngineKind.DOCKER,
     tags: ['Cache'],
     description: 'Store clé-valeur en mémoire.',
   },
@@ -29,6 +32,7 @@ const ITEMS: readonly CatalogItem[] = [
     icon: 'monitor',
     category: 'Compute',
     provider: 'Terraform',
+    engine: EngineKind.TERRAFORM,
     tags: ['VM'],
     description: 'Machine virtuelle Linux.',
   },

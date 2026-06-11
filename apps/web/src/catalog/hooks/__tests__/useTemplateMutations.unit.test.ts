@@ -19,7 +19,13 @@ const payload: TemplateWriteDTO = {
   popular: true,
 }
 
-const detail: TemplateDetailDTO = { ...payload, id: 'pg16', versions: [], params: [] }
+const detail: TemplateDetailDTO = {
+  ...payload,
+  id: 'pg16',
+  engine: 'docker',
+  versions: [],
+  params: [],
+}
 
 describe('useTemplateMutations', () => {
   it('crée un template via la mutation create', async () => {
