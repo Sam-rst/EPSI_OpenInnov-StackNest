@@ -24,6 +24,7 @@ def _param(
     required: bool = False,
     options: dict[str, object] | None = None,
     env_var: str | None = None,
+    default_value: str | None = None,
 ) -> TemplateParam:
     return TemplateParam(
         id=uuid4(),
@@ -31,7 +32,7 @@ def _param(
         label=key.upper(),
         type=type,
         required=required,
-        default_value=None,
+        default_value=default_value,
         options=options,
         order_index=0,
         env_var=env_var,
@@ -128,6 +129,21 @@ class TestCatalogTemplateProvisioningReader:
         by_key = {spec.key: spec for spec in descriptor.params}
         assert by_key["db_name"].env_var == "POSTGRES_DB"
         assert by_key["port"].env_var is None
+
+    async def test_projette_la_valeur_par_defaut_des_parametres(self) -> None:
+        params = [
+            _param("username", required=True, default_value="root"),
+            _param("db_name", required=True),  # sans valeur par defaut
+        ]
+        template = _docker_template(versions=["16"], params=params)
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "16")
+
+        assert descriptor is not None
+        by_key = {spec.key: spec for spec in descriptor.params}
+        assert by_key["username"].default_value == "root"
+        assert by_key["db_name"].default_value is None
 
     async def test_descripteur_sans_parametre(self) -> None:
         template = _docker_template(versions=["16"])

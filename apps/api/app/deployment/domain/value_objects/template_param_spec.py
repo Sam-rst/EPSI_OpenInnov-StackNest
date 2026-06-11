@@ -28,6 +28,9 @@ class TemplateParamSpec:
     - `env_var`  : variable d'environnement du conteneur recevant la valeur du
       parametre (ex. `POSTGRES_DB`), ou `None` si le parametre ne configure aucune
       variable d'env. Consommee par le worker pour injecter la config saisie.
+    - `default_value` : valeur par defaut du parametre (texte), appliquee a la
+      creation quand un param requis non-secret est omis (cf. `CreateDeployment`),
+      ou `None` si le template n'en declare aucune.
     """
 
     key: str
@@ -35,6 +38,7 @@ class TemplateParamSpec:
     required: bool
     options: dict[str, Any] | None
     env_var: str | None = None
+    default_value: str | None = None
 
     def is_secret(self) -> bool:
         """Vrai si le parametre porte une valeur sensible (jamais reaffichee)."""

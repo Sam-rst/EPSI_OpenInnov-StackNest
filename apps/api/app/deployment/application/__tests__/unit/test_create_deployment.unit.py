@@ -188,3 +188,101 @@ class TestCreateDeploymentValidation:
             await use_case.execute(_command(template_id=template_id, name="Ma Base!"))
 
         assert repository.added == []
+
+
+class TestCreateDeploymentDefaults:
+    """Remplissage des valeurs par defaut des params requis non-secret (#85)."""
+
+    async def test_param_requis_absent_avec_defaut_est_rempli_et_persiste(self) -> None:
+        # Le chat (ou tout client) qui omet un param requis non-secret muni d'un
+        # `default_value` ne doit PAS recevoir 422 : le defaut est applique et
+        # atterrit dans les params persistes (donc dans l'env via l'injection #85).
+        template_id = uuid4()
+        repository = FakeDeploymentRepository()
+        queue = FakeJobQueue()
+        specs = (
+            TemplateParamSpec(
+                key="username",
+                type=ParamType.STRING,
+                required=True,
+                options=None,
+                default_value="root",
+            ),
+        )
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, "16"): docker_descriptor(params=specs)}
+        )
+        use_case = _build(repository=repository, queue=queue, reader=reader)
+
+        result = await use_case.execute(_command(template_id=template_id, params={}))
+
+        assert result.status is DeploymentStatus.PENDING
+        assert result.params["username"] == "root"
+        assert repository.added[0].params["username"] == "root"
+
+    async def test_la_valeur_fournie_ecrase_le_defaut(self) -> None:
+        template_id = uuid4()
+        repository = FakeDeploymentRepository()
+        queue = FakeJobQueue()
+        specs = (
+            TemplateParamSpec(
+                key="username",
+                type=ParamType.STRING,
+                required=True,
+                options=None,
+                default_value="root",
+            ),
+        )
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, "16"): docker_descriptor(params=specs)}
+        )
+        use_case = _build(repository=repository, queue=queue, reader=reader)
+
+        result = await use_case.execute(
+            _command(template_id=template_id, params={"username": "admin"})
+        )
+
+        assert result.params["username"] == "admin"
+
+    async def test_param_requis_sans_defaut_absent_leve_toujours_422(self) -> None:
+        template_id = uuid4()
+        repository = FakeDeploymentRepository()
+        queue = FakeJobQueue()
+        specs = (
+            TemplateParamSpec(key="db_name", type=ParamType.STRING, required=True, options=None),
+        )
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, "16"): docker_descriptor(params=specs)}
+        )
+        use_case = _build(repository=repository, queue=queue, reader=reader)
+
+        with pytest.raises(InvalidDeploymentParamsException):
+            await use_case.execute(_command(template_id=template_id, params={}))
+
+        assert repository.added == []
+        assert queue.enqueued == []
+
+    async def test_param_secret_absent_n_est_pas_rempli(self) -> None:
+        # Un secret muni d'un `default_value` ne doit jamais etre pre-rempli en
+        # clair : il est genere worker-side. Son absence reste acceptee.
+        template_id = uuid4()
+        repository = FakeDeploymentRepository()
+        queue = FakeJobQueue()
+        specs = (
+            TemplateParamSpec(
+                key="api_key",
+                type=ParamType.SECRET,
+                required=True,
+                options=None,
+                default_value="should-not-leak",
+            ),
+        )
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, "16"): docker_descriptor(params=specs)}
+        )
+        use_case = _build(repository=repository, queue=queue, reader=reader)
+
+        result = await use_case.execute(_command(template_id=template_id, params={}))
+
+        assert result.status is DeploymentStatus.PENDING
+        assert "api_key" not in result.params
