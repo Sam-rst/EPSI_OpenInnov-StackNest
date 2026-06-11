@@ -1,4 +1,4 @@
-import { Button } from '../../../shared/components/ui'
+import { Button } from './ui'
 
 interface ConfirmDialogProps {
   title: string
@@ -8,7 +8,11 @@ interface ConfirmDialogProps {
   onCancel: () => void
 }
 
-/** Modale de confirmation (actions destructrices, ex. détruire un déploiement). */
+/**
+ * Modale de confirmation réutilisable pour les actions destructrices (ex. détruire
+ * un déploiement, supprimer une conversation). Partagée par ≥ 2 features, donc
+ * placée dans `shared/`. Overlay accessible (`role="dialog"`, `aria-modal`).
+ */
 export function ConfirmDialog({
   title,
   description,

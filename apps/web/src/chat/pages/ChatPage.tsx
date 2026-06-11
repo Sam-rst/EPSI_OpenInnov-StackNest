@@ -80,11 +80,10 @@ export function ChatPage() {
     void conversations.create(NEW_CONVERSATION_TITLE).then((created) => setSelectedId(created.id))
   }
 
-  const handleRename = (id: string, currentTitle: string): void => {
-    const next = globalThis.prompt('Renommer la conversation', currentTitle)
-    if (next && next.trim().length > 0) {
-      void conversations.rename(id, next.trim())
-    }
+  // Le renommage est saisi inline dans la sidebar (ConversationItem) : on reçoit
+  // directement le nouveau libellé (déjà trimmé, non vide) — plus de prompt navigateur.
+  const handleRename = (id: string, newTitle: string): void => {
+    void conversations.rename(id, newTitle)
   }
 
   const handleDelete = (id: string): void => {

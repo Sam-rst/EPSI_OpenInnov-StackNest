@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
 import { Button } from '../../../shared/components/ui'
+import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { Card } from '../common/Card'
-import { ConfirmDialog } from './ConfirmDialog'
 import { availableActions } from './lifecycleAvailability'
 import { useDeploymentActions } from '../../hooks/useDeploymentActions'
 import type { DeploymentStatus } from '../../types/enums/DeploymentStatus'
