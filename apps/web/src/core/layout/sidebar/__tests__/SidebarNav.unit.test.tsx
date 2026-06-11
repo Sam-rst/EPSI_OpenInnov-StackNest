@@ -20,10 +20,10 @@ describe('SidebarNav', () => {
     expect(screen.getByText('Administration')).toBeInTheDocument()
   })
 
-  it('liste les 6 entrées de navigation', () => {
+  it('liste les 7 entrées de navigation', () => {
     renderNav()
 
-    expect(screen.getAllByRole('link')).toHaveLength(6)
+    expect(screen.getAllByRole('link')).toHaveLength(7)
   })
 
   it('marque la route courante comme active (aria-current)', () => {

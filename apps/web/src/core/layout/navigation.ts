@@ -25,6 +25,7 @@ export interface TopBarTitle {
 export const SIDEBAR_NAV: readonly NavItem[] = [
   { id: 'catalog', label: 'Catalogue', icon: 'layout-grid', group: 'main', to: '/catalog' },
   { id: 'deployments', label: 'Déploiements', icon: 'activity', group: 'main', to: '/deployments' },
+  { id: 'stacks', label: 'Stacks', icon: 'layers', group: 'main', to: '/stacks' },
   {
     id: 'chat',
     label: 'ChatOps IA',
@@ -42,6 +43,11 @@ export const TOPBAR_TITLES: Record<string, TopBarTitle> = {
   '/catalog': { title: 'Catalogue', subtitle: 'Choisis une ressource à provisionner' },
   '/deployments/config': { title: 'Configurer', subtitle: 'Paramètres et aperçu Terraform live' },
   '/deployments': { title: 'Déploiements', subtitle: 'Suivi temps réel des opérations' },
+  '/stacks/new': {
+    title: 'Composer une stack',
+    subtitle: 'Services, liens et déploiement Compose',
+  },
+  '/stacks': { title: 'Stacks', subtitle: 'Projets multi-services Docker Compose' },
   '/chat': { title: 'ChatOps IA', subtitle: "Décris ton besoin, on s'occupe du reste" },
   '/dashboard': { title: 'Dashboard', subtitle: 'Ressources actives, coûts, KPI' },
   '/team': { title: 'Équipe', subtitle: 'Membres, rôles et permissions (RBAC)' },
