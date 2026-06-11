@@ -64,6 +64,33 @@ describe('chatService (API REST /chat)', () => {
     expect(messages[0]?.content).toBe('Bonjour')
   })
 
+  it('rattache la proposition encore proposed au message d’amorce (rechargement)', async () => {
+    const detail: ConversationDetailDTO = {
+      conversation: conversationDto(),
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          content: 'Déployer PostgreSQL (version 16) sous le nom « db ».',
+          created_at: '2026-06-08T10:01:00Z',
+          action: {
+            action_id: 'act-1',
+            kind: 'deploy',
+            restatement: 'Déployer PostgreSQL (version 16) sous le nom « db ».',
+            recap: { template: 'PostgreSQL', version: '16', name: 'db' },
+          },
+        },
+      ],
+    }
+    server.use(http.get('*/chat/conversations/c1', () => HttpResponse.json(detail)))
+
+    const messages = await getConversationMessages('c1')
+
+    expect(messages[0]?.action).toBeDefined()
+    expect(messages[0]?.action?.id).toBe('act-1')
+    expect(messages[0]?.action?.intent).toBe('Déployer PostgreSQL (version 16) sous le nom « db ».')
+  })
+
   it('propage une erreur 404 pour un fil introuvable', async () => {
     server.use(
       http.get('*/chat/conversations/inconnu', () => new HttpResponse(null, { status: 404 })),

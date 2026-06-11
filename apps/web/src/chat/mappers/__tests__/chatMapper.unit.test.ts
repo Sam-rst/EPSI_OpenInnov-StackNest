@@ -90,6 +90,45 @@ describe('chatMapper', () => {
       expect(message.role).toBe(MessageRole.ASSISTANT)
       expect(message.createdAt).toBeTruthy()
     })
+
+    it('reconstruit la proposition rattachée au message d’amorce (rechargement)', () => {
+      const message = mapMessageDto({
+        id: 'm3',
+        role: 'assistant',
+        content: 'Déployer PostgreSQL (version 16) sous le nom « db ».',
+        created_at: '2026-06-08T11:30:00Z',
+        action: {
+          action_id: 'a1',
+          kind: 'deploy',
+          restatement: 'Déployer PostgreSQL (version 16) sous le nom « db ».',
+          recap: { template: 'PostgreSQL', version: '16', name: 'db', params: { db_name: 'app' } },
+        },
+      })
+
+      expect(message.action).toBeDefined()
+      expect(message.action?.id).toBe('a1')
+      expect(message.action?.kind).toBe(ActionKind.DEPLOY)
+      expect(message.action?.status).toBe(ActionStatus.PROPOSED)
+      expect(message.action?.intent).toBe('Déployer PostgreSQL (version 16) sous le nom « db ».')
+      expect(message.action?.version).toBe('16')
+      expect(message.action?.params).toEqual([
+        { label: 'template', value: 'PostgreSQL' },
+        { label: 'version', value: '16' },
+        { label: 'name', value: 'db' },
+        { label: 'db_name', value: 'app' },
+      ])
+    })
+
+    it('n’attache aucune action quand le DTO n’en porte pas', () => {
+      const message = mapMessageDto({
+        id: 'm4',
+        role: 'assistant',
+        content: 'Quel nom veux-tu ?',
+        created_at: null,
+      })
+
+      expect(message.action).toBeUndefined()
+    })
   })
 
   describe('mapStreamEvent', () => {

@@ -39,8 +39,10 @@ from app.chat.application.__tests__.fakes import (
 )
 from app.chat.domain.entities.chat_action import ChatAction
 from app.chat.domain.entities.conversation import Conversation
+from app.chat.domain.entities.message import Message
 from app.chat.domain.enums.action_kind import ActionKind
 from app.chat.domain.enums.action_status import ActionStatus
+from app.chat.domain.enums.message_role import MessageRole
 from app.chat.domain.interfaces.chat_event_subscriber import ChatEventSubscriber
 from app.chat.domain.value_objects.chat_event import ChatEvent
 from app.chat.domain.value_objects.tool_call import ToolCall
@@ -205,6 +207,87 @@ class TestConversationCrud:
         response = await http.get(f"/chat/conversations/{fil.id}", headers=_auth(user))
 
         assert response.status_code == 404
+
+    async def test_detail_rejoue_la_proposition_proposed(self, context: dict[str, object]) -> None:
+        # Au rechargement, le message assistant porteur d'une action `proposed`
+        # ressort avec son recap PUBLIC rattache (carte rejouable cote front).
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        conversations: FakeConversationRepository = context["conversations"]  # type: ignore[assignment]
+        actions: FakeChatActionRepository = context["actions"]  # type: ignore[assignment]
+        template: Template = context["template"]  # type: ignore[assignment]
+        fil = Conversation(id=uuid4(), owner_id=user.id, title="fil")
+        await conversations.add(fil)
+        assistant = Message(
+            id=uuid4(),
+            conversation_id=fil.id,
+            role=MessageRole.ASSISTANT,
+            content="Déployer PostgreSQL (version 16) sous le nom « db ».",
+        )
+        await conversations.add_message(assistant)
+        await actions.add(
+            ChatAction(
+                id=uuid4(),
+                conversation_id=fil.id,
+                message_id=assistant.id,
+                kind=ActionKind.DEPLOY,
+                status=ActionStatus.PROPOSED,
+                args={
+                    "template_id": str(template.id),
+                    "version": "16",
+                    "name": "db",
+                    "params": {},
+                },
+            )
+        )
+
+        response = await http.get(f"/chat/conversations/{fil.id}", headers=_auth(user))
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        message = body["messages"][0]
+        assert message["action"] is not None
+        assert message["action"]["kind"] == "deploy"
+        assert message["action"]["restatement"] == assistant.content
+        assert message["action"]["recap"]["template"] == template.name
+        # Le recap public ne porte pas l'id technique du template.
+        assert str(template.id) not in str(message["action"]["recap"])
+
+    async def test_detail_n_attache_pas_d_action_terminee(self, context: dict[str, object]) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        conversations: FakeConversationRepository = context["conversations"]  # type: ignore[assignment]
+        actions: FakeChatActionRepository = context["actions"]  # type: ignore[assignment]
+        template: Template = context["template"]  # type: ignore[assignment]
+        fil = Conversation(id=uuid4(), owner_id=user.id, title="fil")
+        await conversations.add(fil)
+        assistant = Message(
+            id=uuid4(),
+            conversation_id=fil.id,
+            role=MessageRole.ASSISTANT,
+            content="Déjà exécutée.",
+        )
+        await conversations.add_message(assistant)
+        await actions.add(
+            ChatAction(
+                id=uuid4(),
+                conversation_id=fil.id,
+                message_id=assistant.id,
+                kind=ActionKind.DEPLOY,
+                status=ActionStatus.EXECUTED,
+                args={
+                    "template_id": str(template.id),
+                    "version": "16",
+                    "name": "db",
+                    "params": {},
+                },
+            )
+        )
+
+        response = await http.get(f"/chat/conversations/{fil.id}", headers=_auth(user))
+
+        assert response.status_code == 200
+        assert response.json()["messages"][0]["action"] is None
 
 
 class TestSendMessage:

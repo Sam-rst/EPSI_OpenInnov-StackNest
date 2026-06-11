@@ -17,11 +17,14 @@ from app.catalog.domain.value_objects.slug import Slug
 from app.chat.domain.entities.chat_action import ChatAction
 from app.chat.domain.entities.conversation import Conversation
 from app.chat.domain.entities.message import Message
+from app.chat.domain.enums.action_status import ActionStatus
 from app.chat.domain.interfaces.catalog_reader import CatalogReader
 from app.chat.domain.interfaces.chat_action_repository import ChatActionRepository
 from app.chat.domain.interfaces.chat_event_publisher import ChatEventPublisher
 from app.chat.domain.interfaces.conversation_repository import ConversationRepository
 from app.chat.domain.interfaces.deployment_actions import DeploymentActions
+from app.chat.domain.interfaces.proposed_action_reader import ProposedActionReader
+from app.chat.domain.value_objects.proposed_action import ProposedAction
 
 
 def make_template(
@@ -148,10 +151,27 @@ class FakeChatActionRepository(ChatActionRepository):
     async def get_by_id(self, action_id: UUID) -> ChatAction | None:
         return self._by_id.get(action_id)
 
+    async def list_proposed_by_conversation(self, conversation_id: UUID) -> list[ChatAction]:
+        return [
+            action
+            for action in self._by_id.values()
+            if action.conversation_id == conversation_id and action.status is ActionStatus.PROPOSED
+        ]
+
     async def update(self, action: ChatAction) -> ChatAction:
         self._by_id[action.id] = action
         self.updated.append(action)
         return action
+
+
+class FakeProposedActionReader(ProposedActionReader):
+    """Lecteur de propositions rejouables en memoire pour les tests des use cases."""
+
+    def __init__(self, proposals: list[ProposedAction] | None = None) -> None:
+        self._proposals = list(proposals or [])
+
+    async def list_proposed(self, conversation_id: UUID) -> list[ProposedAction]:
+        return list(self._proposals)
 
 
 class FakeChatEventPublisher(ChatEventPublisher):

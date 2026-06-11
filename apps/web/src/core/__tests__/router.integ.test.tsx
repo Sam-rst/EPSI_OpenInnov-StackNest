@@ -26,6 +26,19 @@ vi.mock('@microsoft/fetch-event-source', () => ({
 // stubbe les contrats pour que les routes rendent sans erreur réseau.
 beforeEach(() => {
   server.use(
+    // Le chat charge la liste des fils ; un fil ciblé par l'URL charge son détail.
+    http.get('*/chat/conversations', () => HttpResponse.json([])),
+    http.get('*/chat/conversations/:id', ({ params }) =>
+      HttpResponse.json({
+        conversation: {
+          id: params.id,
+          title: 'Fil de test',
+          created_at: null,
+          updated_at: null,
+        },
+        messages: [],
+      }),
+    ),
     http.get('*/catalog/templates', () => HttpResponse.json([])),
     http.get('*/catalog/templates/:id', () =>
       HttpResponse.json({
@@ -154,6 +167,19 @@ describe('Router — routes placeholder publiques (socle gelé)', () => {
       expect(screen.queryByRole('heading', { name: /connexion/i })).not.toBeInTheDocument()
     },
   )
+})
+
+describe('Router — fil de chat porté par l’URL (/chat/:id)', () => {
+  it('monte ChatPage sur /chat/:id quand authentifié', () => {
+    renderAt('/chat/c1', true)
+    expectPageHeadingInMain(/chat/i)
+    expect(screen.queryByRole('heading', { name: /connexion/i })).not.toBeInTheDocument()
+  })
+
+  it('redirige /chat/:id vers /login quand non authentifié', () => {
+    renderAt('/chat/c1', false)
+    expectLoginRendered()
+  })
 })
 
 describe('Router — détail déploiement protégé avec paramètre (/deployments/:id)', () => {

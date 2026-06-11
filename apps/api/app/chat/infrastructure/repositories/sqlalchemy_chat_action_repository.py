@@ -2,9 +2,11 @@
 
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.domain.entities.chat_action import ChatAction
+from app.chat.domain.enums.action_status import ActionStatus
 from app.chat.domain.interfaces.chat_action_repository import ChatActionRepository
 from app.chat.infrastructure.mappers.chat_action_mapper import ChatActionMapper
 from app.chat.infrastructure.models.chat_action_model import ChatActionModel
@@ -33,6 +35,15 @@ class SqlAlchemyChatActionRepository(ChatActionRepository):
         if model is None:
             return None
         return ChatActionMapper.to_entity(model)
+
+    async def list_proposed_by_conversation(self, conversation_id: UUID) -> list[ChatAction]:
+        result = await self._session.execute(
+            select(ChatActionModel)
+            .where(ChatActionModel.conversation_id == conversation_id)
+            .where(ChatActionModel.status == ActionStatus.PROPOSED)
+            .order_by(ChatActionModel.created_at)
+        )
+        return [ChatActionMapper.to_entity(model) for model in result.scalars().all()]
 
     async def update(self, action: ChatAction) -> ChatAction:
         model = await self._session.get(ChatActionModel, action.id)

@@ -2,7 +2,7 @@ import type { EventSourceMessage, FetchEventSourceInit } from '@microsoft/fetch-
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { server } from '../../../../tests/mocks/server'
@@ -69,15 +69,35 @@ function deployProposal(): Record<string, unknown> {
   }
 }
 
-function renderChat() {
+/** Sonde la localisation courante : le test lit le pathname affiché. */
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="location">{location.pathname}</div>
+}
+
+/**
+ * Monte ChatPage derrière les vraies routes `/chat` et `/chat/:id` afin que
+ * `useParams()` et `navigate()` se comportent comme en production (fil actif porté
+ * par l'URL). Une sonde de localisation permet d'asserter les redirections.
+ */
+function renderChatAt(path = '/chat') {
   const Wrapper = createQueryWrapper()
   return render(
     <Wrapper>
-      <MemoryRouter initialEntries={['/chat']}>
-        <ChatPage />
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/chat/:id" element={<ChatPage />} />
+          <Route path="/deployments/:id" element={<div>Page déploiement</div>} />
+        </Routes>
+        <LocationProbe />
       </MemoryRouter>
     </Wrapper>,
   )
+}
+
+function renderChat() {
+  return renderChatAt('/chat')
 }
 
 describe('ChatPage (parcours chat IA → API REST + SSE)', () => {
@@ -203,6 +223,15 @@ describe('ChatPage (parcours chat IA → API REST + SSE)', () => {
     await waitFor(() => {
       expect(screen.getByText('Exécutée')).toBeInTheDocument()
     })
+
+    // Item #7 : un CTA visible « Voir le déploiement → » mène au suivi du
+    // déploiement créé (pas de redirection automatique).
+    const cta = await screen.findByRole('button', { name: /Voir le déploiement/ })
+    await user.click(cta)
+    await waitFor(() => {
+      expect(screen.getByText('Page déploiement')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('location')).toHaveTextContent('/deployments/dep-1')
   })
 
   it('annonce courtoisement la réflexion (aria-live) et verrouille le composer — F1/A5', async () => {
@@ -222,6 +251,83 @@ describe('ChatPage (parcours chat IA → API REST + SSE)', () => {
     })
     // A5 : la saisie est verrouillée tant que la génération est en cours.
     expect(textarea).toBeDisabled()
+  })
+
+  it('rejoue la carte de proposition au rechargement (action proposed sur le seed)', async () => {
+    // Le détail renvoie un message assistant porteur d'une proposition encore
+    // `proposed` : la carte (Confirmer/Modifier/Annuler) doit réapparaître sans
+    // qu'aucun événement SSE `action_proposed` ne soit émis.
+    server.use(
+      http.get('*/chat/conversations/c1', () =>
+        HttpResponse.json({
+          conversation: DETAIL.conversation,
+          messages: [
+            {
+              id: 'm-act',
+              role: 'assistant',
+              content: 'Voici ce que je te propose :',
+              created_at: '2026-06-08T11:00:00Z',
+              action: {
+                action_id: 'act-1',
+                kind: 'deploy',
+                restatement: 'Déployer un PostgreSQL 16 isolé',
+                recap: { template: 'PostgreSQL', version: '16', name: 'db', params: {} },
+              },
+            },
+          ],
+        }),
+      ),
+    )
+    renderChat()
+
+    expect(await screen.findByText(/Déployer un PostgreSQL 16 isolé/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Confirmer/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /Annuler/ })).toBeInTheDocument()
+  })
+
+  it('ouvre le fil porté par l’URL /chat/:id (fil actif = paramètre)', async () => {
+    renderChatAt('/chat/c1')
+
+    // Le détail du fil c1 est chargé directement à partir de l'id de l'URL.
+    expect(await screen.findByText(/Décris-moi ton besoin/)).toBeInTheDocument()
+    await waitFor(() => {
+      const [url] = fetchEventSourceMock.mock.calls[0] as [string]
+      expect(url).toContain('/chat/conversations/c1/stream')
+    })
+  })
+
+  it('redirige /chat (sans id) vers le fil le plus récent', async () => {
+    renderChatAt('/chat')
+
+    // Le fil le plus récent (c1) est ouvert : l'URL bascule vers /chat/c1.
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('/chat/c1')
+    })
+    expect(await screen.findByText(/Décris-moi ton besoin/)).toBeInTheDocument()
+  })
+
+  it('sélectionner un fil navigue vers /chat/{id}', async () => {
+    const user = userEvent.setup()
+    const second = {
+      id: 'c2',
+      title: 'Redis isolé',
+      created_at: '2026-06-07T09:00:00Z',
+      updated_at: '2026-06-07T09:30:00Z',
+    }
+    server.use(
+      http.get('*/chat/conversations', () => HttpResponse.json([DETAIL.conversation, second])),
+      http.get('*/chat/conversations/c2', () =>
+        HttpResponse.json({ conversation: second, messages: [] }),
+      ),
+    )
+    renderChatAt('/chat/c1')
+    await screen.findByText(/Décris-moi ton besoin/)
+
+    await user.click(await screen.findByText('Redis isolé'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('/chat/c2')
+    })
   })
 
   it('crée une nouvelle conversation', async () => {
