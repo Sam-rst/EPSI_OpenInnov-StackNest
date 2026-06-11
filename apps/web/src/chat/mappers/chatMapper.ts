@@ -3,6 +3,7 @@ import type {
   ActionResultEventDTO,
   ErrorEventDTO,
   MessageEventDTO,
+  TitleEventDTO,
   TokenEventDTO,
 } from '../types/dto/ChatStreamEventDTO'
 import type { ConversationDTO } from '../types/dto/ConversationDTO'
@@ -148,6 +149,10 @@ export function mapStreamEvent(eventName: string, data: string): ChatStreamEvent
     case ChatStreamEventName.ERROR: {
       const dto = JSON.parse(data) as ErrorEventDTO
       return { type: 'error', message: dto.message }
+    }
+    case ChatStreamEventName.TITLE: {
+      const dto = JSON.parse(data) as TitleEventDTO
+      return { type: 'title', title: dto.title }
     }
     default:
       throw new Error(`Événement SSE de chat inconnu : « ${eventName} ».`)

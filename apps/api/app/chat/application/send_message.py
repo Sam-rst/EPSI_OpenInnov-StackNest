@@ -21,9 +21,13 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
+import structlog
+
 from app.chat.application.commands.send_message_command import SendMessageCommand
 from app.chat.application.conversation_access import load_owned_conversation
+from app.chat.application.conversation_titler import ConversationTitler
 from app.chat.domain.entities.chat_action import ChatAction
+from app.chat.domain.entities.conversation import Conversation
 from app.chat.domain.entities.message import Message
 from app.chat.domain.enums.action_status import ActionStatus
 from app.chat.domain.enums.message_role import MessageRole
@@ -40,6 +44,8 @@ from app.chat.infrastructure.tools.action_args_gate import ActionArgsGate
 from app.chat.infrastructure.tools.read_tool_executor import ReadToolExecutor
 from app.chat.infrastructure.tools.tool_catalog_builder import ToolCatalogBuilder
 from app.chat.infrastructure.tools.tool_names import READ_TOOLS, ToolName
+
+_logger = structlog.get_logger(__name__)
 
 # Borne du nombre de passes LLM enchainees par execution d'outils de lecture :
 # protege contre une boucle d'appels d'outils sans fin (anti-emballement).
@@ -82,6 +88,7 @@ class SendMessage:
         tool_builder: ToolCatalogBuilder,
         gate: ActionArgsGate,
         read_executor: ReadToolExecutor,
+        titler: ConversationTitler,
     ) -> None:
         self._provider = provider
         self._conversations = conversations
@@ -90,17 +97,39 @@ class SendMessage:
         self._tool_builder = tool_builder
         self._gate = gate
         self._read_executor = read_executor
+        self._titler = titler
 
     async def execute(self, command: SendMessageCommand) -> None:
         """Traite le message user et diffuse la reponse (texte ou proposition)."""
         conversation = await load_owned_conversation(
             self._conversations, command.conversation_id, command.owner_id
         )
+        # Detecte le 1er message AVANT de le persister : a ce moment le fil est vide.
+        is_first_message = not await self._conversations.list_messages(conversation.id)
         await self._persist_message(conversation.id, MessageRole.USER, command.content)
+
+        if is_first_message:
+            await self._title_conversation(conversation, command.content)
 
         history = await self._build_history(conversation.id)
         tools = await self._tool_builder.build()
         await self._run_passes(conversation.id, command.owner_id, history, tools)
+
+    async def _title_conversation(self, conversation: Conversation, first_message: str) -> None:
+        """Genere un titre court du fil depuis le 1er message, le persiste et le diffuse.
+
+        Le titre est emis AVANT la reponse pour apparaitre vite dans la sidebar
+        (event SSE `title`). Best-effort : un echec LLM ne casse jamais le tour —
+        le fil conserve alors son titre par defaut.
+        """
+        try:
+            title = await self._titler.generate(first_message)
+        except Exception:  # frontiere infra LLM : le titrage ne doit pas casser le tour
+            _logger.warning("chat.title.generation_failed", conversation_id=str(conversation.id))
+            return
+        conversation.title = title
+        await self._conversations.update(conversation)
+        await self._publisher.publish(conversation.id, "title", {"title": title})
 
     async def _run_passes(
         self,

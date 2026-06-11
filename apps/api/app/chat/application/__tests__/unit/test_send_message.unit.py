@@ -21,8 +21,10 @@ from app.chat.application.__tests__.fakes import (
     make_template,
 )
 from app.chat.application.commands.send_message_command import SendMessageCommand
+from app.chat.application.conversation_titler import ConversationTitler
 from app.chat.application.send_message import SendMessage
 from app.chat.domain.entities.conversation import Conversation
+from app.chat.domain.entities.message import Message
 from app.chat.domain.enums.action_status import ActionStatus
 from app.chat.domain.enums.message_role import MessageRole
 from app.chat.domain.exceptions.conversation_not_found import ConversationNotFoundException
@@ -52,7 +54,10 @@ def _build_send_message(
     publisher: FakeChatEventPublisher,
     catalog: FakeCatalogReader,
     deployments: FakeDeploymentRepository,
+    titler: ConversationTitler | None = None,
 ) -> SendMessage:
+    # Titreur par défaut adossé à un provider DÉDIÉ (jamais celui de la réponse,
+    # dont le script serait consommé) : titre déterministe, sans effet de bord.
     return SendMessage(
         provider=provider,
         conversations=conversations,
@@ -61,6 +66,7 @@ def _build_send_message(
         tool_builder=ToolCatalogBuilder(catalog),
         gate=ActionArgsGate(catalog=catalog, deployments=deployments),
         read_executor=ReadToolExecutor(catalog=catalog, deployments=deployments),
+        titler=titler or ConversationTitler(FakeLLMProvider(text="Titre du fil")),
     )
 
 
@@ -131,6 +137,64 @@ class TestTextResponse:
 
         last_call = provider.calls[-1]
         assert any(m.role == MessageRole.USER and "neuf" in m.content for m in last_call)
+
+
+class TestAutoTitle:
+    async def test_genere_et_diffuse_un_titre_au_premier_message(self) -> None:
+        owner = uuid4()
+        conversation = _conversation(owner)
+        publisher = FakeChatEventPublisher()
+        send = _build_send_message(
+            provider=FakeLLMProvider(text="ok"),
+            conversations=FakeConversationRepository([conversation]),
+            actions=FakeChatActionRepository(),
+            publisher=publisher,
+            catalog=FakeCatalogReader([]),
+            deployments=FakeDeploymentRepository(),
+            titler=ConversationTitler(FakeLLMProvider(text="Déploiement PostgreSQL")),
+        )
+
+        await send.execute(
+            SendMessageCommand(
+                conversation_id=conversation.id, owner_id=owner, content="Déploie un postgres"
+            )
+        )
+
+        assert conversation.title == "Déploiement PostgreSQL"
+        assert "title" in publisher.names()
+        title_event = next(payload for _, name, payload in publisher.events if name == "title")
+        assert title_event["title"] == "Déploiement PostgreSQL"
+
+    async def test_ne_retitre_pas_les_messages_suivants(self) -> None:
+        owner = uuid4()
+        conversation = _conversation(owner)  # titre initial « Mon fil »
+        conversations = FakeConversationRepository([conversation])
+        # Un message existe déjà : ce tour n'est plus le premier.
+        await conversations.add_message(
+            Message(
+                id=uuid4(),
+                conversation_id=conversation.id,
+                role=MessageRole.USER,
+                content="message précédent",
+            )
+        )
+        publisher = FakeChatEventPublisher()
+        send = _build_send_message(
+            provider=FakeLLMProvider(text="ok"),
+            conversations=conversations,
+            actions=FakeChatActionRepository(),
+            publisher=publisher,
+            catalog=FakeCatalogReader([]),
+            deployments=FakeDeploymentRepository(),
+            titler=ConversationTitler(FakeLLMProvider(text="NE DOIT PAS REMPLACER")),
+        )
+
+        await send.execute(
+            SendMessageCommand(conversation_id=conversation.id, owner_id=owner, content="la suite")
+        )
+
+        assert conversation.title == "Mon fil"
+        assert "title" not in publisher.names()
 
 
 class TestOwnership:
