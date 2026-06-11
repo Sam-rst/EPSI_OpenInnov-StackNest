@@ -30,6 +30,8 @@ from app.catalog.domain.enums.template_category import TemplateCategory
 
 
 def _port_param(default: int, order: int = 1) -> ParamSpec:
+    # Le port est alloue cote infra (publication Docker), pas via une variable
+    # d'env du conteneur : env_var reste None.
     return ParamSpec(
         key="port",
         label="Port d'ecoute",
@@ -42,6 +44,8 @@ def _port_param(default: int, order: int = 1) -> ParamSpec:
 
 
 def _memory_param(default_mb: int, order: int) -> ParamSpec:
+    # La memoire pilote `mem_limit` du conteneur (cf. ContainerSpecFactory), pas une
+    # variable d'env : env_var reste None.
     return ParamSpec(
         key="memory_mb",
         label="Memoire allouee (Mo)",
@@ -54,6 +58,8 @@ def _memory_param(default_mb: int, order: int) -> ParamSpec:
 
 
 def _password_param(label: str, order: int, *, required: bool) -> ParamSpec:
+    # Le mot de passe (secret) est injecte via `secret_env` du template, jamais en
+    # clair via env_var : ce param reste sans env_var (None).
     return ParamSpec(
         key="password",
         label=label,
@@ -65,7 +71,20 @@ def _password_param(label: str, order: int, *, required: bool) -> ParamSpec:
     )
 
 
-def _db_name_param(default: str, order: int) -> ParamSpec:
+def _username_param(default: str, order: int, *, env_var: str) -> ParamSpec:
+    return ParamSpec(
+        key="username",
+        label="Nom d'utilisateur",
+        type=ParamType.STRING,
+        required=True,
+        default_value=default,
+        options=None,
+        order_index=order,
+        env_var=env_var,
+    )
+
+
+def _db_name_param(default: str, order: int, *, env_var: str | None = None) -> ParamSpec:
     return ParamSpec(
         key="db_name",
         label="Nom de la base",
@@ -74,6 +93,7 @@ def _db_name_param(default: str, order: int) -> ParamSpec:
         default_value=default,
         options=None,
         order_index=order,
+        env_var=env_var,
     )
 
 
@@ -116,6 +136,7 @@ _POSTGRESQL = TemplateCommand(
             default_value="app",
             options=None,
             order_index=0,
+            env_var="POSTGRES_DB",
         ),
         _port_param(5432),
         ParamSpec(
@@ -175,7 +196,7 @@ _MINIO = TemplateCommand(
     is_active=True,
     image_repository="minio/minio",
     internal_port=9000,
-    secret_env=None,
+    secret_env="MINIO_ROOT_PASSWORD",
     versions=[
         VersionSpec(version="RELEASE.2025-04-22", is_default=True, is_lts=False, eol_date=None),
     ],
@@ -188,6 +209,7 @@ _MINIO = TemplateCommand(
             default_value="minioadmin",
             options=None,
             order_index=0,
+            env_var="MINIO_ROOT_USER",
         ),
         ParamSpec(
             key="root_password",
@@ -573,7 +595,7 @@ _MYSQL = TemplateCommand(
         VersionSpec(version="8.0", is_default=False, is_lts=False, eol_date=date(2026, 4, 30)),
     ],
     params=[
-        _db_name_param("app", 0),
+        _db_name_param("app", 0, env_var="MYSQL_DATABASE"),
         _port_param(3306),
         _password_param("Mot de passe root", 2, required=True),
         _memory_param(512, 3),
@@ -598,7 +620,7 @@ _MARIADB = TemplateCommand(
         VersionSpec(version="10.11 LTS", is_default=False, is_lts=True, eol_date=date(2028, 2, 16)),
     ],
     params=[
-        _db_name_param("app", 0),
+        _db_name_param("app", 0, env_var="MARIADB_DATABASE"),
         _port_param(3306),
         _password_param("Mot de passe root", 2, required=True),
         _memory_param(512, 3),
@@ -623,10 +645,12 @@ _MONGODB = TemplateCommand(
         VersionSpec(version="7.0", is_default=False, is_lts=False, eol_date=None),
     ],
     params=[
-        _db_name_param("app", 0),
+        _db_name_param("app", 0, env_var="MONGO_INITDB_DATABASE"),
         _port_param(27017),
         _password_param("Mot de passe root", 2, required=True),
         _memory_param(512, 3),
+        # Active l'auth root (sinon MONGO_INITDB_ROOT_PASSWORD seul est ignore).
+        _username_param("root", 4, env_var="MONGO_INITDB_ROOT_USERNAME"),
     ],
 )
 
@@ -648,10 +672,13 @@ _COUCHDB = TemplateCommand(
         VersionSpec(version="3.3", is_default=False, is_lts=False, eol_date=None),
     ],
     params=[
+        # CouchDB n'a pas de notion de "base par defaut" a la creation : db_name ne
+        # mappe aucune variable d'env (env_var=None), il reste informatif cote UI.
         _db_name_param("app", 0),
         _port_param(5984),
         _password_param("Mot de passe administrateur", 2, required=True),
         _memory_param(512, 3),
+        _username_param("admin", 4, env_var="COUCHDB_USER"),
     ],
 )
 
@@ -673,6 +700,8 @@ _MEILISEARCH = TemplateCommand(
         VersionSpec(version="1.12", is_default=False, is_lts=False, eol_date=None),
     ],
     params=[
+        # Meilisearch n'a pas de "base" a nommer : db_name reste sans env_var (None),
+        # la cle maitre est injectee via secret_env (MEILI_MASTER_KEY).
         _db_name_param("documents", 0),
         _port_param(7700),
         _password_param("Cle maitre (master key)", 2, required=True),
@@ -697,11 +726,15 @@ _INFLUXDB = TemplateCommand(
         VersionSpec(version="2.7", is_default=True, is_lts=False, eol_date=None),
         VersionSpec(version="1.11", is_default=False, is_lts=False, eol_date=None),
     ],
+    # NOTE : InfluxDB 2.x exige un init complet (mode setup + org + bucket + user).
+    # On mappe ce que l'on connait avec certitude ; le mode setup et l'organisation
+    # (DOCKER_INFLUXDB_INIT_MODE / _ORG) peuvent etre necessaires -> a valider en E2E.
     params=[
-        _db_name_param("metrics", 0),
+        _db_name_param("metrics", 0, env_var="DOCKER_INFLUXDB_INIT_BUCKET"),
         _port_param(8086),
         _password_param("Mot de passe administrateur", 2, required=True),
         _memory_param(512, 3),
+        _username_param("admin", 4, env_var="DOCKER_INFLUXDB_INIT_USERNAME"),
     ],
 )
 
@@ -803,6 +836,7 @@ _RABBITMQ = TemplateCommand(
         _port_param(5672, 0),
         _password_param("Mot de passe par defaut", 1, required=True),
         _memory_param(512, 2),
+        _username_param("user", 3, env_var="RABBITMQ_DEFAULT_USER"),
     ],
 )
 
@@ -1066,6 +1100,7 @@ _GRAFANA = TemplateCommand(
         _port_param(3000, 0),
         _password_param("Mot de passe administrateur", 1, required=True),
         _memory_param(512, 2),
+        _username_param("admin", 3, env_var="GF_SECURITY_ADMIN_USER"),
     ],
 )
 
@@ -1202,6 +1237,7 @@ _KEYCLOAK = TemplateCommand(
         _port_param(8080, 0),
         _password_param("Mot de passe administrateur", 1, required=True),
         _memory_param(1024, 2),
+        _username_param("admin", 3, env_var="KEYCLOAK_ADMIN"),
     ],
 )
 

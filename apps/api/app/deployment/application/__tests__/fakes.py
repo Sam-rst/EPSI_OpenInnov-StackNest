@@ -89,14 +89,16 @@ def make_deployment(
     host: str | None = "host-b",
     published_port: int | None = 32768,
     container_ref: str | None = "container-abc",
+    extra_params: dict[str, object] | None = None,
 ) -> Deployment:
     """Construit un Deployment valide pour les tests.
 
     `container_ref` est porte dans `params['container_ref']` (convention worker)
     afin que les use cases de cycle de vie disposent de la reference du conteneur
-    a passer au provisioner.
+    a passer au provisioner. `extra_params` permet de simuler les valeurs de
+    configuration saisies par l'utilisateur (ex. `{"db_name": "mabase"}`).
     """
-    params: dict[str, object] = {}
+    params: dict[str, object] = dict(extra_params or {})
     if container_ref is not None:
         params["container_ref"] = container_ref
     return Deployment(

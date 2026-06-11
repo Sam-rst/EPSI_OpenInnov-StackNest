@@ -153,6 +153,7 @@ class DeploymentJobHandler:
             internal_port=descriptor.internal_port,
             secret_env=descriptor.secret_env,
             params=deployment.params,
+            param_specs=descriptor.params,
             secret=secret,
             deployment_id=str(deployment.id),
         )

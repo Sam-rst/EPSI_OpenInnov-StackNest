@@ -52,4 +52,5 @@ class CatalogTemplateProvisioningReader(TemplateProvisioningReader):
             type=param.type,
             required=param.required,
             options=param.options,
+            env_var=param.env_var,
         )

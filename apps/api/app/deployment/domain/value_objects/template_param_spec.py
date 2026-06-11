@@ -25,12 +25,16 @@ class TemplateParamSpec:
     - `type`     : type metier (pilote la validation et le masquage secret).
     - `required` : vrai si une valeur non vide est obligatoire a la creation.
     - `options`  : JSON des choix possibles (parametre `SELECT`), sinon None.
+    - `env_var`  : variable d'environnement du conteneur recevant la valeur du
+      parametre (ex. `POSTGRES_DB`), ou `None` si le parametre ne configure aucune
+      variable d'env. Consommee par le worker pour injecter la config saisie.
     """
 
     key: str
     type: ParamType
     required: bool
     options: dict[str, Any] | None
+    env_var: str | None = None
 
     def is_secret(self) -> bool:
         """Vrai si le parametre porte une valeur sensible (jamais reaffichee)."""

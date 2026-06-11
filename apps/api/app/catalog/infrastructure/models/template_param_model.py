@@ -21,6 +21,8 @@ class TemplateParamModel(Base):
     - `default_value` : valeur par defaut (texte, nullable).
     - `options`       : choix possibles pour un parametre `select` (JSONB, nullable).
     - `order_index`   : ordre d'affichage dans le formulaire.
+    - `env_var`       : variable d'environnement du conteneur recevant la valeur
+      du parametre (ex. `POSTGRES_DB`), ou `NULL` si aucune (port, memoire...).
     """
 
     __tablename__ = "template_params"
@@ -43,3 +45,4 @@ class TemplateParamModel(Base):
     default_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     options: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    env_var: Mapped[str | None] = mapped_column(String(120), nullable=True)

@@ -23,6 +23,7 @@ def _param(
     type: ParamType = ParamType.STRING,
     required: bool = False,
     options: dict[str, object] | None = None,
+    env_var: str | None = None,
 ) -> TemplateParam:
     return TemplateParam(
         id=uuid4(),
@@ -33,6 +34,7 @@ def _param(
         default_value=None,
         options=options,
         order_index=0,
+        env_var=env_var,
     )
 
 
@@ -111,6 +113,21 @@ class TestCatalogTemplateProvisioningReader:
         keys = {spec.key for spec in descriptor.params}
         assert keys == {"db_name", "api_key"}
         assert descriptor.secret_param_keys() == frozenset({"api_key"})
+
+    async def test_projette_la_variable_d_env_des_parametres(self) -> None:
+        params = [
+            _param("db_name", required=True, env_var="POSTGRES_DB"),
+            _param("port", type=ParamType.INT),  # sans env_var
+        ]
+        template = _docker_template(versions=["16"], params=params)
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "16")
+
+        assert descriptor is not None
+        by_key = {spec.key: spec for spec in descriptor.params}
+        assert by_key["db_name"].env_var == "POSTGRES_DB"
+        assert by_key["port"].env_var is None
 
     async def test_descripteur_sans_parametre(self) -> None:
         template = _docker_template(versions=["16"])

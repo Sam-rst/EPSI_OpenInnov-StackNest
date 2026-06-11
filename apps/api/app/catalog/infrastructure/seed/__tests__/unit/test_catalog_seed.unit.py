@@ -1,11 +1,17 @@
 """Tests unitaires des donnees de seed du catalogue (integrite, coherence)."""
 
-from app.catalog.application.commands.template_command import TemplateCommand
+from app.catalog.application.commands.template_command import ParamSpec, TemplateCommand
 from app.catalog.domain.enums.engine_kind import EngineKind
+from app.catalog.domain.enums.param_type import ParamType
 from app.catalog.domain.value_objects.slug import Slug
 from app.catalog.infrastructure.seed.catalog_seed import CATALOG_SEED
 
 _BY_SLUG = {item.slug: item for item in CATALOG_SEED}
+
+
+def _param_by_key(slug: str, key: str) -> ParamSpec:
+    return next(param for param in _BY_SLUG[slug].params if param.key == key)
+
 
 _EXPECTED_SLUGS = {
     # Socle historique (12)
@@ -158,7 +164,8 @@ class TestSeedDescripteurProvisioning:
 
         assert item.image_repository == "minio/minio"
         assert item.internal_port == 9000
-        assert item.secret_env is None
+        # Le mot de passe racine est desormais injecte via secret_env.
+        assert item.secret_env == "MINIO_ROOT_PASSWORD"
 
     def test_s3_bucket_sans_image(self) -> None:
         item = _BY_SLUG["s3"]
@@ -282,3 +289,69 @@ class TestSeedEngine:
                 EngineKind.DOCKER if item.image_repository is not None else EngineKind.TERRAFORM
             )
             assert item.engine is expected, item.slug
+
+
+class TestSeedVariablesEnv:
+    """Verifie le mapping parametre -> variable d'env du conteneur (config reelle)."""
+
+    def test_postgres_db_name_mappe_postgres_db(self) -> None:
+        assert _param_by_key("postgresql-16", "db_name").env_var == "POSTGRES_DB"
+
+    def test_mysql_db_name_mappe_mysql_database(self) -> None:
+        assert _param_by_key("mysql", "db_name").env_var == "MYSQL_DATABASE"
+
+    def test_mariadb_db_name_mappe_mariadb_database(self) -> None:
+        assert _param_by_key("mariadb", "db_name").env_var == "MARIADB_DATABASE"
+
+    def test_mongodb_db_name_mappe_mongo_initdb_database(self) -> None:
+        assert _param_by_key("mongodb", "db_name").env_var == "MONGO_INITDB_DATABASE"
+
+    def test_mongodb_username_mappe_root_username(self) -> None:
+        username = _param_by_key("mongodb", "username")
+        assert username.env_var == "MONGO_INITDB_ROOT_USERNAME"
+        assert username.default_value == "root"
+
+    def test_minio_root_user_mappe_minio_root_user(self) -> None:
+        assert _param_by_key("minio", "root_user").env_var == "MINIO_ROOT_USER"
+
+    def test_couchdb_username_mappe_couchdb_user(self) -> None:
+        username = _param_by_key("couchdb", "username")
+        assert username.env_var == "COUCHDB_USER"
+        assert username.default_value == "admin"
+
+    def test_influxdb_db_name_mappe_init_bucket(self) -> None:
+        assert _param_by_key("influxdb", "db_name").env_var == "DOCKER_INFLUXDB_INIT_BUCKET"
+
+    def test_influxdb_username_mappe_init_username(self) -> None:
+        assert _param_by_key("influxdb", "username").env_var == "DOCKER_INFLUXDB_INIT_USERNAME"
+
+    def test_grafana_username_mappe_gf_admin_user(self) -> None:
+        assert _param_by_key("grafana", "username").env_var == "GF_SECURITY_ADMIN_USER"
+
+    def test_keycloak_username_mappe_keycloak_admin(self) -> None:
+        assert _param_by_key("keycloak", "username").env_var == "KEYCLOAK_ADMIN"
+
+    def test_rabbitmq_username_mappe_default_user(self) -> None:
+        username = _param_by_key("rabbitmq", "username")
+        assert username.env_var == "RABBITMQ_DEFAULT_USER"
+        assert username.default_value == "user"
+
+    def test_le_port_n_est_jamais_mappe_en_variable_d_env(self) -> None:
+        for item in CATALOG_SEED:
+            for param in item.params:
+                if param.key == "port":
+                    assert param.env_var is None, item.slug
+
+    def test_la_memoire_n_est_jamais_mappee_en_variable_d_env(self) -> None:
+        for item in CATALOG_SEED:
+            for param in item.params:
+                if param.key == "memory_mb":
+                    assert param.env_var is None, item.slug
+
+    def test_aucun_parametre_secret_ne_porte_une_variable_d_env(self) -> None:
+        # Securite : un secret ne fuit jamais en clair via env_var (il passe par
+        # secret_env du template, alimente par un secret genere worker-side).
+        for item in CATALOG_SEED:
+            for param in item.params:
+                if param.type is ParamType.SECRET:
+                    assert param.env_var is None, f"{item.slug}.{param.key}"

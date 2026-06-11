@@ -90,6 +90,7 @@ class TemplateMapper:
             default_value=entity.default_value,
             options=entity.options,
             order_index=entity.order_index,
+            env_var=entity.env_var,
         )
 
     @staticmethod
@@ -113,4 +114,5 @@ class TemplateMapper:
             default_value=model.default_value,
             options=model.options,
             order_index=model.order_index,
+            env_var=model.env_var,
         )

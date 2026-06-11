@@ -64,4 +64,5 @@ class TemplateAssembler:
             default_value=spec.default_value,
             options=spec.options,
             order_index=spec.order_index,
+            env_var=spec.env_var,
         )
