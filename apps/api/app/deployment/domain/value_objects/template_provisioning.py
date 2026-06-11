@@ -40,6 +40,14 @@ class TemplateProvisioning:
     - `params`           : descripteurs des parametres attendus (cle/type/requis/
       options). Pilotent la validation a la creation et le masquage des secrets
       dans la reponse REST.
+    - `command`          : commande de demarrage du conteneur (None = defaut image).
+      Ex. Keycloak : `("start-dev",)`, sans quoi l'image affiche l'aide et sort.
+    - `secret_value_template` : gabarit de la VALEUR injectee dans `secret_env`.
+      None = la valeur est le secret brut. Sinon, `resolve_secret_value` formate le
+      secret via ce gabarit, qui n'accepte QUE le placeholder `{secret}`. Ex. Neo4j :
+      `"neo4j/{secret}"` car `NEO4J_AUTH` attend la forme `user/password`.
+    - `is_deployable`    : `False` = template visible au catalogue mais refuse au
+      deploiement (gate use case `CreateDeployment`). Defaut `True`.
 
     `image_repository` doit etre non vide pour un template Docker : la guard
     clause l'exige uniquement quand un libelle est fourni (un template Terraform
@@ -52,6 +60,9 @@ class TemplateProvisioning:
     engine: EngineKind
     template_name: str = ""
     params: tuple[TemplateParamSpec, ...] = field(default_factory=tuple)
+    command: tuple[str, ...] | None = None
+    secret_value_template: str | None = None
+    is_deployable: bool = True
 
     def __post_init__(self) -> None:
         if self.image_repository is not None and not self.image_repository.strip():
@@ -64,6 +75,28 @@ class TemplateProvisioning:
     def requires_secret(self) -> bool:
         """Vrai si le template declare une variable d'env recevant un secret."""
         return self.secret_env is not None
+
+    def resolve_secret_value(self, secret: str) -> str:
+        """Valeur a injecter dans `secret_env` a partir du secret genere worker-side.
+
+        Sans gabarit (`secret_value_template` None), la valeur est le secret brut
+        (comportement par defaut). Avec gabarit, la valeur est le secret formate via
+        `secret_value_template.format(secret=...)`.
+
+        Securite (invariant #85) : le seul materiau secret reste le secret genere ;
+        le gabarit ne fait que le mettre en forme et n'accepte QUE le placeholder
+        `{secret}`. Tout autre placeholder leve `ValueError` (jamais d'autre cle qui
+        casserait le formatage ou fuiterait une donnee). La valeur n'est jamais
+        loggee.
+        """
+        if self.secret_value_template is None:
+            return secret
+        try:
+            return self.secret_value_template.format(secret=secret)
+        except (KeyError, IndexError) as error:
+            raise ValueError(
+                "TemplateProvisioning.secret_value_template n'accepte que le placeholder {secret}."
+            ) from error
 
     def secret_param_keys(self) -> frozenset[str]:
         """Cles des parametres de type `secret` (a masquer dans la reponse REST)."""

@@ -355,3 +355,58 @@ class TestSeedVariablesEnv:
             for param in item.params:
                 if param.type is ParamType.SECRET:
                     assert param.env_var is None, f"{item.slug}.{param.key}"
+
+
+# Runtimes langage : pas de service long-running utile -> bloques dans le catalogue.
+_NON_DEPLOYABLE_RUNTIME_SLUGS = {"node-20", "python-3-13", "golang", "php"}
+
+
+class TestSeedModeleProvisioningV2:
+    """Champs etendus du modele de provisioning (command / secret_value_template)."""
+
+    def test_keycloak_porte_la_commande_start_dev(self) -> None:
+        # Sans commande serveur l'image Keycloak affiche l'aide et sort.
+        assert _BY_SLUG["keycloak"].command == ["start-dev"]
+
+    def test_neo4j_porte_le_gabarit_de_valeur_du_secret(self) -> None:
+        # NEO4J_AUTH attend `user/password` : la valeur injectee devient `neo4j/<secret>`.
+        item = _BY_SLUG["neo4j"]
+        assert item.secret_env == "NEO4J_AUTH"
+        assert item.secret_value_template == "neo4j/{secret}"
+
+    def test_seul_keycloak_porte_une_commande(self) -> None:
+        # Seul Keycloak surcharge la commande au seed ; les autres gardent la commande
+        # par defaut de leur image (command=None).
+        with_command = {item.slug for item in CATALOG_SEED if item.command is not None}
+        assert with_command == {"keycloak"}
+
+    def test_seul_neo4j_porte_un_gabarit_de_valeur(self) -> None:
+        with_template = {
+            item.slug for item in CATALOG_SEED if item.secret_value_template is not None
+        }
+        assert with_template == {"neo4j"}
+
+
+class TestSeedDeployable:
+    """Les runtimes langage sont visibles mais non deployables (bientot disponible)."""
+
+    def test_runtimes_langage_sont_non_deployables(self) -> None:
+        for slug in _NON_DEPLOYABLE_RUNTIME_SLUGS:
+            assert _BY_SLUG[slug].is_deployable is False, slug
+
+    def test_seuls_les_runtimes_langage_sont_non_deployables(self) -> None:
+        non_deployable = {item.slug for item in CATALOG_SEED if not item.is_deployable}
+        assert non_deployable == _NON_DEPLOYABLE_RUNTIME_SLUGS
+
+    def test_les_autres_templates_restent_deployables(self) -> None:
+        for item in CATALOG_SEED:
+            if item.slug not in _NON_DEPLOYABLE_RUNTIME_SLUGS:
+                assert item.is_deployable is True, item.slug
+
+
+class TestSeedVersionsNode:
+    """Coherence des versions Node (espace invalide « 20 LTS » -> « 20 »)."""
+
+    def test_node_versions_sans_espace(self) -> None:
+        versions = {version.version for version in _BY_SLUG["node-20"].versions}
+        assert versions == {"20", "22"}

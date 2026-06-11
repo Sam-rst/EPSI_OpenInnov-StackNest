@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import Boolean, Integer, String, Text, text
+from sqlalchemy import JSON, Boolean, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,9 +27,15 @@ class TemplateModel(TimestampMixin, Base):
 
     Descripteur de provisioning (optionnel, exploite par la feature deploiement) :
 
-    - `image_repository` : depot de l'image Docker (ex. `postgres`).
-    - `internal_port`    : port ecoute dans le conteneur (ex. `5432`).
-    - `secret_env`       : nom de la variable d'env recevant le mot de passe genere.
+    - `image_repository`      : depot de l'image Docker (ex. `postgres`).
+    - `internal_port`         : port ecoute dans le conteneur (ex. `5432`).
+    - `secret_env`            : nom de la variable d'env recevant le mot de passe.
+    - `command`               : commande de demarrage du conteneur (JSON, liste de
+      tokens) ; null = commande par defaut de l'image.
+    - `secret_value_template` : gabarit de la valeur injectee dans `secret_env`
+      (placeholder `{secret}`) ; null = valeur = secret brut.
+    - `is_deployable`         : false masque le template du deploiement tout en le
+      laissant visible au catalogue (NOT NULL, defaut true).
     """
 
     __tablename__ = "templates"
@@ -61,3 +67,8 @@ class TemplateModel(TimestampMixin, Base):
     image_repository: Mapped[str | None] = mapped_column(String(255), nullable=True)
     internal_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     secret_env: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    command: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    secret_value_template: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_deployable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )

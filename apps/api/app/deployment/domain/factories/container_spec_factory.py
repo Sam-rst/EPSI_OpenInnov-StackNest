@@ -49,28 +49,37 @@ class ContainerSpecFactory:
         params: dict[str, Any],
         secret: str | None,
         param_specs: tuple[TemplateParamSpec, ...] = (),
+        command: list[str] | None = None,
+        secret_value_template: str | None = None,
         deployment_id: str | None = None,
         cpu_limit: float = 1.0,
         mem_limit: str = _DEFAULT_MEM_LIMIT,
     ) -> ContainerSpec:
         """Construit le `ContainerSpec` du conteneur a provisionner.
 
-        Leve `ValueError` si `image_repository`/`version` sont vides, ou si un
-        `secret_env` est declare sans `secret` fourni.
+        `command` surcharge la commande de demarrage du conteneur (None = defaut de
+        l'image). `secret_value_template` met en forme la valeur injectee dans
+        `secret_env` (None = secret brut).
+
+        Leve `ValueError` si `image_repository`/`version` sont vides, si un
+        `secret_env` est declare sans `secret` fourni, ou si `secret_value_template`
+        contient un placeholder autre que `{secret}`.
         """
         if not image_repository.strip():
             raise ValueError("ContainerSpecFactory: image_repository vide.")
         if not version.strip():
             raise ValueError("ContainerSpecFactory: version vide.")
 
-        env = cls._build_env(secret_env=secret_env, secret=secret)
+        env = cls._build_env(
+            secret_env=secret_env, secret=secret, secret_value_template=secret_value_template
+        )
         env.update(cls._params_env(param_specs=param_specs, params=params))
         labels = {_DEPLOYMENT_ID_LABEL: deployment_id} if deployment_id is not None else {}
 
         return ContainerSpec(
             image=f"{image_repository.strip()}:{version.strip()}",
             env=env,
-            command=None,
+            command=list(command) if command is not None else None,
             internal_port=internal_port,
             cpu_limit=cpu_limit,
             mem_limit=cls._resolve_mem_limit(params=params, fallback=mem_limit),
@@ -78,15 +87,30 @@ class ContainerSpecFactory:
         )
 
     @staticmethod
-    def _build_env(*, secret_env: str | None, secret: str | None) -> dict[str, str]:
-        """Place le secret dans l'env si une variable cible est declaree."""
+    def _build_env(
+        *, secret_env: str | None, secret: str | None, secret_value_template: str | None
+    ) -> dict[str, str]:
+        """Place la valeur du secret dans l'env si une variable cible est declaree.
+
+        Securite (invariant #85) : le seul materiau secret est le `secret` genere
+        worker-side. `secret_value_template` ne fait que le mettre en forme et
+        n'accepte QUE le placeholder `{secret}` ; tout autre placeholder leve.
+        """
         if secret_env is None:
             return {}
         if not secret:
             raise ValueError(
                 f"ContainerSpecFactory: secret requis pour la variable {secret_env!r}."
             )
-        return {secret_env: secret}
+        if secret_value_template is None:
+            return {secret_env: secret}
+        try:
+            value = secret_value_template.format(secret=secret)
+        except (KeyError, IndexError) as error:
+            raise ValueError(
+                "ContainerSpecFactory: secret_value_template n'accepte que le placeholder {secret}."
+            ) from error
+        return {secret_env: value}
 
     @staticmethod
     def _params_env(

@@ -41,6 +41,9 @@ class TemplateAssembler:
             image_repository=command.image_repository,
             internal_port=command.internal_port,
             secret_env=command.secret_env,
+            command=list(command.command) if command.command is not None else None,
+            secret_value_template=command.secret_value_template,
+            is_deployable=command.is_deployable,
         )
 
     @staticmethod

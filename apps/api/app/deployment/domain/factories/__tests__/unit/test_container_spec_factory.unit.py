@@ -214,6 +214,93 @@ class TestInjectionParamsEnv:
         assert "leaked-in-clear" not in spec.env.values()
 
 
+class TestCommand:
+    def test_command_absente_par_defaut(self) -> None:
+        spec = ContainerSpecFactory.build(
+            image_repository="nginx",
+            version="1.27",
+            internal_port=80,
+            secret_env=None,
+            params={},
+            secret=None,
+        )
+
+        assert spec.command is None
+
+    def test_command_transmise_au_conteneur(self) -> None:
+        # Keycloak : sans commande serveur l'image affiche l'aide et sort. On force
+        # `start-dev` via le descripteur du template.
+        spec = ContainerSpecFactory.build(
+            image_repository="quay.io/keycloak/keycloak",
+            version="26.1",
+            internal_port=8080,
+            secret_env="KEYCLOAK_ADMIN_PASSWORD",
+            params={},
+            secret="s3cr3t",
+            command=["start-dev"],
+        )
+
+        assert spec.command == ["start-dev"]
+
+
+class TestSecretValueTemplate:
+    """Gabarit de la valeur injectee dans secret_env (securite : uniquement {secret})."""
+
+    def test_sans_gabarit_injecte_le_secret_brut(self) -> None:
+        spec = ContainerSpecFactory.build(
+            image_repository="postgres",
+            version="16",
+            internal_port=5432,
+            secret_env="POSTGRES_PASSWORD",
+            params={},
+            secret="s3cr3t",
+        )
+
+        assert spec.env == {"POSTGRES_PASSWORD": "s3cr3t"}
+
+    def test_gabarit_formate_la_valeur_injectee(self) -> None:
+        # Neo4j : NEO4J_AUTH attend la forme `user/password`. Le secret genere reste
+        # le seul materiau secret, simplement formate `neo4j/{secret}`.
+        spec = ContainerSpecFactory.build(
+            image_repository="neo4j",
+            version="5",
+            internal_port=7474,
+            secret_env="NEO4J_AUTH",
+            params={},
+            secret="s3cr3t",
+            secret_value_template="neo4j/{secret}",
+        )
+
+        assert spec.env == {"NEO4J_AUTH": "neo4j/s3cr3t"}
+
+    def test_gabarit_avec_placeholder_inconnu_leve(self) -> None:
+        # Securite : le gabarit n'accepte QUE {secret} ; toute autre cle est refusee.
+        with pytest.raises(ValueError):
+            ContainerSpecFactory.build(
+                image_repository="neo4j",
+                version="5",
+                internal_port=7474,
+                secret_env="NEO4J_AUTH",
+                params={},
+                secret="s3cr3t",
+                secret_value_template="{user}/{secret}",
+            )
+
+    def test_gabarit_sans_secret_env_est_ignore(self) -> None:
+        # Pas de secret_env : aucun secret injecte, le gabarit n'a aucun effet.
+        spec = ContainerSpecFactory.build(
+            image_repository="nginx",
+            version="1.27",
+            internal_port=80,
+            secret_env=None,
+            params={},
+            secret=None,
+            secret_value_template="neo4j/{secret}",
+        )
+
+        assert spec.env == {}
+
+
 class TestLimiteMemoire:
     def test_memory_mb_definit_mem_limit(self) -> None:
         spec = ContainerSpecFactory.build(

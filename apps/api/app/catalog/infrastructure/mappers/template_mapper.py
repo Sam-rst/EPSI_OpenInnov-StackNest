@@ -44,6 +44,9 @@ class TemplateMapper:
             image_repository=model.image_repository,
             internal_port=model.internal_port,
             secret_env=model.secret_env,
+            command=list(model.command) if model.command is not None else None,
+            secret_value_template=model.secret_value_template,
+            is_deployable=model.is_deployable,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -65,6 +68,9 @@ class TemplateMapper:
             image_repository=entity.image_repository,
             internal_port=entity.internal_port,
             secret_env=entity.secret_env,
+            command=list(entity.command) if entity.command is not None else None,
+            secret_value_template=entity.secret_value_template,
+            is_deployable=entity.is_deployable,
         )
 
     @staticmethod

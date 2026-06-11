@@ -287,12 +287,15 @@ _NODE = TemplateCommand(
     popular=False,
     tags=["Runtime", "JS"],
     is_active=True,
+    # Runtime langage : aucun service long-running utile au MVP -> visible mais bloque.
+    is_deployable=False,
     image_repository="node",
     internal_port=None,
     secret_env=None,
     versions=[
-        VersionSpec(version="20 LTS", is_default=True, is_lts=True, eol_date=date(2026, 4, 30)),
-        VersionSpec(version="22 LTS", is_default=False, is_lts=True, eol_date=date(2027, 4, 30)),
+        # Le tag d'image Docker est `20` / `22` (pas « 20 LTS » : espace invalide).
+        VersionSpec(version="20", is_default=True, is_lts=True, eol_date=date(2026, 4, 30)),
+        VersionSpec(version="22", is_default=False, is_lts=True, eol_date=date(2027, 4, 30)),
     ],
     params=[
         _port_param(3000, 0),
@@ -319,6 +322,8 @@ _PYTHON = TemplateCommand(
     popular=False,
     tags=["Runtime", "Python"],
     is_active=True,
+    # Runtime langage : aucun service long-running utile au MVP -> visible mais bloque.
+    is_deployable=False,
     image_repository="python",
     internal_port=None,
     secret_env=None,
@@ -753,6 +758,9 @@ _NEO4J = TemplateCommand(
     image_repository="neo4j",
     internal_port=7474,
     secret_env="NEO4J_AUTH",
+    # NEO4J_AUTH attend la forme `user/password` : la valeur injectee devient
+    # `neo4j/<secret>` (le secret genere reste le seul materiau secret).
+    secret_value_template="neo4j/{secret}",
     versions=[
         VersionSpec(version="5", is_default=True, is_lts=False, eol_date=None),
         VersionSpec(version="4.4", is_default=False, is_lts=False, eol_date=None),
@@ -970,6 +978,8 @@ _PHP = TemplateCommand(
     popular=False,
     tags=["Runtime", "PHP"],
     is_active=True,
+    # Runtime langage : aucun service long-running utile au MVP -> visible mais bloque.
+    is_deployable=False,
     image_repository="php",
     internal_port=80,
     secret_env=None,
@@ -994,6 +1004,8 @@ _GOLANG = TemplateCommand(
     popular=False,
     tags=["Runtime", "Go"],
     is_active=True,
+    # Runtime langage : aucun service long-running utile au MVP -> visible mais bloque.
+    is_deployable=False,
     image_repository="golang",
     internal_port=None,
     secret_env=None,
@@ -1231,6 +1243,8 @@ _KEYCLOAK = TemplateCommand(
     image_repository="quay.io/keycloak/keycloak",
     internal_port=8080,
     secret_env="KEYCLOAK_ADMIN_PASSWORD",
+    # Sans commande serveur, l'image Keycloak affiche l'aide et sort : on force `start-dev`.
+    command=["start-dev"],
     versions=[
         VersionSpec(version="26.1", is_default=True, is_lts=False, eol_date=None),
         VersionSpec(version="25.0", is_default=False, is_lts=False, eol_date=None),

@@ -153,3 +153,55 @@ class TestCatalogTemplateProvisioningReader:
 
         assert descriptor is not None
         assert descriptor.params == ()
+
+
+class TestCatalogTemplateProvisioningReaderModeleEtendu:
+    """Projection des champs etendus command / secret_value_template / is_deployable."""
+
+    async def test_projette_la_command(self) -> None:
+        template = _docker_template(versions=["26.1"])
+        template.command = ["start-dev"]
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "26.1")
+
+        assert descriptor is not None
+        assert descriptor.command == ("start-dev",)
+
+    async def test_command_absente_reste_none(self) -> None:
+        template = _docker_template(versions=["16"])
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "16")
+
+        assert descriptor is not None
+        assert descriptor.command is None
+
+    async def test_projette_le_secret_value_template(self) -> None:
+        template = _docker_template(versions=["5"])
+        template.secret_value_template = "neo4j/{secret}"
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "5")
+
+        assert descriptor is not None
+        assert descriptor.secret_value_template == "neo4j/{secret}"
+
+    async def test_projette_is_deployable_false(self) -> None:
+        template = _docker_template(versions=["20"])
+        template.is_deployable = False
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "20")
+
+        assert descriptor is not None
+        assert descriptor.is_deployable is False
+
+    async def test_is_deployable_vrai_par_defaut(self) -> None:
+        template = _docker_template(versions=["16"])
+        reader = CatalogTemplateProvisioningReader(FakeTemplateRepository([template]))
+
+        descriptor = await reader.get(template.id, "16")
+
+        assert descriptor is not None
+        assert descriptor.is_deployable is True
