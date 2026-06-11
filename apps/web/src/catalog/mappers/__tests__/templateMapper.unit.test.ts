@@ -11,6 +11,7 @@ const cardDto: TemplateCardDTO = {
   icon: 'database',
   category: 'database',
   provider: 'Docker',
+  engine: 'docker',
   tags: ['SQL', 'Persistant'],
   description: 'Base relationnelle managée.',
   popular: true,
@@ -39,6 +40,18 @@ describe('mapCardDtoToCatalogItem', () => {
     const item = mapCardDtoToCatalogItem({ ...cardDto, category: 'quantum' })
 
     expect(item.category).toBe('quantum')
+  })
+
+  it('expose le moteur docker de la carte', () => {
+    const item = mapCardDtoToCatalogItem(cardDto)
+
+    expect(item.engine).toBe('docker')
+  })
+
+  it('expose le moteur terraform de la carte', () => {
+    const item = mapCardDtoToCatalogItem({ ...cardDto, engine: 'terraform' })
+
+    expect(item.engine).toBe('terraform')
   })
 })
 

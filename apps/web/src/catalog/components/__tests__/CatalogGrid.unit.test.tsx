@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { CatalogItem } from '../../domain/models/CatalogItem'
+import { EngineKind } from '../../types/enums/EngineKind'
 import { CatalogGrid } from '../CatalogGrid'
 
 const ITEMS: readonly CatalogItem[] = [
@@ -12,6 +13,7 @@ const ITEMS: readonly CatalogItem[] = [
     icon: 'database',
     category: 'Database',
     provider: 'Docker',
+    engine: EngineKind.DOCKER,
     tags: ['SQL'],
     description: 'Base relationnelle.',
   },
@@ -21,6 +23,7 @@ const ITEMS: readonly CatalogItem[] = [
     icon: 'server',
     category: 'Cache',
     provider: 'Docker',
+    engine: EngineKind.DOCKER,
     tags: ['Cache'],
     description: 'Store clé-valeur.',
   },

@@ -4,10 +4,19 @@ import type { TemplateDetailDTO } from '../types/dto/TemplateDetailDTO'
 import type { TemplateParamDTO } from '../types/dto/TemplateParamDTO'
 import type { TemplateVersionDTO } from '../types/dto/TemplateVersionDTO'
 import { labelForCategory } from '../types/enums/TemplateCategory'
+import { EngineKind } from '../types/enums/EngineKind'
 import type { ParamType } from '../types/enums/ParamType'
 import type { TemplateDetail } from '../types/models/TemplateDetail'
 import type { TemplateParam } from '../types/models/TemplateParam'
 import type { TemplateVersion } from '../types/models/TemplateVersion'
+
+/**
+ * Normalise la valeur brute du moteur en `EngineKind`. Toute valeur inattendue
+ * retombe sur `docker` : une carte n'est jamais bloquée par erreur.
+ */
+function toEngineKind(raw: string): EngineKind {
+  return raw === EngineKind.TERRAFORM ? EngineKind.TERRAFORM : EngineKind.DOCKER
+}
 
 /** Mappe une carte API (`TemplateCardDTO`) vers le modèle liste `CatalogItem`. */
 export function mapCardDtoToCatalogItem(dto: TemplateCardDTO): CatalogItem {
@@ -17,6 +26,7 @@ export function mapCardDtoToCatalogItem(dto: TemplateCardDTO): CatalogItem {
     icon: dto.icon,
     category: labelForCategory(dto.category),
     provider: dto.provider,
+    engine: toEngineKind(dto.engine),
     tags: dto.tags,
     description: dto.description,
     popular: dto.popular,

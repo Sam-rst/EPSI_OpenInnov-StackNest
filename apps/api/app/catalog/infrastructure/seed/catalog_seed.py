@@ -1,4 +1,4 @@
-"""Donnees de seed du catalogue : 12 templates reels (metadonnees publiques).
+"""Donnees de seed du catalogue : 45 templates reels (metadonnees publiques).
 
 Catalogue legitime de ressources provisionnables, avec versions LTS/EOL
 plausibles et parametres de configuration typiques. AUCUNE donnee utilisateur :
@@ -48,6 +48,42 @@ def _memory_param(default_mb: int, order: int) -> ParamSpec:
         type=ParamType.INT,
         required=False,
         default_value=str(default_mb),
+        options=None,
+        order_index=order,
+    )
+
+
+def _password_param(label: str, order: int, *, required: bool) -> ParamSpec:
+    return ParamSpec(
+        key="password",
+        label=label,
+        type=ParamType.SECRET,
+        required=required,
+        default_value=None,
+        options=None,
+        order_index=order,
+    )
+
+
+def _db_name_param(default: str, order: int) -> ParamSpec:
+    return ParamSpec(
+        key="db_name",
+        label="Nom de la base",
+        type=ParamType.STRING,
+        required=True,
+        default_value=default,
+        options=None,
+        order_index=order,
+    )
+
+
+def _start_command_param(default: str, order: int) -> ParamSpec:
+    return ParamSpec(
+        key="start_command",
+        label="Commande de demarrage",
+        type=ParamType.STRING,
+        required=False,
+        default_value=default,
         options=None,
         order_index=order,
     )
@@ -515,7 +551,907 @@ _S3 = TemplateCommand(
 )
 
 
-# Catalogue legitime de 12 templates (metadonnees publiques, aucune donnee
+# --------------------------------------------------------------------------- #
+# Bases de donnees & moteurs de data (Docker)                                  #
+# --------------------------------------------------------------------------- #
+
+_MYSQL = TemplateCommand(
+    slug="mysql",
+    name="MySQL",
+    icon="database",
+    category=TemplateCategory.DATABASE,
+    provider="Docker",
+    description="Base relationnelle SQL la plus repandue.",
+    popular=True,
+    tags=["SQL", "Persistant"],
+    is_active=True,
+    image_repository="mysql",
+    internal_port=3306,
+    secret_env="MYSQL_ROOT_PASSWORD",
+    versions=[
+        VersionSpec(version="8.4 LTS", is_default=True, is_lts=True, eol_date=date(2032, 4, 30)),
+        VersionSpec(version="8.0", is_default=False, is_lts=False, eol_date=date(2026, 4, 30)),
+    ],
+    params=[
+        _db_name_param("app", 0),
+        _port_param(3306),
+        _password_param("Mot de passe root", 2, required=True),
+        _memory_param(512, 3),
+    ],
+)
+
+_MARIADB = TemplateCommand(
+    slug="mariadb",
+    name="MariaDB",
+    icon="database",
+    category=TemplateCategory.DATABASE,
+    provider="Docker",
+    description="Fork communautaire de MySQL, compatible et performant.",
+    popular=False,
+    tags=["SQL", "Persistant"],
+    is_active=True,
+    image_repository="mariadb",
+    internal_port=3306,
+    secret_env="MARIADB_ROOT_PASSWORD",
+    versions=[
+        VersionSpec(version="11.4 LTS", is_default=True, is_lts=True, eol_date=date(2029, 5, 29)),
+        VersionSpec(version="10.11 LTS", is_default=False, is_lts=True, eol_date=date(2028, 2, 16)),
+    ],
+    params=[
+        _db_name_param("app", 0),
+        _port_param(3306),
+        _password_param("Mot de passe root", 2, required=True),
+        _memory_param(512, 3),
+    ],
+)
+
+_MONGODB = TemplateCommand(
+    slug="mongodb",
+    name="MongoDB",
+    icon="database",
+    category=TemplateCategory.DATABASE,
+    provider="Docker",
+    description="Base documentaire NoSQL orientee JSON/BSON.",
+    popular=True,
+    tags=["NoSQL", "Document"],
+    is_active=True,
+    image_repository="mongo",
+    internal_port=27017,
+    secret_env="MONGO_INITDB_ROOT_PASSWORD",
+    versions=[
+        VersionSpec(version="8.0", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="7.0", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _db_name_param("app", 0),
+        _port_param(27017),
+        _password_param("Mot de passe root", 2, required=True),
+        _memory_param(512, 3),
+    ],
+)
+
+_COUCHDB = TemplateCommand(
+    slug="couchdb",
+    name="CouchDB",
+    icon="database",
+    category=TemplateCategory.DATABASE,
+    provider="Docker",
+    description="Base documentaire repliquable, API HTTP/JSON.",
+    popular=False,
+    tags=["NoSQL", "Document"],
+    is_active=True,
+    image_repository="couchdb",
+    internal_port=5984,
+    secret_env="COUCHDB_PASSWORD",
+    versions=[
+        VersionSpec(version="3.4", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="3.3", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _db_name_param("app", 0),
+        _port_param(5984),
+        _password_param("Mot de passe administrateur", 2, required=True),
+        _memory_param(512, 3),
+    ],
+)
+
+_MEILISEARCH = TemplateCommand(
+    slug="meilisearch",
+    name="Meilisearch",
+    icon="search",
+    category=TemplateCategory.DATABASE,
+    provider="Docker",
+    description="Moteur de recherche full-text rapide et simple.",
+    popular=False,
+    tags=["Search", "Full-text"],
+    is_active=True,
+    image_repository="getmeili/meilisearch",
+    internal_port=7700,
+    secret_env="MEILI_MASTER_KEY",
+    versions=[
+        VersionSpec(version="1.13", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="1.12", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _db_name_param("documents", 0),
+        _port_param(7700),
+        _password_param("Cle maitre (master key)", 2, required=True),
+        _memory_param(512, 3),
+    ],
+)
+
+_INFLUXDB = TemplateCommand(
+    slug="influxdb",
+    name="InfluxDB",
+    icon="database",
+    category=TemplateCategory.DATABASE,
+    provider="Docker",
+    description="Base time-series pour metriques et capteurs.",
+    popular=False,
+    tags=["Time-series", "Metrics"],
+    is_active=True,
+    image_repository="influxdb",
+    internal_port=8086,
+    secret_env="DOCKER_INFLUXDB_INIT_PASSWORD",
+    versions=[
+        VersionSpec(version="2.7", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="1.11", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _db_name_param("metrics", 0),
+        _port_param(8086),
+        _password_param("Mot de passe administrateur", 2, required=True),
+        _memory_param(512, 3),
+    ],
+)
+
+_NEO4J = TemplateCommand(
+    slug="neo4j",
+    name="Neo4j",
+    icon="share-2",
+    category=TemplateCategory.DATABASE,
+    provider="Docker",
+    description="Base de donnees orientee graphe (Cypher).",
+    popular=False,
+    tags=["Graph", "Cypher"],
+    is_active=True,
+    image_repository="neo4j",
+    internal_port=7474,
+    secret_env="NEO4J_AUTH",
+    versions=[
+        VersionSpec(version="5", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="4.4", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _db_name_param("neo4j", 0),
+        _port_param(7474),
+        _password_param("Mot de passe (NEO4J_AUTH)", 2, required=True),
+        _memory_param(1024, 3),
+    ],
+)
+
+_CLICKHOUSE = TemplateCommand(
+    slug="clickhouse",
+    name="ClickHouse",
+    icon="database",
+    category=TemplateCategory.DATABASE,
+    provider="Docker",
+    description="Base columnar analytique (OLAP) ultra-rapide.",
+    popular=False,
+    tags=["OLAP", "Analytics"],
+    is_active=True,
+    image_repository="clickhouse/clickhouse-server",
+    internal_port=8123,
+    secret_env="CLICKHOUSE_PASSWORD",
+    versions=[
+        VersionSpec(version="25.3 LTS", is_default=True, is_lts=True, eol_date=None),
+        VersionSpec(version="24.8 LTS", is_default=False, is_lts=True, eol_date=None),
+    ],
+    params=[
+        _db_name_param("default", 0),
+        _port_param(8123),
+        _password_param("Mot de passe", 2, required=True),
+        _memory_param(1024, 3),
+    ],
+)
+
+
+# --------------------------------------------------------------------------- #
+# Cache & messaging (Docker)                                                   #
+# --------------------------------------------------------------------------- #
+
+_MEMCACHED = TemplateCommand(
+    slug="memcached",
+    name="Memcached",
+    icon="server",
+    category=TemplateCategory.CACHE,
+    provider="Docker",
+    description="Cache memoire distribue, simple et eprouve.",
+    popular=False,
+    tags=["Cache", "In-memory"],
+    is_active=True,
+    image_repository="memcached",
+    internal_port=11211,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="1.6", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(11211, 0),
+        _memory_param(256, 1),
+    ],
+)
+
+_RABBITMQ = TemplateCommand(
+    slug="rabbitmq",
+    name="RabbitMQ",
+    icon="send",
+    category=TemplateCategory.CACHE,
+    provider="Docker",
+    description="Broker de messages AMQP fiable et mature.",
+    popular=False,
+    tags=["Messaging", "AMQP"],
+    is_active=True,
+    image_repository="rabbitmq",
+    internal_port=5672,
+    secret_env="RABBITMQ_DEFAULT_PASS",
+    versions=[
+        VersionSpec(version="4.0", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="3.13", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(5672, 0),
+        _password_param("Mot de passe par defaut", 1, required=True),
+        _memory_param(512, 2),
+    ],
+)
+
+_NATS = TemplateCommand(
+    slug="nats",
+    name="NATS",
+    icon="send",
+    category=TemplateCategory.CACHE,
+    provider="Docker",
+    description="Systeme de messaging cloud-native leger.",
+    popular=False,
+    tags=["Messaging", "PubSub"],
+    is_active=True,
+    image_repository="nats",
+    internal_port=4222,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="2.10", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(4222, 0),
+        _memory_param(256, 1),
+    ],
+)
+
+_MOSQUITTO = TemplateCommand(
+    slug="mosquitto",
+    name="Mosquitto",
+    icon="send",
+    category=TemplateCategory.CACHE,
+    provider="Docker",
+    description="Broker MQTT leger pour l'IoT et l'embarque.",
+    popular=False,
+    tags=["Messaging", "MQTT"],
+    is_active=True,
+    image_repository="eclipse-mosquitto",
+    internal_port=1883,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="2.0", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(1883, 0),
+        _memory_param(128, 1),
+    ],
+)
+
+_KAFKA = TemplateCommand(
+    slug="kafka",
+    name="Kafka",
+    icon="send",
+    category=TemplateCategory.CACHE,
+    provider="Docker",
+    description="Plateforme de streaming d'evenements distribuee.",
+    popular=True,
+    tags=["Messaging", "Streaming"],
+    is_active=True,
+    image_repository="apache/kafka",
+    internal_port=9092,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="3.9", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="3.8", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(9092, 0),
+        _memory_param(1024, 1),
+    ],
+)
+
+
+# --------------------------------------------------------------------------- #
+# Runtimes & web / proxy (Docker)                                             #
+# --------------------------------------------------------------------------- #
+
+_TRAEFIK = TemplateCommand(
+    slug="traefik",
+    name="Traefik",
+    icon="globe",
+    category=TemplateCategory.NETWORK,
+    provider="Docker",
+    description="Reverse proxy cloud-native avec decouverte auto.",
+    popular=False,
+    tags=["Proxy", "Ingress"],
+    is_active=True,
+    image_repository="traefik",
+    internal_port=80,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="3.3", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="2.11", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(80, 0),
+        _memory_param(256, 1),
+    ],
+)
+
+_CADDY = TemplateCommand(
+    slug="caddy",
+    name="Caddy",
+    icon="globe",
+    category=TemplateCategory.NETWORK,
+    provider="Docker",
+    description="Serveur web avec HTTPS automatique (Let's Encrypt).",
+    popular=False,
+    tags=["Proxy", "TLS"],
+    is_active=True,
+    image_repository="caddy",
+    internal_port=80,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="2.9", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="2.8", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(80, 0),
+        _memory_param(256, 1),
+    ],
+)
+
+_PHP = TemplateCommand(
+    slug="php",
+    name="Conteneur PHP",
+    icon="box",
+    category=TemplateCategory.RUNTIME,
+    provider="Docker",
+    description="Runtime PHP-FPM/Apache pret a deployer.",
+    popular=False,
+    tags=["Runtime", "PHP"],
+    is_active=True,
+    image_repository="php",
+    internal_port=80,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="8.4", is_default=True, is_lts=False, eol_date=date(2028, 12, 31)),
+        VersionSpec(version="8.3", is_default=False, is_lts=False, eol_date=date(2027, 12, 31)),
+    ],
+    params=[
+        _port_param(80, 0),
+        _start_command_param("php-fpm", 1),
+        _memory_param(512, 2),
+    ],
+)
+
+_GOLANG = TemplateCommand(
+    slug="golang",
+    name="Conteneur Go",
+    icon="box",
+    category=TemplateCategory.RUNTIME,
+    provider="Docker",
+    description="Image Go pour compiler et lancer des binaires.",
+    popular=False,
+    tags=["Runtime", "Go"],
+    is_active=True,
+    image_repository="golang",
+    internal_port=None,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="1.24", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="1.23", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(8080, 0),
+        _start_command_param("go run .", 1),
+        _memory_param(512, 2),
+    ],
+)
+
+_ADMINER = TemplateCommand(
+    slug="adminer",
+    name="Adminer",
+    icon="database",
+    category=TemplateCategory.RUNTIME,
+    provider="Docker",
+    description="Interface web de gestion de bases de donnees.",
+    popular=False,
+    tags=["Admin", "SQL"],
+    is_active=True,
+    image_repository="adminer",
+    internal_port=8080,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="4.8", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(8080, 0),
+        _start_command_param("php -S [::]:8080 -t /var/www/html", 1),
+        _memory_param(256, 2),
+    ],
+)
+
+_GITEA = TemplateCommand(
+    slug="gitea",
+    name="Gitea",
+    icon="git-branch",
+    category=TemplateCategory.RUNTIME,
+    provider="Docker",
+    description="Forge Git auto-hebergee, legere et complete.",
+    popular=False,
+    tags=["Git", "DevOps"],
+    is_active=True,
+    image_repository="gitea/gitea",
+    internal_port=3000,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="1.23", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="1.22", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(3000, 0),
+        _memory_param(512, 1),
+    ],
+)
+
+_N8N = TemplateCommand(
+    slug="n8n",
+    name="n8n",
+    icon="workflow",
+    category=TemplateCategory.RUNTIME,
+    provider="Docker",
+    description="Automatisation de workflows low-code self-hosted.",
+    popular=False,
+    tags=["Automation", "Workflow"],
+    is_active=True,
+    image_repository="n8nio/n8n",
+    internal_port=5678,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="1.80", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(5678, 0),
+        _memory_param(512, 1),
+    ],
+)
+
+
+# --------------------------------------------------------------------------- #
+# Observabilite & securite (Docker)                                            #
+# --------------------------------------------------------------------------- #
+
+_GRAFANA = TemplateCommand(
+    slug="grafana",
+    name="Grafana",
+    icon="bar-chart-3",
+    category=TemplateCategory.OBSERVABILITY,
+    provider="Docker",
+    description="Dashboards et visualisation de metriques.",
+    popular=True,
+    tags=["Dashboards", "Metrics"],
+    is_active=True,
+    image_repository="grafana/grafana",
+    internal_port=3000,
+    secret_env="GF_SECURITY_ADMIN_PASSWORD",
+    versions=[
+        VersionSpec(version="11.5", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="10.4", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(3000, 0),
+        _password_param("Mot de passe administrateur", 1, required=True),
+        _memory_param(512, 2),
+    ],
+)
+
+_PROMETHEUS = TemplateCommand(
+    slug="prometheus",
+    name="Prometheus",
+    icon="activity",
+    category=TemplateCategory.OBSERVABILITY,
+    provider="Docker",
+    description="Collecte et requetage de metriques time-series.",
+    popular=True,
+    tags=["Metrics", "Monitoring"],
+    is_active=True,
+    image_repository="prom/prometheus",
+    internal_port=9090,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="3.1", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="2.55", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(9090, 0),
+        _memory_param(512, 1),
+    ],
+)
+
+_LOKI = TemplateCommand(
+    slug="loki",
+    name="Loki",
+    icon="scroll-text",
+    category=TemplateCategory.OBSERVABILITY,
+    provider="Docker",
+    description="Agregation de logs indexee par labels.",
+    popular=False,
+    tags=["Logs", "Monitoring"],
+    is_active=True,
+    image_repository="grafana/loki",
+    internal_port=3100,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="3.4", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="3.3", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(3100, 0),
+        _memory_param(512, 1),
+    ],
+)
+
+_JAEGER = TemplateCommand(
+    slug="jaeger",
+    name="Jaeger",
+    icon="route",
+    category=TemplateCategory.OBSERVABILITY,
+    provider="Docker",
+    description="Tracing distribue pour microservices.",
+    popular=False,
+    tags=["Tracing", "Monitoring"],
+    is_active=True,
+    image_repository="jaegertracing/all-in-one",
+    internal_port=16686,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="1.65", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(16686, 0),
+        _memory_param(512, 1),
+    ],
+)
+
+_UPTIME_KUMA = TemplateCommand(
+    slug="uptime-kuma",
+    name="Uptime Kuma",
+    icon="activity",
+    category=TemplateCategory.OBSERVABILITY,
+    provider="Docker",
+    description="Monitoring de disponibilite et alertes self-hosted.",
+    popular=False,
+    tags=["Monitoring", "Uptime"],
+    is_active=True,
+    image_repository="louislam/uptime-kuma",
+    internal_port=3001,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="1.23", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(3001, 0),
+        _memory_param(256, 1),
+    ],
+)
+
+_MAILHOG = TemplateCommand(
+    slug="mailhog",
+    name="MailHog",
+    icon="mail",
+    category=TemplateCategory.OBSERVABILITY,
+    provider="Docker",
+    description="Serveur SMTP de test avec interface web.",
+    popular=False,
+    tags=["Email", "Testing"],
+    is_active=True,
+    image_repository="mailhog/mailhog",
+    internal_port=8025,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="1.0", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(8025, 0),
+        _memory_param(128, 1),
+    ],
+)
+
+_KEYCLOAK = TemplateCommand(
+    slug="keycloak",
+    name="Keycloak",
+    icon="lock",
+    category=TemplateCategory.SECURITY,
+    provider="Docker",
+    description="Gestion d'identite et d'acces (SSO, OIDC, SAML).",
+    popular=True,
+    tags=["SSO", "IAM"],
+    is_active=True,
+    image_repository="quay.io/keycloak/keycloak",
+    internal_port=8080,
+    secret_env="KEYCLOAK_ADMIN_PASSWORD",
+    versions=[
+        VersionSpec(version="26.1", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="25.0", is_default=False, is_lts=False, eol_date=None),
+    ],
+    params=[
+        _port_param(8080, 0),
+        _password_param("Mot de passe administrateur", 1, required=True),
+        _memory_param(1024, 2),
+    ],
+)
+
+
+# --------------------------------------------------------------------------- #
+# Infra / cloud — Terraform (cartes bloquees, sans image Docker)               #
+# --------------------------------------------------------------------------- #
+
+_KUBERNETES = TemplateCommand(
+    slug="kubernetes",
+    name="Cluster Kubernetes",
+    icon="boxes",
+    category=TemplateCategory.VM,
+    provider="Terraform",
+    description="Cluster Kubernetes manage, prets pour vos workloads.",
+    popular=False,
+    tags=["K8s", "Cluster"],
+    is_active=True,
+    engine=EngineKind.TERRAFORM,
+    # Provisionne par Terraform (cluster), pas via une image Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="v1", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        ParamSpec(
+            key="cluster_name",
+            label="Nom du cluster",
+            type=ParamType.STRING,
+            required=True,
+            default_value="mon-cluster",
+            options=None,
+            order_index=0,
+        ),
+        ParamSpec(
+            key="node_count",
+            label="Nombre de noeuds",
+            type=ParamType.INT,
+            required=False,
+            default_value="3",
+            options=None,
+            order_index=1,
+        ),
+    ],
+)
+
+_MANAGED_DATABASE = TemplateCommand(
+    slug="managed-database",
+    name="Base managee",
+    icon="database",
+    category=TemplateCategory.DATABASE,
+    provider="Terraform",
+    description="Base de donnees managee type RDS, backups inclus.",
+    popular=False,
+    tags=["Managed", "RDS"],
+    is_active=True,
+    engine=EngineKind.TERRAFORM,
+    # Service manage provisionne par Terraform, pas une image Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="v1", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        ParamSpec(
+            key="engine",
+            label="Moteur",
+            type=ParamType.SELECT,
+            required=True,
+            default_value="postgres",
+            options={"choices": ["postgres", "mysql", "mariadb"]},
+            order_index=0,
+        ),
+        ParamSpec(
+            key="instance_size",
+            label="Taille d'instance",
+            type=ParamType.SELECT,
+            required=False,
+            default_value="small",
+            options={"choices": ["small", "medium", "large"]},
+            order_index=1,
+        ),
+    ],
+)
+
+_LOAD_BALANCER = TemplateCommand(
+    slug="load-balancer",
+    name="Load Balancer",
+    icon="network",
+    category=TemplateCategory.NETWORK,
+    provider="Terraform",
+    description="Repartiteur de charge L4/L7 avec sante des cibles.",
+    popular=False,
+    tags=["LB", "Network"],
+    is_active=True,
+    engine=EngineKind.TERRAFORM,
+    # Ressource reseau provisionnee par Terraform, pas un conteneur Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="v1", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        ParamSpec(
+            key="lb_name",
+            label="Nom du load balancer",
+            type=ParamType.STRING,
+            required=True,
+            default_value="mon-lb",
+            options=None,
+            order_index=0,
+        ),
+        ParamSpec(
+            key="protocol",
+            label="Protocole",
+            type=ParamType.SELECT,
+            required=False,
+            default_value="http",
+            options={"choices": ["http", "https", "tcp"]},
+            order_index=1,
+        ),
+    ],
+)
+
+_DNS_ZONE = TemplateCommand(
+    slug="dns-zone",
+    name="Zone DNS",
+    icon="globe",
+    category=TemplateCategory.NETWORK,
+    provider="Terraform",
+    description="Zone DNS managee avec enregistrements versionnes.",
+    popular=False,
+    tags=["DNS", "Network"],
+    is_active=True,
+    engine=EngineKind.TERRAFORM,
+    # Zone DNS provisionnee par Terraform, pas un conteneur Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="v1", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        ParamSpec(
+            key="domain_name",
+            label="Nom de domaine",
+            type=ParamType.STRING,
+            required=True,
+            default_value="exemple.com",
+            options=None,
+            order_index=0,
+        ),
+        ParamSpec(
+            key="ttl",
+            label="TTL par defaut (s)",
+            type=ParamType.INT,
+            required=False,
+            default_value="3600",
+            options=None,
+            order_index=1,
+        ),
+    ],
+)
+
+_CDN = TemplateCommand(
+    slug="cdn",
+    name="CDN",
+    icon="globe",
+    category=TemplateCategory.NETWORK,
+    provider="Terraform",
+    description="Reseau de diffusion de contenu en peripherie.",
+    popular=False,
+    tags=["CDN", "Edge"],
+    is_active=True,
+    engine=EngineKind.TERRAFORM,
+    # Distribution CDN provisionnee par Terraform, pas un conteneur Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="v1", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        ParamSpec(
+            key="origin_url",
+            label="URL d'origine",
+            type=ParamType.STRING,
+            required=True,
+            default_value="https://origin.exemple.com",
+            options=None,
+            order_index=0,
+        ),
+        ParamSpec(
+            key="cache_ttl",
+            label="Duree de cache (s)",
+            type=ParamType.INT,
+            required=False,
+            default_value="86400",
+            options=None,
+            order_index=1,
+        ),
+    ],
+)
+
+_SERVERLESS_FUNCTION = TemplateCommand(
+    slug="serverless-function",
+    name="Fonction serverless",
+    icon="zap",
+    category=TemplateCategory.RUNTIME,
+    provider="Terraform",
+    description="Fonction a la demande, scaling automatique.",
+    popular=False,
+    tags=["Serverless", "FaaS"],
+    is_active=True,
+    engine=EngineKind.TERRAFORM,
+    # Fonction managee provisionnee par Terraform, pas un conteneur Docker.
+    image_repository=None,
+    internal_port=None,
+    secret_env=None,
+    versions=[
+        VersionSpec(version="v1", is_default=True, is_lts=False, eol_date=None),
+    ],
+    params=[
+        ParamSpec(
+            key="function_name",
+            label="Nom de la fonction",
+            type=ParamType.STRING,
+            required=True,
+            default_value="ma-fonction",
+            options=None,
+            order_index=0,
+        ),
+        ParamSpec(
+            key="runtime",
+            label="Runtime",
+            type=ParamType.SELECT,
+            required=False,
+            default_value="python3.13",
+            options={"choices": ["python3.13", "node20", "go1.24"]},
+            order_index=1,
+        ),
+    ],
+)
+
+
+# Catalogue legitime de 45 templates (metadonnees publiques, aucune donnee
 # utilisateur). Sert de jeu de donnees initial du store.
 CATALOG_SEED: list[TemplateCommand] = [
     _POSTGRESQL,
@@ -530,4 +1466,42 @@ CATALOG_SEED: list[TemplateCommand] = [
     _OLLAMA,
     _VPC,
     _S3,
+    # Bases & data
+    _MYSQL,
+    _MARIADB,
+    _MONGODB,
+    _COUCHDB,
+    _MEILISEARCH,
+    _INFLUXDB,
+    _NEO4J,
+    _CLICKHOUSE,
+    # Cache & messaging
+    _MEMCACHED,
+    _RABBITMQ,
+    _NATS,
+    _MOSQUITTO,
+    _KAFKA,
+    # Runtimes & web / proxy
+    _TRAEFIK,
+    _CADDY,
+    _PHP,
+    _GOLANG,
+    _ADMINER,
+    _GITEA,
+    _N8N,
+    # Observabilite & securite
+    _GRAFANA,
+    _PROMETHEUS,
+    _LOKI,
+    _JAEGER,
+    _UPTIME_KUMA,
+    _MAILHOG,
+    _KEYCLOAK,
+    # Infra / cloud — Terraform (bloques)
+    _KUBERNETES,
+    _MANAGED_DATABASE,
+    _LOAD_BALANCER,
+    _DNS_ZONE,
+    _CDN,
+    _SERVERLESS_FUNCTION,
 ]

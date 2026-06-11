@@ -14,6 +14,7 @@ const pgCard: TemplateCardDTO = {
   icon: 'database',
   category: 'database',
   provider: 'Docker',
+  engine: 'docker',
   tags: ['SQL'],
   description: 'Base relationnelle managée.',
   popular: true,

@@ -16,6 +16,7 @@ const pgDetail: TemplateDetailDTO = {
   icon: 'database',
   category: 'database',
   provider: 'Docker',
+  engine: 'docker',
   tags: ['SQL', 'Persistant'],
   description: 'Base relationnelle managée, backups & replicas.',
   popular: true,
