@@ -18,6 +18,7 @@ from app.deployment.presentation.routers.deployment_router import (
     router as deployment_router,
 )
 from app.health.presentation.routers.health_router import router as health_router
+from app.stack.presentation.routers.stack_router import router as stack_router
 
 # Environnements internes autorises a exposer Swagger / ReDoc / OpenAPI.
 # En dehors (preview, prod, staging, ...) on desactive pour ne pas divulguer
@@ -93,6 +94,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "cases de deploiement). Le LLM ne voit jamais de secret."
                 ),
             },
+            {
+                "name": "Stack",
+                "description": (
+                    "Composeur de stacks multi-services : creation (composition "
+                    "validee puis persistee, le provisioning compose viendra plus "
+                    "tard), liste, detail (services + liens) et suppression. Toutes "
+                    "les routes sont isolees par proprietaire ; aucun secret ne "
+                    "figure dans les reponses (params secret masques)."
+                ),
+            },
         ],
     )
     app.add_middleware(LoggingMiddleware)
@@ -112,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(catalog_router)
     app.include_router(deployment_router)
     app.include_router(chat_router)
+    app.include_router(stack_router)
 
     @app.get("/version", tags=["Platform"], summary="Metadonnees de build et de deploiement")
     async def version(settings: SettingsDep) -> VersionResponse:
