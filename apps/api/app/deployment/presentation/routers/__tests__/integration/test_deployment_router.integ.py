@@ -263,6 +263,47 @@ class TestCreate:
         assert response.json()["error"] == "INVALID_DEPLOYMENT_PARAMS"
         assert queue.enqueued == []
 
+    async def test_creation_param_requis_avec_defaut_omis_renvoie_201(
+        self, context: dict[str, object]
+    ) -> None:
+        # Regression #85 : un client (ex. le chat) qui omet un param requis
+        # non-secret muni d'un `default_value` ne doit PAS recevoir 422. Le defaut
+        # est applique cote serveur et atterrit dans les params persistes.
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        queue: FakeJobQueue = context["queue"]  # type: ignore[assignment]
+        repository: FakeDeploymentRepository = context["repository"]  # type: ignore[assignment]
+        template_id = UUID(int=43)
+        specs = (
+            TemplateParamSpec(
+                key="username",
+                type=ParamType.STRING,
+                required=True,
+                options=None,
+                default_value="root",
+            ),
+        )
+        reader = FakeTemplateProvisioningReader(
+            {(template_id, "16"): docker_descriptor(params=specs)}
+        )
+        app = http._transport.app  # type: ignore[attr-defined]
+        app.dependency_overrides[get_template_provisioning_reader] = lambda: reader
+
+        response = await http.post(
+            "/deployments",
+            json={
+                "template_id": str(template_id),
+                "version": "16",
+                "name": "ma-base",
+                "params": {},
+            },
+            headers=_auth(user),
+        )
+
+        assert response.status_code == 201, response.text
+        assert [job.kind for job in queue.enqueued] == [JobKind.PROVISION]
+        assert repository.added[0].params["username"] == "root"
+
 
 class TestListAndGet:
     async def test_liste_ne_renvoie_que_les_deploiements_de_l_owner(
