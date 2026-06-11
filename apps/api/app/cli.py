@@ -80,9 +80,12 @@ async def _run_seed_catalog() -> None:
     session_factory = get_sessionmaker()
     async with session_factory() as session:
         seeder = CatalogSeeder(SqlAlchemyTemplateRepository(session))
-        inserted = await seeder.seed()
+        outcome = await seeder.seed()
         await session.commit()
-    print(f"Seed catalogue : {inserted} templates inseres (idempotent).")
+    print(
+        f"Seed catalogue : {outcome.inserted} insere(s), "
+        f"{outcome.updated} mis a jour (convergent, idempotent)."
+    )
 
 
 def _prompt_password() -> str:
