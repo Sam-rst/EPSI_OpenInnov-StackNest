@@ -68,7 +68,7 @@ export function ChatComposer({ onSend, disabled, pending = false }: ChatComposer
   }
 
   return (
-    <div className="border-border bg-surface-elevated border-t p-4">
+    <div className="border-border bg-surface-elevated shrink-0 border-t p-4">
       <div className="mx-auto max-w-[760px]">
         <form
           onSubmit={handleSubmit}

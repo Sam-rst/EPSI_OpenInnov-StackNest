@@ -55,7 +55,7 @@ export function MessageList({
   const streaming = streamStatus === 'streaming' && streamingText.length > 0
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div className="relative min-h-0 flex-1 overflow-hidden">
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto p-6 md:p-8">
         <div className="mx-auto flex max-w-[760px] flex-col gap-5">
           {messages.map((message) => (
