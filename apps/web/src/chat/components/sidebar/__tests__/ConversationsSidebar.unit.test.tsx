@@ -63,12 +63,17 @@ describe('ConversationsSidebar', () => {
     expect(onCreate).toHaveBeenCalledTimes(1)
   })
 
-  it('supprime un fil', async () => {
+  it('supprime un fil après confirmation', async () => {
     const user = userEvent.setup()
     const { onDelete } = renderSidebar()
 
-    const deleteButtons = screen.getAllByRole('button', { name: /Supprimer/ })
+    const deleteButtons = screen.getAllByRole('button', { name: /Supprimer «/ })
     await user.click(deleteButtons[0])
+
+    // Confirmation requise : rien n'est supprimé tant qu'on n'a pas confirmé.
+    expect(onDelete).not.toHaveBeenCalled()
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /^Supprimer$/ }))
 
     expect(onDelete).toHaveBeenCalledWith('c1')
   })
