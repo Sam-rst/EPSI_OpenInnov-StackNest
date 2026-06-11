@@ -3,16 +3,23 @@ import { describe, expect, it } from 'vitest'
 import { SIDEBAR_NAV, TOPBAR_TITLES } from '../navigation'
 
 describe('navigation config', () => {
-  it('expose les 6 entrées de navigation principale', () => {
-    expect(SIDEBAR_NAV).toHaveLength(6)
+  it('expose les 7 entrées de navigation principale', () => {
+    expect(SIDEBAR_NAV).toHaveLength(7)
   })
 
-  it('répartit 4 entrées Plateforme et 2 Administration', () => {
+  it('répartit 5 entrées Plateforme et 2 Administration', () => {
     const main = SIDEBAR_NAV.filter((item) => item.group === 'main')
     const admin = SIDEBAR_NAV.filter((item) => item.group === 'admin')
 
-    expect(main).toHaveLength(4)
+    expect(main).toHaveLength(5)
     expect(admin).toHaveLength(2)
+  })
+
+  it('expose une entrée Stacks vers le composeur', () => {
+    const stacks = SIDEBAR_NAV.find((item) => item.id === 'stacks')
+
+    expect(stacks?.to).toBe('/stacks')
+    expect(stacks?.group).toBe('main')
   })
 
   it('marque ChatOps IA comme nouveauté', () => {

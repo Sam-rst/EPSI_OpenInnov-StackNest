@@ -42,7 +42,7 @@ describe('Sidebar', () => {
     expect(screen.queryByText('StackNest Lab')).toBeNull()
     expect(screen.queryByText(/plan Team/i)).toBeNull()
     expect(screen.getByText('Coût ce mois')).toBeInTheDocument()
-    expect(screen.getAllByRole('link')).toHaveLength(6)
+    expect(screen.getAllByRole('link')).toHaveLength(7)
   })
 
   it('referme le drawer au clic sur un lien de navigation', async () => {

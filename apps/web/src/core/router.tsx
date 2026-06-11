@@ -17,6 +17,9 @@ import { DeploymentsPage } from '../deployment/pages/DeploymentsPage'
 import { DeploymentDetailPage } from '../deployment/pages/DeploymentDetailPage'
 import { ConfigPage } from '../deployment/pages/ConfigPage'
 import { ChatPage } from '../chat/pages/ChatPage'
+import { StacksPage } from '../stack/pages/StacksPage'
+import { StackBuilderPage } from '../stack/pages/StackBuilderPage'
+import { StackDetailPage } from '../stack/pages/StackDetailPage'
 import { TeamPage } from '../team/pages/TeamPage'
 import { SettingsPage } from '../settings/pages/SettingsPage'
 
@@ -46,6 +49,11 @@ export const routes: RouteObject[] = [
       { path: 'deployments', element: requireAuth(<DeploymentsPage />) },
       { path: 'deployments/:id', element: requireAuth(<DeploymentDetailPage />) },
       { path: 'deployments/config', element: requireAuth(<ConfigPage />) },
+      // Stacks (composeur). « new » déclaré avant `:id` : le segment statique
+      // prime sur le param dynamique.
+      { path: 'stacks', element: requireAuth(<StacksPage />) },
+      { path: 'stacks/new', element: requireAuth(<StackBuilderPage />) },
+      { path: 'stacks/:id', element: requireAuth(<StackDetailPage />) },
       { path: 'chat', element: requireAuth(<ChatPage />) },
       // Fil actif porté par l'URL : un fil sélectionné est partageable / rechargeable.
       { path: 'chat/:id', element: requireAuth(<ChatPage />) },
