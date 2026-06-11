@@ -198,7 +198,9 @@ _MINIO = TemplateCommand(
     internal_port=9000,
     secret_env="MINIO_ROOT_PASSWORD",
     versions=[
-        VersionSpec(version="RELEASE.2025-04-22", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(
+            version="RELEASE.2025-04-22T22-12-26Z", is_default=True, is_lts=False, eol_date=None
+        ),
     ],
     params=[
         ParamSpec(
@@ -458,7 +460,7 @@ _OLLAMA = TemplateCommand(
     internal_port=11434,
     secret_env=None,
     versions=[
-        VersionSpec(version="0.5", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="0.5.13", is_default=True, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(11434, 0),
@@ -591,7 +593,7 @@ _MYSQL = TemplateCommand(
     internal_port=3306,
     secret_env="MYSQL_ROOT_PASSWORD",
     versions=[
-        VersionSpec(version="8.4 LTS", is_default=True, is_lts=True, eol_date=date(2032, 4, 30)),
+        VersionSpec(version="8.4", is_default=True, is_lts=True, eol_date=date(2032, 4, 30)),
         VersionSpec(version="8.0", is_default=False, is_lts=False, eol_date=date(2026, 4, 30)),
     ],
     params=[
@@ -616,8 +618,8 @@ _MARIADB = TemplateCommand(
     internal_port=3306,
     secret_env="MARIADB_ROOT_PASSWORD",
     versions=[
-        VersionSpec(version="11.4 LTS", is_default=True, is_lts=True, eol_date=date(2029, 5, 29)),
-        VersionSpec(version="10.11 LTS", is_default=False, is_lts=True, eol_date=date(2028, 2, 16)),
+        VersionSpec(version="11.4", is_default=True, is_lts=True, eol_date=date(2029, 5, 29)),
+        VersionSpec(version="10.11", is_default=False, is_lts=True, eol_date=date(2028, 2, 16)),
     ],
     params=[
         _db_name_param("app", 0, env_var="MARIADB_DATABASE"),
@@ -696,8 +698,8 @@ _MEILISEARCH = TemplateCommand(
     internal_port=7700,
     secret_env="MEILI_MASTER_KEY",
     versions=[
-        VersionSpec(version="1.13", is_default=True, is_lts=False, eol_date=None),
-        VersionSpec(version="1.12", is_default=False, is_lts=False, eol_date=None),
+        VersionSpec(version="v1.13", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="v1.12", is_default=False, is_lts=False, eol_date=None),
     ],
     params=[
         # Meilisearch n'a pas de "base" a nommer : db_name reste sans env_var (None),
@@ -777,8 +779,8 @@ _CLICKHOUSE = TemplateCommand(
     internal_port=8123,
     secret_env="CLICKHOUSE_PASSWORD",
     versions=[
-        VersionSpec(version="25.3 LTS", is_default=True, is_lts=True, eol_date=None),
-        VersionSpec(version="24.8 LTS", is_default=False, is_lts=True, eol_date=None),
+        VersionSpec(version="25.3", is_default=True, is_lts=True, eol_date=None),
+        VersionSpec(version="24.8", is_default=False, is_lts=True, eol_date=None),
     ],
     params=[
         _db_name_param("default", 0),
@@ -898,8 +900,8 @@ _KAFKA = TemplateCommand(
     internal_port=9092,
     secret_env=None,
     versions=[
-        VersionSpec(version="3.9", is_default=True, is_lts=False, eol_date=None),
-        VersionSpec(version="3.8", is_default=False, is_lts=False, eol_date=None),
+        VersionSpec(version="3.9.0", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="3.8.1", is_default=False, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(9092, 0),
@@ -1020,7 +1022,7 @@ _ADMINER = TemplateCommand(
     internal_port=8080,
     secret_env=None,
     versions=[
-        VersionSpec(version="4.8", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="4.8.1", is_default=True, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(8080, 0),
@@ -1066,7 +1068,7 @@ _N8N = TemplateCommand(
     internal_port=5678,
     secret_env=None,
     versions=[
-        VersionSpec(version="1.80", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="1.80.5", is_default=True, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(5678, 0),
@@ -1094,7 +1096,7 @@ _GRAFANA = TemplateCommand(
     secret_env="GF_SECURITY_ADMIN_PASSWORD",
     versions=[
         VersionSpec(version="11.5", is_default=True, is_lts=False, eol_date=None),
-        VersionSpec(version="10.4", is_default=False, is_lts=False, eol_date=None),
+        VersionSpec(version="10.4.19", is_default=False, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(3000, 0),
@@ -1118,8 +1120,8 @@ _PROMETHEUS = TemplateCommand(
     internal_port=9090,
     secret_env=None,
     versions=[
-        VersionSpec(version="3.1", is_default=True, is_lts=False, eol_date=None),
-        VersionSpec(version="2.55", is_default=False, is_lts=False, eol_date=None),
+        VersionSpec(version="v3.1.0", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="v2.55.0", is_default=False, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(9090, 0),
@@ -1164,7 +1166,7 @@ _JAEGER = TemplateCommand(
     internal_port=16686,
     secret_env=None,
     versions=[
-        VersionSpec(version="1.65", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="1.65.0", is_default=True, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(16686, 0),
@@ -1186,7 +1188,7 @@ _UPTIME_KUMA = TemplateCommand(
     internal_port=3001,
     secret_env=None,
     versions=[
-        VersionSpec(version="1.23", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="1.23.17", is_default=True, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(3001, 0),
@@ -1208,7 +1210,7 @@ _MAILHOG = TemplateCommand(
     internal_port=8025,
     secret_env=None,
     versions=[
-        VersionSpec(version="1.0", is_default=True, is_lts=False, eol_date=None),
+        VersionSpec(version="v1.0.1", is_default=True, is_lts=False, eol_date=None),
     ],
     params=[
         _port_param(8025, 0),
