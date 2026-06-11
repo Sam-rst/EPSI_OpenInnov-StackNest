@@ -16,7 +16,12 @@ _SEED_SIZE = len(CATALOG_SEED)
 
 
 def _command(
-    *, slug: str = "postgresql-16", params: list[ParamSpec] | None = None
+    *,
+    slug: str = "postgresql-16",
+    params: list[ParamSpec] | None = None,
+    command: list[str] | None = None,
+    secret_value_template: str | None = None,
+    is_deployable: bool = True,
 ) -> TemplateCommand:
     """Construit une TemplateCommand minimale valide pour les tests."""
     return TemplateCommand(
@@ -31,6 +36,9 @@ def _command(
         is_active=True,
         engine=EngineKind.DOCKER,
         params=params if params is not None else [],
+        command=command,
+        secret_value_template=secret_value_template,
+        is_deployable=is_deployable,
     )
 
 
@@ -132,6 +140,35 @@ class TestCatalogSeeder:
         assert updated is not None
         assert updated.id == original_id
         assert {param.key for param in updated.params} == {"database", "schema"}
+
+    async def test_changement_de_champ_v2_seul_declenche_un_update(self) -> None:
+        """Un template dont seuls les champs v2 changent est detecte et mis a jour.
+
+        Regression : `_snapshot` ignorait `command`/`secret_value_template`/
+        `is_deployable` -> un template dont seul un champ v2 evoluait n'etait jamais
+        reactualise (runtimes restes deployables, Keycloak/Neo4j non configures).
+        """
+        repository = FakeTemplateRepository([])
+        seeder = CatalogSeeder(repository)
+        await seeder.seed(dataset=[_command(slug="keycloak")])
+
+        outcome = await seeder.seed(
+            dataset=[
+                _command(
+                    slug="keycloak",
+                    is_deployable=False,
+                    command=["start-dev"],
+                    secret_value_template="neo4j/{secret}",
+                )
+            ]
+        )
+
+        assert outcome.updated == 1
+        stored = await repository.get_by_slug(Slug("keycloak"))
+        assert stored is not None
+        assert stored.is_deployable is False
+        assert stored.command == ["start-dev"]
+        assert stored.secret_value_template == "neo4j/{secret}"
 
     async def test_seed_complet_est_idempotent_et_convergent(self) -> None:
         repository = FakeTemplateRepository([])

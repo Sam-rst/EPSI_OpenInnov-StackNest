@@ -66,6 +66,9 @@ class CatalogSeeder:
             template.image_repository,
             template.internal_port,
             template.secret_env,
+            None if template.command is None else tuple(template.command),
+            template.secret_value_template,
+            template.is_deployable,
             tuple(
                 (version.version, version.is_default, version.is_lts, version.eol_date)
                 for version in template.versions

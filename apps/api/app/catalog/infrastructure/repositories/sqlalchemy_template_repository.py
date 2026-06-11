@@ -117,3 +117,9 @@ class SqlAlchemyTemplateRepository(TemplateRepository):
         model.tags = list(template.tags)
         model.is_active = template.is_active
         model.engine = template.engine
+        model.image_repository = template.image_repository
+        model.internal_port = template.internal_port
+        model.secret_env = template.secret_env
+        model.command = list(template.command) if template.command is not None else None
+        model.secret_value_template = template.secret_value_template
+        model.is_deployable = template.is_deployable
