@@ -57,3 +57,9 @@ export interface ActionResultEventDTO {
 export interface ErrorEventDTO {
   message: string
 }
+
+/** Titre auto du fil, généré par le LLM au 1er message (émis une fois). */
+export interface TitleEventDTO {
+  /** Libellé court résumant la demande (déjà nettoyé côté back). */
+  title: string
+}

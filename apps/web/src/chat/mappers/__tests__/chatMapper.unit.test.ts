@@ -187,6 +187,11 @@ describe('chatMapper', () => {
       expect(event).toEqual({ type: 'error', message: 'Quota dépassé' })
     })
 
+    it('mappe le titre auto du fil', () => {
+      const event = mapStreamEvent('title', JSON.stringify({ title: 'Déploiement PostgreSQL' }))
+      expect(event).toEqual({ type: 'title', title: 'Déploiement PostgreSQL' })
+    })
+
     it('ignore une trame keepalive vide (heartbeat SSE) sans lever', () => {
       // @microsoft/fetch-event-source dispatche un message au nom/données vides
       // sur la ligne blanche qui termine le commentaire « : keepalive ». Sans ce

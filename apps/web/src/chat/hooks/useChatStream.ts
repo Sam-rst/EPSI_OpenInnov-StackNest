@@ -1,14 +1,17 @@
 import { type EventSourceMessage, fetchEventSource } from '@microsoft/fetch-event-source'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { apiClient } from '../../core/api/apiClient'
 import { refreshAccessToken } from '../../core/api/refreshSession'
 import { getAccessToken } from '../../core/api/tokenStore'
 import { mapStreamEvent } from '../mappers/chatMapper'
+import { CHAT_QUERY_KEYS } from './chatQueryKeys'
 import { sendMessage } from '../services/chatService'
 import { ActionStatus } from '../types/enums/ActionStatus'
 import { MessageRole } from '../types/enums/MessageRole'
 import type { ChatStreamEvent } from '../types/models/ChatStreamEvent'
+import type { Conversation } from '../types/models/Conversation'
 import type {
   ChatErrorKind,
   ChatStreamError,
@@ -252,6 +255,7 @@ function createOpenGate(): OpenGate {
  *   - **401** : refresh borné puis réouverture avec le nouveau Bearer (`auth` si épuisé).
  */
 export function useChatStream(conversationId: string): UseChatStreamResult {
+  const queryClient = useQueryClient()
   const [state, setState] = useState<KeyedStreamState>(() => initialState(conversationId))
   // Bump pour rouvrir un flux frais sans changer de fil (stop, redémarrage manuel).
   const [connectionNonce, setConnectionNonce] = useState(0)
@@ -274,6 +278,15 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
 
     const applyEvent = (message: EventSourceMessage): void => {
       const event = mapStreamEvent(message.event, message.data)
+      // Le titre auto (1er message) ne touche pas l'état du tour : il met à jour le
+      // libellé du fil dans la sidebar. On patche DIRECTEMENT le cache avec le titre
+      // de l'event (pas d'invalidation/refetch) : le back publie l'event AVANT le
+      // commit de sa transaction, donc un refetch immédiat relirait l'ancien titre.
+      if (event.type === 'title') {
+        queryClient.setQueryData<readonly Conversation[]>(CHAT_QUERY_KEYS.conversations, (fils) =>
+          fils?.map((fil) => (fil.id === conversationId ? { ...fil, title: event.title } : fil)),
+        )
+      }
       setState((previous) => reduceEvent(baseFor(previous), event))
     }
 
@@ -381,7 +394,7 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
     return () => {
       controller.abort()
     }
-  }, [conversationId, connectionNonce])
+  }, [conversationId, connectionNonce, queryClient])
 
   /** Lance le POST d'envoi après ouverture du flux (E1) ; échec → erreur réseau (B3). */
   const postWhenReady = useCallback(

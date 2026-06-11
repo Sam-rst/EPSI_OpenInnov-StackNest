@@ -1,11 +1,22 @@
 import type { EventSourceMessage, FetchEventSourceInit } from '@microsoft/fetch-event-source'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { createElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ActionStatus } from '../../types/enums/ActionStatus'
 import { MessageRole } from '../../types/enums/MessageRole'
 import { ChatStreamEventName } from '../../types/models/ChatStreamEvent'
+import type { Conversation } from '../../types/models/Conversation'
+import { CHAT_QUERY_KEYS } from '../chatQueryKeys'
 import { useChatStream } from '../useChatStream'
+
+// `useChatStream` lit le `QueryClient` (invalidation de la liste des conversations
+// au titre auto) : tout rendu de hook doit donc fournir un `QueryClientProvider`.
+const testQueryClient = new QueryClient()
+function wrapper({ children }: { children: ReactNode }) {
+  return createElement(QueryClientProvider, { client: testQueryClient }, children)
+}
 
 /**
  * On mocke `@microsoft/fetch-event-source` (flux SSE), le `tokenStore` (Bearer), le
@@ -149,7 +160,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('ouverture du flux', () => {
     it('ouvre le flux SSE sur le bon endpoint avec le header Bearer', () => {
-      renderHook(() => useChatStream('c1'))
+      renderHook(() => useChatStream('c1'), { wrapper })
 
       expect(fetchEventSourceMock).toHaveBeenCalledTimes(1)
       const stream = lastStream()
@@ -158,13 +169,13 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('n’ouvre aucun flux sans conversation active', () => {
-      renderHook(() => useChatStream(''))
+      renderHook(() => useChatStream(''), { wrapper })
 
       expect(fetchEventSourceMock).not.toHaveBeenCalled()
     })
 
     it('démarre au repos (idle), sans message ni texte de streaming', () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
 
       expect(result.current.state.status).toBe('idle')
       expect(result.current.state.streamingText).toBe('')
@@ -177,7 +188,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('machine d’état du tour', () => {
     it('passe en thinking dès l’envoi (avant le 1er token) et ajoute le message user', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'Je veux un Postgres')
 
       expect(stream).toBeDefined()
@@ -188,7 +199,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('passe en streaming au 1er token et accumule le texte', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
 
       act(() => {
@@ -201,7 +212,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('passe en done et vide le buffer quand le message final est figé', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
 
       act(() => {
@@ -217,7 +228,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('passe en done sur une action proposée (bulle porteuse de l’action)', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
 
       act(() => stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal()))
@@ -231,7 +242,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('ignore un envoi vide (pas de message, pas de POST)', () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
 
       act(() => result.current.send('   '))
 
@@ -243,7 +254,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('verrou d’envoi (E2 / canSend)', () => {
     it('canSend=false pendant thinking', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       await sendAfterOpen(result.current.send, 'go')
 
       expect(result.current.state.status).toBe('thinking')
@@ -251,7 +262,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('canSend=false pendant streaming', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
 
       act(() => stream.emit(ChatStreamEventName.TOKEN, { delta: 'x' }))
@@ -261,7 +272,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('canSend redevient true après done', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
 
       act(() => stream.emit(ChatStreamEventName.MESSAGE, { content: 'fini' }))
@@ -270,7 +281,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('un 2e envoi est ignoré tant qu’un tour est en cours', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       await sendAfterOpen(result.current.send, 'premier')
       sendMessageMock.mockClear()
 
@@ -283,7 +294,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('course du 1er message (E1)', () => {
     it('n’émet le POST /messages qu’après l’ouverture du flux SSE', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = lastStream()
 
       // Le flux n'est pas encore ouvert : l'envoi ne doit PAS encore poster.
@@ -301,7 +312,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('poste immédiatement si le flux est déjà ouvert', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = lastStream()
       await act(async () => {
         stream.open(200)
@@ -315,7 +326,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('erreurs typées', () => {
     it('error métier (event error) → kind business, sans reconnexion', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
 
       act(() => stream.emit(ChatStreamEventName.ERROR, { message: 'Template inconnu' }))
@@ -327,7 +338,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
     it('401 avec refresh épuisé → kind auth', async () => {
       refreshAccessTokenMock.mockRejectedValue(new Error('refresh expiré'))
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = lastStream()
 
       await act(async () => {
@@ -344,7 +355,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
       getAccessTokenMock.mockReturnValue('access-frais')
       refreshAccessTokenMock.mockResolvedValue(undefined)
 
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const firstStream = lastStream()
       expect(firstStream.init.headers?.Authorization).toBe('Bearer access-expiré')
 
@@ -360,7 +371,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
     it('échec du POST d’envoi → erreur (message non perdu, B3)', async () => {
       sendMessageMock.mockRejectedValueOnce(new Error('boom'))
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = lastStream()
       await act(async () => {
         stream.open(200)
@@ -375,10 +386,39 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
   })
 
+  describe('titre auto (1er message)', () => {
+    it('met à jour le libellé du fil dans le cache au reçu d’un event title', async () => {
+      // Cache seedé avec le fil au titre par défaut (comme après création).
+      testQueryClient.setQueryData<readonly Conversation[]>(CHAT_QUERY_KEYS.conversations, [
+        {
+          id: 'c1',
+          title: 'Nouvelle conversation',
+          createdAt: null,
+          updatedAt: null,
+          relativeWhen: "à l'instant",
+        },
+      ])
+      renderHook(() => useChatStream('c1'), { wrapper })
+      const stream = lastStream()
+      await act(async () => {
+        stream.open(200)
+      })
+
+      act(() => stream.emit('title', { title: 'Déploiement Redis' }))
+
+      // Patch direct du cache (pas de refetch : la transaction back n'est pas
+      // encore commitée au moment où l'event arrive).
+      const fils = testQueryClient.getQueryData<readonly Conversation[]>(
+        CHAT_QUERY_KEYS.conversations,
+      )
+      expect(fils?.[0]?.title).toBe('Déploiement Redis')
+    })
+  })
+
   describe('reconnexion bornée avec backoff (B4)', () => {
     it('sur coupure réseau, passe en isReconnecting et rouvre un flux (pas d’erreur immédiate)', async () => {
       vi.useFakeTimers()
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = lastStream()
       await act(async () => {
         stream.open(200)
@@ -399,7 +439,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
     it('après épuisement des tentatives, bascule en error kind network', async () => {
       vi.useFakeTimers()
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
 
       // 1 ouverture initiale + N reconnexions : chaque flux échoue, jusqu'à épuisement.
       // À l'échec du dernier flux toléré, plus de reconnexion → error{network}.
@@ -427,7 +467,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('stop (A3)', () => {
     it('stop() abandonne la génération et repasse en done', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
       act(() => stream.emit(ChatStreamEventName.TOKEN, { delta: 'partiel' }))
       await waitFor(() => expect(result.current.state.status).toBe('streaming'))
@@ -441,7 +481,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('retry (B2)', () => {
     it('retry() réémet le dernier message utilisateur', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'Je veux un Postgres')
       act(() => stream.emit(ChatStreamEventName.ERROR, { message: 'Quota dépassé' }))
       await waitFor(() => expect(result.current.state.status).toBe('error'))
@@ -455,7 +495,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('retry() sans message précédent ne fait rien', () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
 
       act(() => result.current.retry())
 
@@ -465,7 +505,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('actions (chat fonctionnel préservé)', () => {
     it('marque l’action exécutée et mémorise le déploiement sur action_result', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
       act(() => stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal()))
       await waitFor(() => expect(result.current.messages).toHaveLength(2))
@@ -486,7 +526,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
     })
 
     it('marque l’action annulée localement et ne la redégrade pas sur action_result', async () => {
-      const { result } = renderHook(() => useChatStream('c1'))
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = await sendAfterOpen(result.current.send, 'go')
       act(() => stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal()))
       await waitFor(() => expect(result.current.messages).toHaveLength(2))
@@ -511,7 +551,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
   describe('cycle de vie', () => {
     it('abandonne le flux au démontage (cleanup via AbortController)', () => {
-      const { unmount } = renderHook(() => useChatStream('c1'))
+      const { unmount } = renderHook(() => useChatStream('c1'), { wrapper })
       const stream = lastStream()
 
       expect(stream.init.signal?.aborted).toBe(false)
@@ -521,6 +561,7 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
 
     it('réinitialise l’état et rouvre le flux au changement de fil', async () => {
       const { result, rerender } = renderHook(({ id }) => useChatStream(id), {
+        wrapper,
         initialProps: { id: 'c1' },
       })
       const firstStream = await sendAfterOpen(result.current.send, 'go')

@@ -19,6 +19,7 @@ from app.auth.domain.entities.user import User
 from app.auth.presentation.dependencies.current_user import get_current_user
 from app.chat.application.commands.send_message_command import SendMessageCommand
 from app.chat.application.confirm_action import ConfirmAction
+from app.chat.application.conversation_titler import ConversationTitler
 from app.chat.application.create_conversation import CreateConversation
 from app.chat.application.delete_conversation import DeleteConversation
 from app.chat.application.get_conversation import GetConversation
@@ -172,6 +173,7 @@ async def send_message(
         tool_builder=ToolCatalogBuilder(catalog),
         gate=ActionArgsGate(catalog=catalog, deployments=deployments),
         read_executor=ReadToolExecutor(catalog=catalog, deployments=deployments),
+        titler=ConversationTitler(provider),
     )
     await send.execute(
         SendMessageCommand(

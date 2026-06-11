@@ -44,6 +44,16 @@ export interface ErrorEvent {
 }
 
 /**
+ * Titre auto du fil (généré par le LLM au 1er message). Sans effet sur le tour en
+ * cours : il sert à rafraîchir le libellé du fil dans la sidebar (`useChatStream`
+ * invalide alors la liste des conversations).
+ */
+export interface TitleEvent {
+  type: 'title'
+  title: string
+}
+
+/**
  * Trame SSE inerte (`keepalive`) : `@microsoft/fetch-event-source` dispatche un
  * message au nom/données vides sur la ligne blanche qui termine un commentaire
  * SSE (`: keepalive`). On la modélise en no-op explicite pour la distinguer d'un
@@ -59,6 +69,7 @@ export type ChatStreamEvent =
   | ActionProposedEvent
   | ActionResultEvent
   | ErrorEvent
+  | TitleEvent
   | KeepaliveEvent
 
 /** Noms d'événements SSE (champ `event:`), partagés mapper ↔ seam ↔ hook. */
@@ -68,6 +79,7 @@ export const ChatStreamEventName = {
   ACTION_PROPOSED: 'action_proposed',
   ACTION_RESULT: 'action_result',
   ERROR: 'error',
+  TITLE: 'title',
 } as const
 
 export type ChatStreamEventName = (typeof ChatStreamEventName)[keyof typeof ChatStreamEventName]
