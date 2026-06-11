@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
   TemplateConfig,
@@ -81,6 +81,17 @@ export function useStackComposition(): UseStackCompositionResult {
   const [services, setServices] = useState<CompositionService[]>([])
   const [links, setLinks] = useState<CompositionLink[]>([])
 
+  /**
+   * Miroir des services lisible hors d'un updater de state. Permet à `addLink`
+   * de résoudre le template fournisseur sans imbriquer `setLinks` dans
+   * l'updater de `setServices` (updater impur, double-invoqué sous StrictMode).
+   * Synchronisé via effet (jamais écrit pendant le rendu).
+   */
+  const servicesRef = useRef(services)
+  useEffect(() => {
+    servicesRef.current = services
+  }, [services])
+
   const addService = useCallback((template: TemplateConfig): void => {
     setServices((previous) => {
       const taken = new Set(previous.map((service) => service.alias))
@@ -130,21 +141,15 @@ export function useStackComposition(): UseStackCompositionResult {
   }, [])
 
   const addLink = useCallback((fromLocalId: string, toLocalId: string): void => {
-    setServices((currentServices) => {
-      const provider = currentServices.find((service) => service.localId === toLocalId)
-      if (provider !== undefined) {
-        setLinks((previous) => [
-          ...previous,
-          {
-            localId: nextLocalId('link'),
-            fromLocalId,
-            toLocalId,
-            varMappings: defaultLinkMappings(provider.template),
-          },
-        ])
-      }
-      return currentServices
-    })
+    const provider = servicesRef.current.find((service) => service.localId === toLocalId)
+    if (provider === undefined) {
+      return
+    }
+    const varMappings = defaultLinkMappings(provider.template)
+    setLinks((previous) => [
+      ...previous,
+      { localId: nextLocalId('link'), fromLocalId, toLocalId, varMappings },
+    ])
   }, [])
 
   const removeLink = useCallback((localId: string): void => {

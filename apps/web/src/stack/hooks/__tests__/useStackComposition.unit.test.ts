@@ -1,3 +1,4 @@
+import { StrictMode, createElement, type ReactNode } from 'react'
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
@@ -139,6 +140,23 @@ describe('useStackComposition', () => {
     expect(payload.name).toBe('ma-stack')
     expect(payload.services[0]?.alias).toBe('db')
     expect(payload.services[0]?.template_id).toBe('pg16')
+  })
+
+  it('sous StrictMode, un seul appel addLink crée un seul lien (updater pur)', () => {
+    const strictWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(StrictMode, null, children)
+    const { result } = renderHook(() => useStackComposition(), { wrapper: strictWrapper })
+    act(() => result.current.addService(postgres()))
+    act(() => result.current.addService(api()))
+    const dbId = result.current.services[0]?.localId as string
+    const apiId = result.current.services[1]?.localId as string
+
+    act(() => result.current.addLink(apiId, dbId))
+
+    expect(result.current.links).toHaveLength(1)
+    expect(result.current.links[0]?.fromLocalId).toBe(apiId)
+    expect(result.current.links[0]?.toLocalId).toBe(dbId)
+    expect(result.current.links[0]?.varMappings.DB_HOST).toBe('{to.alias}')
   })
 
   it('édite les mappings d’un lien existant', () => {
