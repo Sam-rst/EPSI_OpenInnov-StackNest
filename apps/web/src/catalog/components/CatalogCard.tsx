@@ -15,10 +15,33 @@ const CARD_ACTIVE =
 
 const CARD_BLOCKED = 'border-border bg-surface-elevated opacity-60 cursor-not-allowed'
 
-const BLOCKED_TOOLTIP = 'Déploiements Terraform bientôt disponibles'
+const TERRAFORM_TOOLTIP = 'Déploiements Terraform bientôt disponibles'
+const NOT_DEPLOYABLE_TOOLTIP = 'Déploiement bientôt disponible'
+
+interface BlockState {
+  blocked: boolean
+  /** Tooltip explicatif, présent uniquement quand la carte est bloquée. */
+  tooltip?: string
+}
+
+/**
+ * Détermine si la carte est bloquée et pourquoi. Deux raisons distinctes, chacune
+ * avec son tooltip : moteur Terraform (pas encore supporté) ou template marqué
+ * non déployable (runtime langage). Le moteur prime sur le flag (message le plus
+ * spécifique à la nature de la ressource).
+ */
+function resolveBlock(item: CatalogItem): BlockState {
+  if (item.engine === EngineKind.TERRAFORM) {
+    return { blocked: true, tooltip: TERRAFORM_TOOLTIP }
+  }
+  if (!item.deployable) {
+    return { blocked: true, tooltip: NOT_DEPLOYABLE_TOOLTIP }
+  }
+  return { blocked: false }
+}
 
 export function CatalogCard({ item, onSelect }: CatalogCardProps) {
-  const isBlocked = item.engine === EngineKind.TERRAFORM
+  const { blocked: isBlocked, tooltip } = resolveBlock(item)
 
   return (
     <button
@@ -26,7 +49,7 @@ export function CatalogCard({ item, onSelect }: CatalogCardProps) {
       onClick={isBlocked ? undefined : () => onSelect(item)}
       disabled={isBlocked}
       aria-disabled={isBlocked}
-      title={isBlocked ? BLOCKED_TOOLTIP : undefined}
+      title={tooltip}
       className={cn(CARD_BASE, isBlocked ? CARD_BLOCKED : CARD_ACTIVE)}
     >
       {isBlocked && (

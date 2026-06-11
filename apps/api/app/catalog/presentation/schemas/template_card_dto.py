@@ -28,3 +28,10 @@ class TemplateCardDTO(BaseModel):
     tags: list[str] = Field(default_factory=list, description="Libelles de recherche.")
     description: str = Field(..., description="Description courte de la ressource.")
     popular: bool = Field(..., description="Mis en avant dans le catalogue.")
+    is_deployable: bool = Field(
+        True,
+        description=(
+            "Faux pour un template visible mais non deployable (carte « Bientot "
+            "disponible » : runtimes langage)."
+        ),
+    )

@@ -13,4 +13,9 @@ export interface CatalogItem {
   tags: readonly string[]
   description: string
   popular?: boolean
+  /**
+   * Déployable depuis l'UI. Faux pour un template visible mais bloqué (runtime
+   * langage) : la carte est grisée avec l'étiquette « Bientôt disponible ».
+   */
+  deployable: boolean
 }

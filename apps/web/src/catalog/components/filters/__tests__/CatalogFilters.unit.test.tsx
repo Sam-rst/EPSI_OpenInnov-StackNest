@@ -16,6 +16,7 @@ const ITEMS: readonly CatalogItem[] = [
     engine: EngineKind.DOCKER,
     tags: ['SQL'],
     description: 'Base relationnelle.',
+    deployable: true,
   },
   {
     id: 'vm',
@@ -26,6 +27,7 @@ const ITEMS: readonly CatalogItem[] = [
     engine: EngineKind.TERRAFORM,
     tags: ['VM'],
     description: 'Machine virtuelle.',
+    deployable: true,
   },
 ]
 

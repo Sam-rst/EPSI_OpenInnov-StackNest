@@ -10,6 +10,7 @@ from app.deployment.application.__tests__.fakes import (
     FakeJobQueue,
     FakeTemplateProvisioningReader,
     docker_descriptor,
+    non_deployable_descriptor,
     terraform_descriptor,
 )
 from app.deployment.application.commands.create_deployment_command import (
@@ -26,6 +27,9 @@ from app.deployment.domain.exceptions.invalid_deployment_name import (
 )
 from app.deployment.domain.exceptions.invalid_deployment_params import (
     InvalidDeploymentParamsException,
+)
+from app.deployment.domain.exceptions.template_not_deployable import (
+    TemplateNotDeployableException,
 )
 from app.deployment.domain.exceptions.template_not_found import (
     TemplateNotFoundForDeploymentException,
@@ -106,6 +110,21 @@ class TestCreateDeployment:
         use_case = _build(repository=repository, queue=queue, reader=reader)
 
         with pytest.raises(EngineNotSupportedException):
+            await use_case.execute(_command(template_id=template_id))
+
+        assert repository.added == []
+        assert queue.enqueued == []
+
+    async def test_template_non_deployable_rejete(self) -> None:
+        # Un runtime (Docker mais is_deployable=False) est refuse avant persistance :
+        # exception domaine typee (409), rien n'est persiste ni enfile.
+        template_id = uuid4()
+        repository = FakeDeploymentRepository()
+        queue = FakeJobQueue()
+        reader = FakeTemplateProvisioningReader({(template_id, "16"): non_deployable_descriptor()})
+        use_case = _build(repository=repository, queue=queue, reader=reader)
+
+        with pytest.raises(TemplateNotDeployableException):
             await use_case.execute(_command(template_id=template_id))
 
         assert repository.added == []

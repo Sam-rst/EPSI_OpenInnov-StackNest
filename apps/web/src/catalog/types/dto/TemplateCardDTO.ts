@@ -1,6 +1,7 @@
 /**
  * Miroir exact de la réponse `GET /catalog/templates` (carte légère).
- * Contrat figé : `{id, slug, name, icon, category, provider, engine, tags[], description, popular}`.
+ * Contrat figé : `{id, slug, name, icon, category, provider, engine, tags[],
+ * description, popular, is_deployable}`.
  */
 export interface TemplateCardDTO {
   id: string
@@ -16,4 +17,10 @@ export interface TemplateCardDTO {
   tags: string[]
   description: string
   popular: boolean
+  /**
+   * Faux pour un template visible mais non déployable (runtime langage : carte
+   * « Bientôt disponible »). Optionnel : une API antérieure peut l'omettre — le
+   * mapper retombe alors sur `true` (carte déployable par défaut).
+   */
+  is_deployable?: boolean
 }

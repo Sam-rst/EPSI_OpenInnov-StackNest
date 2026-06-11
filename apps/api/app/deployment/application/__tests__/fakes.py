@@ -121,6 +121,9 @@ def docker_descriptor(
     secret_env: str | None = "POSTGRES_PASSWORD",
     template_name: str = "PostgreSQL",
     params: tuple[TemplateParamSpec, ...] = (),
+    command: tuple[str, ...] | None = None,
+    secret_value_template: str | None = None,
+    is_deployable: bool = True,
 ) -> TemplateProvisioning:
     """Descripteur de provisioning Docker valide pour les tests."""
     return TemplateProvisioning(
@@ -130,6 +133,20 @@ def docker_descriptor(
         engine=EngineKind.DOCKER,
         template_name=template_name,
         params=params,
+        command=command,
+        secret_value_template=secret_value_template,
+        is_deployable=is_deployable,
+    )
+
+
+def non_deployable_descriptor() -> TemplateProvisioning:
+    """Descripteur Docker marque non deployable (runtime bloque dans le catalogue)."""
+    return docker_descriptor(
+        image_repository="node",
+        internal_port=None,
+        secret_env=None,
+        template_name="Conteneur Node.js",
+        is_deployable=False,
     )
 
 

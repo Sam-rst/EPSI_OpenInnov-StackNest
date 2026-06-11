@@ -31,6 +31,9 @@ class TestTemplateModel:
             "image_repository",
             "internal_port",
             "secret_env",
+            "command",
+            "secret_value_template",
+            "is_deployable",
             "created_at",
             "updated_at",
         }
@@ -54,6 +57,19 @@ class TestTemplateModel:
         assert colonnes["image_repository"].nullable is True
         assert colonnes["internal_port"].nullable is True
         assert colonnes["secret_env"].nullable is True
+
+    def test_command_et_secret_value_template_sont_nullables(self) -> None:
+        colonnes = TemplateModel.__table__.columns
+
+        assert colonnes["command"].nullable is True
+        assert colonnes["secret_value_template"].nullable is True
+
+    def test_is_deployable_non_nullable_avec_defaut_true(self) -> None:
+        colonne = TemplateModel.__table__.columns["is_deployable"]
+
+        assert colonne.nullable is False
+        assert colonne.server_default is not None
+        assert str(colonne.server_default.arg) == "true"
 
 
 class TestTemplateVersionModel:

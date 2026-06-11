@@ -37,6 +37,9 @@ class CatalogTemplateProvisioningReader(TemplateProvisioningReader):
             engine=template.engine,
             template_name=template.name,
             params=tuple(self._to_spec(param) for param in template.params),
+            command=tuple(template.command) if template.command is not None else None,
+            secret_value_template=template.secret_value_template,
+            is_deployable=template.is_deployable,
         )
 
     @staticmethod

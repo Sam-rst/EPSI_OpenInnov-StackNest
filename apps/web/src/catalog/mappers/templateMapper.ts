@@ -30,6 +30,9 @@ export function mapCardDtoToCatalogItem(dto: TemplateCardDTO): CatalogItem {
     tags: dto.tags,
     description: dto.description,
     popular: dto.popular,
+    // Seul `false` explicite bloque la carte : un DTO sans le flag (API antérieure)
+    // reste déployable par défaut.
+    deployable: dto.is_deployable !== false,
   }
 }
 

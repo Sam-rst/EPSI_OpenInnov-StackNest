@@ -30,11 +30,23 @@ class Template:
     Descripteur de provisioning (optionnel, consomme par la feature deploiement
     pour construire un conteneur Docker) :
 
-    - `image_repository` : depot de l'image Docker (ex. `postgres`). L'image
+    - `image_repository`      : depot de l'image Docker (ex. `postgres`). L'image
       effective est `{image_repository}:{version}`.
-    - `internal_port`    : port ecoute dans le conteneur (ex. `5432`).
-    - `secret_env`       : nom de la variable d'environnement recevant le mot de
-      passe genere (ex. `POSTGRES_PASSWORD`) ; `None` si aucun secret.
+    - `internal_port`         : port ecoute dans le conteneur (ex. `5432`).
+    - `secret_env`            : nom de la variable d'environnement recevant le mot
+      de passe genere (ex. `POSTGRES_PASSWORD`) ; `None` si aucun secret.
+    - `command`               : commande de demarrage du conteneur (surcharge la
+      commande par defaut de l'image). `None` = commande par defaut. Ex. Keycloak,
+      dont l'image affiche l'aide et sort sans `["start-dev"]`.
+    - `secret_value_template` : gabarit de la VALEUR injectee dans `secret_env`.
+      `None` = la valeur est le secret brut (comportement par defaut). Sinon, la
+      valeur est `secret_value_template.format(secret=<secret genere>)` ; le gabarit
+      n'accepte QUE le placeholder `{secret}`. Ex. Neo4j : `"neo4j/{secret}"` car
+      `NEO4J_AUTH` attend la forme `user/password`.
+    - `is_deployable`         : `False` masque le template du deploiement tout en le
+      laissant visible au catalogue (etiquette « Bientot disponible »). Defaut
+      `True`. Ex. runtimes langage (Node, Python, Go, PHP) : aucun service
+      long-running utile au MVP.
     """
 
     id: UUID
@@ -53,6 +65,9 @@ class Template:
     image_repository: str | None = field(default=None)
     internal_port: int | None = field(default=None)
     secret_env: str | None = field(default=None)
+    command: list[str] | None = field(default=None)
+    secret_value_template: str | None = field(default=None)
+    is_deployable: bool = True
     created_at: datetime | None = field(default=None)
     updated_at: datetime | None = field(default=None)
 

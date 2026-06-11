@@ -280,6 +280,75 @@ class TestProvisionInjectionParams:
         assert spec.mem_limit == "256m"
 
 
+class TestProvisionModeleEtendu:
+    """Le _build_spec transmet command et formate la valeur du secret (Keycloak/Neo4j)."""
+
+    async def test_keycloak_recoit_la_commande_de_demarrage(self) -> None:
+        template_id = uuid4()
+        deployment = make_deployment(
+            template_id=template_id,
+            template_version="26.1",
+            status=DeploymentStatus.PENDING,
+            container_ref=None,
+        )
+        repository = FakeDeploymentRepository([deployment])
+        provisioner = FakeProvisioner()
+        reader = FakeTemplateProvisioningReader(
+            {
+                (template_id, "26.1"): docker_descriptor(
+                    image_repository="quay.io/keycloak/keycloak",
+                    internal_port=8080,
+                    secret_env="KEYCLOAK_ADMIN_PASSWORD",
+                    command=("start-dev",),
+                )
+            }
+        )
+        handler = _handler(
+            repository=repository,
+            provisioner=provisioner,
+            publisher=FakeEventPublisher(),
+            reader=reader,
+            secret_generator=StubSecretGenerator("s3cr3t"),
+        )
+
+        await handler.handle(DeploymentJob(JobKind.PROVISION, deployment.id))
+
+        assert provisioner.created[0].command == ["start-dev"]
+
+    async def test_neo4j_injecte_la_valeur_formatee_dans_secret_env(self) -> None:
+        # NEO4J_AUTH attend `user/password` : la valeur injectee est `neo4j/<secret>`.
+        template_id = uuid4()
+        deployment = make_deployment(
+            template_id=template_id,
+            template_version="5",
+            status=DeploymentStatus.PENDING,
+            container_ref=None,
+        )
+        repository = FakeDeploymentRepository([deployment])
+        provisioner = FakeProvisioner()
+        reader = FakeTemplateProvisioningReader(
+            {
+                (template_id, "5"): docker_descriptor(
+                    image_repository="neo4j",
+                    internal_port=7474,
+                    secret_env="NEO4J_AUTH",
+                    secret_value_template="neo4j/{secret}",
+                )
+            }
+        )
+        handler = _handler(
+            repository=repository,
+            provisioner=provisioner,
+            publisher=FakeEventPublisher(),
+            reader=reader,
+            secret_generator=StubSecretGenerator("s3cr3t"),
+        )
+
+        await handler.handle(DeploymentJob(JobKind.PROVISION, deployment.id))
+
+        assert provisioner.created[0].env["NEO4J_AUTH"] == "neo4j/s3cr3t"
+
+
 class TestStop:
     async def test_arrete_le_conteneur_et_passe_stopped(self) -> None:
         deployment = make_deployment(status=DeploymentStatus.RUNNING)

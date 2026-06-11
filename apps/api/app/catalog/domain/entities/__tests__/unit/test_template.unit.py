@@ -99,6 +99,42 @@ class TestTemplateEngine:
         assert template.engine is EngineKind.TERRAFORM
 
 
+class TestTemplateProvisioningV2:
+    """Champs etendus du modele de provisioning (command / secret_value_template)."""
+
+    def test_command_absente_par_defaut(self) -> None:
+        template = _template()
+
+        assert template.command is None
+
+    def test_command_renseignee(self) -> None:
+        template = _template(command=["start-dev"])
+
+        assert template.command == ["start-dev"]
+
+    def test_secret_value_template_absent_par_defaut(self) -> None:
+        template = _template()
+
+        assert template.secret_value_template is None
+
+    def test_secret_value_template_renseigne(self) -> None:
+        template = _template(secret_value_template="neo4j/{secret}")
+
+        assert template.secret_value_template == "neo4j/{secret}"
+
+
+class TestTemplateDeployable:
+    def test_deployable_par_defaut(self) -> None:
+        template = _template()
+
+        assert template.is_deployable is True
+
+    def test_non_deployable_explicite(self) -> None:
+        template = _template(is_deployable=False)
+
+        assert template.is_deployable is False
+
+
 class TestTemplateGuards:
     def test_name_vide_leve_value_error(self) -> None:
         with pytest.raises(ValueError):

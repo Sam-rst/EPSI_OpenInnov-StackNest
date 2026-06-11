@@ -155,6 +155,8 @@ class DeploymentJobHandler:
             params=deployment.params,
             param_specs=descriptor.params,
             secret=secret,
+            command=list(descriptor.command) if descriptor.command is not None else None,
+            secret_value_template=descriptor.secret_value_template,
             deployment_id=str(deployment.id),
         )
 

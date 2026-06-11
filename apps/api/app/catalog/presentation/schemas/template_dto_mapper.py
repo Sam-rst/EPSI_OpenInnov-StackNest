@@ -23,6 +23,7 @@ class TemplateDTOMapper:
             tags=list(template.tags),
             description=template.description,
             popular=template.popular,
+            is_deployable=template.is_deployable,
         )
 
     @staticmethod
@@ -38,6 +39,7 @@ class TemplateDTOMapper:
             tags=list(template.tags),
             description=template.description,
             popular=template.popular,
+            is_deployable=template.is_deployable,
             image_repository=template.image_repository,
             internal_port=template.internal_port,
             secret_env=template.secret_env,

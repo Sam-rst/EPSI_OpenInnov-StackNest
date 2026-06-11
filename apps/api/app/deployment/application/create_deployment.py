@@ -13,6 +13,9 @@ from app.deployment.domain.enums.job_kind import JobKind
 from app.deployment.domain.exceptions.engine_not_supported import (
     EngineNotSupportedException,
 )
+from app.deployment.domain.exceptions.template_not_deployable import (
+    TemplateNotDeployableException,
+)
 from app.deployment.domain.exceptions.template_not_found import (
     TemplateNotFoundForDeploymentException,
 )
@@ -37,9 +40,11 @@ class CreateDeployment:
     1. le nom respecte le format type label DNS (`DeploymentName`, sinon 422) ;
     2. le template existe (port de lecture du catalogue, sinon 404) et utilise le
        moteur `docker` (gate moteur, cf. design section 12, sinon 409) ;
-    3. les params requis non-secret omis sont remplis avec leur `default_value`
+    3. le template est deployable (`is_deployable`, sinon 409 : runtimes langage
+       visibles mais bloques au deploiement) ;
+    4. les params requis non-secret omis sont remplis avec leur `default_value`
        declaree par le template (les valeurs fournies priment) ;
-    4. les params requis du template sont presents et conformes
+    5. les params requis du template sont presents et conformes
        (`DeploymentParamsValidator`, sinon 422).
 
     Le remplissage des defauts (etape 3) precede la validation : un param requis
@@ -74,6 +79,8 @@ class CreateDeployment:
             raise TemplateNotFoundForDeploymentException()
         if not provisioning.is_docker():
             raise EngineNotSupportedException()
+        if not provisioning.is_deployable:
+            raise TemplateNotDeployableException()
         params = self._apply_default_values(provisioning.params, command.params)
         DeploymentParamsValidator(provisioning.params).validate(params)
 

@@ -80,3 +80,20 @@ class TestEngineExpose:
         detail = TemplateDTOMapper.to_detail(_template(engine=EngineKind.TERRAFORM))
 
         assert detail.engine is EngineKind.TERRAFORM
+
+
+class TestDeployableExpose:
+    def test_la_carte_expose_is_deployable_true_par_defaut(self) -> None:
+        card = TemplateDTOMapper.to_card(_template())
+
+        assert card.is_deployable is True
+
+    def test_la_carte_expose_is_deployable_false(self) -> None:
+        card = TemplateDTOMapper.to_card(_template(is_deployable=False))
+
+        assert card.is_deployable is False
+
+    def test_le_detail_expose_is_deployable_false(self) -> None:
+        detail = TemplateDTOMapper.to_detail(_template(is_deployable=False))
+
+        assert detail.is_deployable is False

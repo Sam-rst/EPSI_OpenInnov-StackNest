@@ -62,3 +62,6 @@ class TemplateCommand:
     image_repository: str | None = None
     internal_port: int | None = None
     secret_env: str | None = None
+    command: list[str] | None = None
+    secret_value_template: str | None = None
+    is_deployable: bool = True

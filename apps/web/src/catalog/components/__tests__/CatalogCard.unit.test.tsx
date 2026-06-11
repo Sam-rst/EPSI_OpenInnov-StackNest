@@ -16,6 +16,7 @@ const ITEM: CatalogItem = {
   tags: ['SQL', 'Persistant'],
   description: 'Base relationnelle managée.',
   popular: true,
+  deployable: true,
 }
 
 const TERRAFORM_ITEM: CatalogItem = {
@@ -28,6 +29,20 @@ const TERRAFORM_ITEM: CatalogItem = {
   tags: ['K8s', 'Cluster'],
   description: 'Cluster Kubernetes managé.',
   popular: false,
+  deployable: true,
+}
+
+const RUNTIME_ITEM: CatalogItem = {
+  id: 'node',
+  name: 'Conteneur Node.js',
+  icon: 'box',
+  category: 'Runtime',
+  provider: 'Docker',
+  engine: EngineKind.DOCKER,
+  tags: ['Runtime', 'JS'],
+  description: 'Image Node LTS prête à déployer.',
+  popular: false,
+  deployable: false,
 }
 
 describe('CatalogCard', () => {
@@ -162,6 +177,47 @@ describe('CatalogCard — moteur Terraform (carte bloquée)', () => {
 
   it("masque le CTA « Configurer » d'une carte active", () => {
     render(<CatalogCard item={TERRAFORM_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.queryByText('Configurer →')).not.toBeInTheDocument()
+  })
+})
+
+describe('CatalogCard — runtime non déployable (carte bloquée)', () => {
+  it('affiche le bandeau « Bientôt disponible »', () => {
+    render(<CatalogCard item={RUNTIME_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByText('Bientôt disponible')).toBeInTheDocument()
+  })
+
+  it('marque la carte comme désactivée (aria-disabled)', () => {
+    render(<CatalogCard item={RUNTIME_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it("n'appelle pas onSelect au clic", async () => {
+    const onSelect = vi.fn()
+    render(<CatalogCard item={RUNTIME_ITEM} onSelect={onSelect} />)
+
+    await userEvent.click(screen.getByRole('button'))
+
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('expose un tooltip spécifique au runtime (et non le tooltip Terraform)', () => {
+    render(<CatalogCard item={RUNTIME_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByRole('button')).toHaveAttribute('title', 'Déploiement bientôt disponible')
+  })
+
+  it('grise visuellement la carte', () => {
+    render(<CatalogCard item={RUNTIME_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByRole('button').className).toMatch(/opacity-/)
+  })
+
+  it('masque le CTA « Configurer »', () => {
+    render(<CatalogCard item={RUNTIME_ITEM} onSelect={vi.fn()} />)
 
     expect(screen.queryByText('Configurer →')).not.toBeInTheDocument()
   })

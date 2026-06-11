@@ -62,3 +62,29 @@ class TestTemplateAssemblerEngine:
         entity = TemplateAssembler.to_entity(uuid4(), command)
 
         assert entity.engine is EngineKind.DOCKER
+
+
+class TestTemplateAssemblerProvisioningV2:
+    """Propagation des champs etendus command / secret_value_template / is_deployable."""
+
+    def test_propage_la_command(self) -> None:
+        entity = TemplateAssembler.to_entity(uuid4(), _command(command=["start-dev"]))
+
+        assert entity.command == ["start-dev"]
+
+    def test_propage_le_secret_value_template(self) -> None:
+        entity = TemplateAssembler.to_entity(
+            uuid4(), _command(secret_value_template="neo4j/{secret}")
+        )
+
+        assert entity.secret_value_template == "neo4j/{secret}"
+
+    def test_propage_is_deployable_false(self) -> None:
+        entity = TemplateAssembler.to_entity(uuid4(), _command(is_deployable=False))
+
+        assert entity.is_deployable is False
+
+    def test_is_deployable_true_par_defaut(self) -> None:
+        entity = TemplateAssembler.to_entity(uuid4(), _command())
+
+        assert entity.is_deployable is True

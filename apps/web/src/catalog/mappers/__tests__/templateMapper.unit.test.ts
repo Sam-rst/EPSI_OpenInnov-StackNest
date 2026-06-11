@@ -53,6 +53,24 @@ describe('mapCardDtoToCatalogItem', () => {
 
     expect(item.engine).toBe('terraform')
   })
+
+  it('expose deployable=true quand is_deployable=true', () => {
+    const item = mapCardDtoToCatalogItem({ ...cardDto, is_deployable: true })
+
+    expect(item.deployable).toBe(true)
+  })
+
+  it('projette deployable=false depuis is_deployable=false', () => {
+    const item = mapCardDtoToCatalogItem({ ...cardDto, is_deployable: false })
+
+    expect(item.deployable).toBe(false)
+  })
+
+  it('retombe sur deployable=true quand is_deployable est absent du DTO', () => {
+    const item = mapCardDtoToCatalogItem(cardDto)
+
+    expect(item.deployable).toBe(true)
+  })
 })
 
 const detailDto: TemplateDetailDTO = {
