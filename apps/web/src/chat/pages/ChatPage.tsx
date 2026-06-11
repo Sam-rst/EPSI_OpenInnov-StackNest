@@ -138,9 +138,13 @@ export function ChatPage() {
         onDelete={handleDelete}
       />
 
-      <div className="flex min-w-0 flex-col">
+      {/* min-h-0 : la colonne centrale est un enfant flex du grid ; sans cette
+          contrainte, MessageList grandirait avec son contenu au lieu de scroller
+          en interne, ce qui pousserait le composer hors de l'écran. Avec min-h-0,
+          MessageList scrolle et le composer (shrink-0) reste fixe en bas. */}
+      <div className="flex min-h-0 min-w-0 flex-col">
         {isThreadEmpty ? (
-          <div className="flex flex-1 items-center justify-center p-6">
+          <div className="flex min-h-0 flex-1 items-center justify-center p-6">
             <ChatEmptyState onSuggestion={stream.send} />
           </div>
         ) : (
