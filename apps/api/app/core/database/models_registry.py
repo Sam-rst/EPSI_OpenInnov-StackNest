@@ -23,12 +23,18 @@ from app.chat.infrastructure.models.chat_action_model import ChatActionModel
 from app.chat.infrastructure.models.conversation_model import ConversationModel
 from app.chat.infrastructure.models.message_model import MessageModel
 from app.deployment.infrastructure.models.deployment_model import DeploymentModel
+from app.stack.infrastructure.models.stack_link_model import StackLinkModel
+from app.stack.infrastructure.models.stack_model import StackModel
+from app.stack.infrastructure.models.stack_service_model import StackServiceModel
 
 __all__ = [
     "ChatActionModel",
     "ConversationModel",
     "DeploymentModel",
     "MessageModel",
+    "StackLinkModel",
+    "StackModel",
+    "StackServiceModel",
     "TemplateModel",
     "TemplateParamModel",
     "TemplateVersionModel",
