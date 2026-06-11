@@ -1,7 +1,7 @@
 """Chargement d'une stack avec controle d'autorisation par proprietaire.
 
 Helper applicatif partage par les use cases de lecture (`GetStack`) et de cycle
-de vie (`DeleteStack`) : factorise la regle « charger par id puis verifier
+de vie (`DestroyStack`) : factorise la regle « charger par id puis verifier
 l'appartenance a l'utilisateur ». Une stack inexistante OU appartenant a un autre
 utilisateur leve la meme 404 (`StackNotFoundException`) : on ne divulgue pas son
 existence (cf. design, section « Securite » — isolation par owner).

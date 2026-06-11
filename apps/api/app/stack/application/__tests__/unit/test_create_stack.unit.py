@@ -12,6 +12,7 @@ from uuid import uuid4
 import pytest
 
 from app.stack.application.__tests__.fakes import (
+    FakeStackJobQueue,
     FakeStackRepository,
     FakeStackTemplateReader,
     docker_ref,
@@ -22,6 +23,7 @@ from app.stack.application.__tests__.fakes import (
 from app.stack.application.commands.stack_link_command import StackLinkCommand
 from app.stack.application.create_stack import CreateStack
 from app.stack.domain.enums.service_status import ServiceStatus
+from app.stack.domain.enums.stack_job_kind import StackJobKind
 from app.stack.domain.enums.stack_status import StackStatus
 from app.stack.domain.exceptions.invalid_stack import InvalidStackException
 
@@ -69,8 +71,8 @@ class TestPersistence:
         assert links[0].to_service_id == db_id
         assert links[0].var_mappings == {"DB_HOST": "{to.alias}"}
 
-    async def test_ne_lance_aucun_provisioning(self) -> None:
-        # Lot 2 : persistance seule. Pas de file de jobs injectee, rien a enfiler.
+    async def test_sans_file_de_jobs_ne_lance_aucun_provisioning(self) -> None:
+        # Sans `queue` injectee (ex. tests de persistance pure) : rien a enfiler.
         repository = FakeStackRepository()
         template_id = uuid4()
         reader = FakeStackTemplateReader({(template_id, "16"): docker_ref()})
@@ -81,6 +83,41 @@ class TestPersistence:
         stack = await CreateStack(repository=repository, reader=reader).execute(command)
 
         assert stack is not None
+
+    async def test_enfile_un_job_provision_apres_persistance(self) -> None:
+        # Lot 3 : avec une file injectee, un job PROVISION est enfile pour la stack.
+        repository = FakeStackRepository()
+        template_id = uuid4()
+        reader = FakeStackTemplateReader({(template_id, "16"): docker_ref()})
+        queue = FakeStackJobQueue()
+        command = make_create_command(
+            services=(make_service_command(template_id=template_id, alias="db"),)
+        )
+
+        stack = await CreateStack(repository=repository, reader=reader, queue=queue).execute(
+            command
+        )
+
+        assert len(queue.enqueued) == 1
+        assert queue.enqueued[0].kind is StackJobKind.PROVISION
+        assert queue.enqueued[0].stack_id == stack.id
+
+    async def test_n_enfile_rien_si_la_composition_est_invalide(self) -> None:
+        repository = FakeStackRepository()
+        template_id = uuid4()
+        reader = FakeStackTemplateReader({(template_id, "16"): docker_ref()})
+        queue = FakeStackJobQueue()
+        command = make_create_command(
+            services=(
+                make_service_command(template_id=template_id, alias="db", order_index=0),
+                make_service_command(template_id=template_id, alias="db", order_index=1),
+            )
+        )
+
+        with pytest.raises(InvalidStackException):
+            await CreateStack(repository=repository, reader=reader, queue=queue).execute(command)
+
+        assert queue.enqueued == []
 
 
 class TestValidation:

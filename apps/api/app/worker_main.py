@@ -62,6 +62,17 @@ from app.deployment.infrastructure.secret.token_secret_generator import (
     TokenSecretGenerator,
 )
 from app.deployment.worker.deployment_job_handler import DeploymentJobHandler
+from app.stack.domain.value_objects.stack_job import StackJob
+from app.stack.infrastructure.events.redis_stack_event_publisher import (
+    RedisStackEventPublisher,
+)
+from app.stack.infrastructure.provisioner.compose_cli_provisioner import ComposeCliProvisioner
+from app.stack.infrastructure.queue.stack_arq_settings import STACK_JOB_FUNCTION
+from app.stack.infrastructure.queue.stack_job_serializer import deserialize_stack_job
+from app.stack.infrastructure.repositories.sqlalchemy_stack_repository import (
+    SqlAlchemyStackRepository,
+)
+from app.stack.worker.stack_job_handler import StackJobHandler
 
 _logger = structlog.get_logger(__name__)
 
@@ -78,16 +89,29 @@ async def process_deployment_job(ctx: dict[str, Any], *, kind: str, deployment_i
     await ctx["execute_job"](job)
 
 
+async def process_stack_job(ctx: dict[str, Any], *, kind: str, stack_id: str) -> None:
+    """Fonction worker arq des jobs de stack (PROVISION / DESTROY via compose).
+
+    Son nom (`process_stack_job`) doit correspondre a celui utilise par
+    l'`ArqStackJobQueue` cote API (`STACK_JOB_FUNCTION`). Delegue a l'executeur de
+    stack (`ctx["execute_stack_job"]`) installe par `on_startup`.
+    """
+    job = deserialize_stack_job({"kind": kind, "stack_id": stack_id})
+    await ctx["execute_stack_job"](job)
+
+
 async def startup(ctx: dict[str, Any]) -> None:
-    """Initialise les ressources partagees du worker et l'executeur de job."""
+    """Initialise les ressources partagees du worker et les executeurs de job."""
     settings = get_settings()
     redis_client: Redis = Redis.from_url(settings.redis_url, decode_responses=True)
     provisioner = DockerSdkProvisioner.from_docker_host(settings.docker_host)
+    compose_provisioner = ComposeCliProvisioner.from_docker_host(settings.docker_host)
     sessionmaker = get_sessionmaker()
 
     ctx["redis_client"] = redis_client
     ctx["execute_job"] = _make_executor(sessionmaker, redis_client, provisioner)
-    _logger.info("deployment.worker.started", queue=DEPLOYMENT_QUEUE_NAME)
+    ctx["execute_stack_job"] = _make_stack_executor(sessionmaker, redis_client, compose_provisioner)
+    _logger.info("worker.started", queue=DEPLOYMENT_QUEUE_NAME)
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
@@ -125,23 +149,54 @@ def _make_executor(
     return execute_job
 
 
+def _make_stack_executor(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    redis_client: Redis,
+    provisioner: ComposeCliProvisioner,
+) -> Any:
+    """Construit l'executeur de jobs de stack (une session DB par job, unit of work).
+
+    Le `StackJobHandler` reutilise le reader de provisioning et le generateur de
+    secret du deploiement (image/port/secret_env identiques) ; le compose-file et
+    les statuts/events sont specifiques a la stack.
+    """
+
+    async def execute_stack_job(job: StackJob) -> None:
+        async with sessionmaker() as session:
+            handler = StackJobHandler(
+                repository=SqlAlchemyStackRepository(session),
+                provisioner=provisioner,
+                publisher=RedisStackEventPublisher(redis_client),
+                reader=CatalogTemplateProvisioningReader(SqlAlchemyTemplateRepository(session)),
+                secret_generator=TokenSecretGenerator(),
+            )
+            await handler.handle(job)
+            await session.commit()
+
+    return execute_stack_job
+
+
 class WorkerSettings:
     """Configuration du worker arq (decouverte par `arq app.worker_main.WorkerSettings`).
 
-    - `functions`     : fonctions worker enregistrees (ici la seule fonction de
-      traitement des jobs de deploiement).
-    - `queue_name`    : file dediee `stacknest:deployment` (isolee des autres usages).
+    - `functions`     : fonctions worker enregistrees — jobs de deploiement ET de
+      stack (un seul worker au MVP, meme file ; arq route par nom de fonction).
+    - `queue_name`    : file partagee `stacknest:deployment`.
     - `redis_settings`: connexion Redis derivee de `Settings.redis_url`.
     - `on_startup` / `on_shutdown` : cycle de vie des ressources partagees.
     """
 
-    functions: ClassVar[list[Callable[..., Awaitable[None]]]] = [process_deployment_job]
+    functions: ClassVar[list[Callable[..., Awaitable[None]]]] = [
+        process_deployment_job,
+        process_stack_job,
+    ]
     queue_name: ClassVar[str] = DEPLOYMENT_QUEUE_NAME
     redis_settings: ClassVar[RedisSettings] = redis_settings_from_url(get_settings().redis_url)
     on_startup: ClassVar[Callable[[dict[str, Any]], Awaitable[None]]] = startup
     on_shutdown: ClassVar[Callable[[dict[str, Any]], Awaitable[None]]] = shutdown
 
 
-# Nom de la fonction worker : doit matcher l'enqueue cote API. Verifie ici pour
-# echouer tot (a l'import) si les deux divergent.
+# Noms des fonctions worker : doivent matcher l'enqueue cote API. Verifies ici
+# pour echouer tot (a l'import) si producteur et consommateur divergent.
 assert process_deployment_job.__name__ == DEPLOYMENT_JOB_FUNCTION
+assert process_stack_job.__name__ == STACK_JOB_FUNCTION
