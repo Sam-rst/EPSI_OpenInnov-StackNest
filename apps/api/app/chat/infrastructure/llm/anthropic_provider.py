@@ -61,8 +61,10 @@ class AnthropicProvider(LLMProvider):
         self, messages: Sequence[ChatMessage], tools: Sequence[ToolDefinition]
     ) -> AsyncIterator[LLMChunk]:
         payload = self._build_payload(messages, tools, stream=True)
-        tool_name: str | None = None
-        tool_args = ""
+        # Args d'outil accumules PAR INDEX de bloc : un `tool_use` parallele ne doit
+        # jamais voir ses fragments concatenes avec ceux d'un autre (sinon json.loads
+        # leve « Extra data »). On retient le 1er tool_use (un par passe cote moteur).
+        tool_blocks: dict[int, dict[str, str]] = {}
         async with (
             self._client() as client,
             client.stream(
@@ -71,14 +73,14 @@ class AnthropicProvider(LLMProvider):
         ):
             response.raise_for_status()
             async for data in iter_sse_data(response.aiter_lines()):
-                frame = json.loads(data)
-                name, text, args = self._read_frame(frame)
-                tool_name = name or tool_name
-                tool_args += args
+                text = self._consume_stream_frame(json.loads(data), tool_blocks)
                 if text:
                     yield LLMChunk.of_text(text)
-        if tool_name is not None:
-            yield LLMChunk.of_tool_call(ToolCall(name=tool_name, args=self._loads(tool_args)))
+        if tool_blocks:
+            first = tool_blocks[min(tool_blocks)]
+            yield LLMChunk.of_tool_call(
+                ToolCall(name=first["name"], args=self._loads(first["args"]))
+            )
 
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
@@ -103,6 +105,10 @@ class AnthropicProvider(LLMProvider):
         }
         if tools:
             payload["tools"] = [self._to_anthropic_tool(tool) for tool in tools]
+            # Un seul outil a la fois : notre moteur traite une proposition par passe.
+            # `disable_parallel_tool_use` evite que Claude emette plusieurs `tool_use`
+            # en parallele (qu'on devrait sinon ignorer) — economie de tokens + simplicite.
+            payload["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": True}
         return payload
 
     @staticmethod
@@ -143,18 +149,28 @@ class AnthropicProvider(LLMProvider):
         return LLMChunk.of_text(text)
 
     @staticmethod
-    def _read_frame(frame: dict[str, Any]) -> tuple[str | None, str, str]:
+    def _consume_stream_frame(frame: dict[str, Any], tool_blocks: dict[int, dict[str, str]]) -> str:
+        """Consomme une trame SSE : route les args d'outil par index, renvoie le texte.
+
+        Chaque `tool_use` a son propre index de bloc ; ses fragments
+        `input_json_delta` sont accumules SEPAREMENT dans `tool_blocks[index]`, jamais
+        concatenes avec un autre bloc (ce qui evitait le « Extra data » de json.loads
+        sur des tool_use paralleles). Renvoie le fragment de texte eventuel.
+        """
         frame_type = frame.get("type")
+        index = frame.get("index", 0)
         if frame_type == "content_block_start":
             block = frame.get("content_block", {})
-            return (block.get("name") if block.get("type") == "tool_use" else None), "", ""
+            if block.get("type") == "tool_use":
+                tool_blocks[index] = {"name": block.get("name", ""), "args": ""}
+            return ""
         if frame_type == "content_block_delta":
             delta = frame.get("delta", {})
             if delta.get("type") == "text_delta":
-                return None, delta.get("text", ""), ""
-            if delta.get("type") == "input_json_delta":
-                return None, "", delta.get("partial_json", "")
-        return None, "", ""
+                return str(delta.get("text", ""))
+            if delta.get("type") == "input_json_delta" and index in tool_blocks:
+                tool_blocks[index]["args"] += delta.get("partial_json", "")
+        return ""
 
     @staticmethod
     def _loads(raw: str) -> dict[str, Any]:

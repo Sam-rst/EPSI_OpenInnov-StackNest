@@ -201,3 +201,72 @@ class TestStream:
         assert tool_chunks[0].tool_call is not None
         assert tool_chunks[0].tool_call.name == "stop_deployment"
         assert tool_chunks[0].tool_call.args == {"deployment_id": "d1"}
+
+    async def test_tool_use_paralleles_ne_concatenent_pas_les_args(self) -> None:
+        # Claude peut emettre PLUSIEURS tool_use en parallele (parallel tool use,
+        # blocs indexes 0,1,...). Les deltas `input_json_delta` de chaque bloc ne
+        # doivent JAMAIS etre concatenes ensemble, sinon json.loads leve
+        # « Extra data » (500 en prod). On retient le 1er tool_use.
+        async def stream_body() -> AsyncIterator[bytes]:
+            frames: list[dict[str, Any]] = [
+                {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {"type": "tool_use", "name": "get_template"},
+                },
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "input_json_delta", "partial_json": '{"template_id":'},
+                },
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "input_json_delta", "partial_json": ' "abc"}'},
+                },
+                {"type": "content_block_stop", "index": 0},
+                {
+                    "type": "content_block_start",
+                    "index": 1,
+                    "content_block": {"type": "tool_use", "name": "list_catalog"},
+                },
+                {
+                    "type": "content_block_delta",
+                    "index": 1,
+                    "delta": {"type": "input_json_delta", "partial_json": "{}"},
+                },
+                {"type": "content_block_stop", "index": 1},
+                {"type": "message_stop"},
+            ]
+            for frame in frames:
+                yield f"event: {frame['type']}\ndata: {json.dumps(frame)}\n\n".encode()
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=stream_body())
+
+        provider = _provider(httpx.MockTransport(handle))
+
+        chunks = [chunk async for chunk in provider.stream(_MESSAGES, _TOOLS)]
+
+        tool_chunks = [c for c in chunks if c.is_tool_call()]
+        assert len(tool_chunks) == 1
+        assert tool_chunks[0].tool_call is not None
+        assert tool_chunks[0].tool_call.name == "get_template"
+        assert tool_chunks[0].tool_call.args == {"template_id": "abc"}
+
+    async def test_desactive_le_parallel_tool_use_quand_des_outils_sont_fournis(self) -> None:
+        captured: dict[str, Any] = {}
+
+        async def stream_body() -> AsyncIterator[bytes]:
+            yield b'event: message_stop\ndata: {"type": "message_stop"}\n\n'
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(200, content=stream_body())
+
+        provider = _provider(httpx.MockTransport(handle))
+
+        _ = [chunk async for chunk in provider.stream(_MESSAGES, _TOOLS)]
+
+        # tool_choice auto + parallelisme desactive : Claude n'emet qu'un seul outil.
+        assert captured["body"]["tool_choice"]["disable_parallel_tool_use"] is True
