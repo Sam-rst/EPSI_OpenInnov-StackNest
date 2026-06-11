@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 
+import { Drawer } from '../../shared/components/Drawer'
+import { Icon } from '../../shared/components/ui'
 import { useDeployments } from '../../deployment/hooks/useDeployments'
 import { ContextAside } from '../components/aside/ContextAside'
 import { ChatComposer } from '../components/composer/ChatComposer'
@@ -60,6 +62,9 @@ export function ChatPage() {
   const conversations = useConversations()
   // Sélection explicite de l'utilisateur (undefined tant qu'il n'a rien choisi).
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+  // Tiroir mobile ouvert : la sidebar (conversations) et l'aside (déploiements)
+  // deviennent des tiroirs sous leur breakpoint inline (cf. rendu). null = fermé.
+  const [openDrawer, setOpenDrawer] = useState<'conversations' | 'deployments' | null>(null)
   const { confirm } = useConfirmAction()
   const { reject } = useRejectAction()
   const deployments = useDeployments()
@@ -117,71 +122,132 @@ export function ChatPage() {
   // (MESSAGES annonce le contenu) — on se limite aux transitions du tour.
   const liveStatus = buildLiveStatus(stream.state)
 
+  const closeDrawer = (): void => setOpenDrawer(null)
+
+  // Panneaux définis une fois, rendus à deux endroits : en colonne (desktop) et
+  // en tiroir (mobile). Sélectionner/créer un fil ferme le tiroir (no-op desktop).
+  const sidebar = (
+    <ConversationsSidebar
+      conversations={conversations.conversations}
+      activeId={activeId}
+      loading={conversations.loading}
+      onSelect={(id) => {
+        setSelectedId(id)
+        closeDrawer()
+      }}
+      onCreate={() => {
+        handleCreate()
+        closeDrawer()
+      }}
+      onRename={handleRename}
+      onDelete={handleDelete}
+    />
+  )
+  const aside = (
+    <ContextAside
+      deployments={deployments.deployments}
+      loading={deployments.loading}
+      isError={deployments.isError}
+    />
+  )
+
   return (
     // h-full (et non une hauteur fixe en vh) : la page remplit EXACTEMENT la zone
     // <main> de l'AppLayout (qui porte déjà le padding), sans la déborder — sinon
     // le <main> scrollait toute la page. overflow-hidden ici + overflow-y-auto sur
-    // chacune des 3 colonnes ⇒ chaque colonne scrolle indépendamment, jamais la page.
-    <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[260px_1fr] xl:grid-cols-[260px_1fr_280px]">
-      {/* Titre accessible : la mise en page 3 colonnes n'affiche pas de bandeau
-          de titre, mais l'écran reste annoncé aux lecteurs d'écran. */}
-      <h1 className="sr-only">Chat IA</h1>
+    // chacune des colonnes ⇒ chaque colonne scrolle indépendamment, jamais la page.
+    // Responsive : sidebar inline ≥ md, aside inline ≥ xl ; en-dessous, tiroirs.
+    <>
+      <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[260px_1fr] xl:grid-cols-[260px_1fr_280px]">
+        {/* Titre accessible : la mise en page n'affiche pas de bandeau de titre,
+            mais l'écran reste annoncé aux lecteurs d'écran. */}
+        <h1 className="sr-only">Chat IA</h1>
 
-      <ConversationsSidebar
-        conversations={conversations.conversations}
-        activeId={activeId}
-        loading={conversations.loading}
-        onSelect={setSelectedId}
-        onCreate={handleCreate}
-        onRename={handleRename}
-        onDelete={handleDelete}
-      />
+        {/* Sidebar en colonne à partir de md ; en tiroir en-dessous (cf. plus bas). */}
+        <div className="hidden md:block">{sidebar}</div>
 
-      {/* min-h-0 : la colonne centrale est un enfant flex du grid ; sans cette
-          contrainte, MessageList grandirait avec son contenu au lieu de scroller
-          en interne, ce qui pousserait le composer hors de l'écran. Avec min-h-0,
-          MessageList scrolle et le composer (shrink-0) reste fixe en bas. */}
-      <div className="flex min-h-0 min-w-0 flex-col">
-        {isThreadEmpty ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-            <ChatEmptyState onSuggestion={stream.send} />
+        {/* min-h-0 : la colonne centrale est un enfant flex du grid ; sans cette
+            contrainte, MessageList grandirait avec son contenu au lieu de scroller
+            en interne, ce qui pousserait le composer hors de l'écran. Avec min-h-0,
+            MessageList scrolle et le composer (shrink-0) reste fixe en bas. */}
+        <div className="flex min-h-0 min-w-0 flex-col">
+          {/* Barre mobile : accès aux tiroirs sous xl. Le bouton « Conversations »
+              ne sert plus dès md (la sidebar est alors en colonne) ; « Déploiements »
+              reste utile jusqu'à xl (l'aside n'apparaît en colonne qu'à partir de xl). */}
+          <div className="border-border flex shrink-0 items-center gap-1.5 border-b p-2 xl:hidden">
+            <button
+              type="button"
+              onClick={() => setOpenDrawer('conversations')}
+              className="text-text-secondary hover:text-text-primary hover:bg-surface-sunken inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium md:hidden"
+            >
+              <Icon name="menu" size={15} />
+              Conversations
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenDrawer('deployments')}
+              className="text-text-secondary hover:text-text-primary hover:bg-surface-sunken inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium"
+            >
+              <Icon name="server" size={15} />
+              Déploiements actifs
+            </button>
           </div>
-        ) : (
-          <MessageList
-            messages={messages}
-            streamStatus={stream.state.status}
-            streamingText={stream.state.streamingText}
-            onStop={stream.stop}
-            onConfirmAction={handleConfirmAction}
-            onRejectAction={handleRejectAction}
-          />
-        )}
-        {/* F1 : annonce courtoise de l'état du tour aux lecteurs d'écran. Visuellement
+          {isThreadEmpty ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+              <ChatEmptyState onSuggestion={stream.send} />
+            </div>
+          ) : (
+            <MessageList
+              messages={messages}
+              streamStatus={stream.state.status}
+              streamingText={stream.state.streamingText}
+              onStop={stream.stop}
+              onConfirmAction={handleConfirmAction}
+              onRejectAction={handleRejectAction}
+            />
+          )}
+          {/* F1 : annonce courtoise de l'état du tour aux lecteurs d'écran. Visuellement
             masquée — le feedback visible est porté par la bulle « réfléchit » et `ChatError`. */}
-        <div role="status" aria-live="polite" className="sr-only">
-          {liveStatus}
-        </div>
-        <div className="mx-auto w-full max-w-[760px] px-6">
-          <ChatError
-            error={stream.state.error}
-            onRetry={stream.retry}
-            isReconnecting={stream.state.isReconnecting}
+          <div role="status" aria-live="polite" className="sr-only">
+            {liveStatus}
+          </div>
+          <div className="mx-auto w-full max-w-[760px] px-6">
+            <ChatError
+              error={stream.state.error}
+              onRetry={stream.retry}
+              isReconnecting={stream.state.isReconnecting}
+            />
+          </div>
+          <ChatComposer
+            onSend={stream.send}
+            disabled={activeId === undefined || !stream.canSend}
+            pending={isGenerating}
           />
         </div>
-        <ChatComposer
-          onSend={stream.send}
-          disabled={activeId === undefined || !stream.canSend}
-          pending={isGenerating}
-        />
+
+        {/* Aside des déploiements en colonne à partir de xl ; en tiroir en-dessous. */}
+        <div className="hidden xl:block">{aside}</div>
       </div>
 
-      <div className="hidden xl:block">
-        <ContextAside
-          deployments={deployments.deployments}
-          loading={deployments.loading}
-          isError={deployments.isError}
-        />
-      </div>
-    </div>
+      {/* Tiroirs mobiles : mêmes panneaux, présentés en superposition coulissante.
+          Les boutons d'ouverture sont masqués au-delà de leur breakpoint, donc ces
+          tiroirs ne s'ouvrent que sur petit écran. */}
+      <Drawer
+        open={openDrawer === 'conversations'}
+        title="Conversations"
+        side="left"
+        onClose={closeDrawer}
+      >
+        {sidebar}
+      </Drawer>
+      <Drawer
+        open={openDrawer === 'deployments'}
+        title="Déploiements actifs"
+        side="right"
+        onClose={closeDrawer}
+      >
+        {aside}
+      </Drawer>
+    </>
   )
 }
