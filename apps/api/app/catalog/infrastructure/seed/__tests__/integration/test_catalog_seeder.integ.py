@@ -72,7 +72,17 @@ async def session(postgres_container: PostgresContainer) -> AsyncIterator[AsyncS
     await engine.dispose()
 
 
-def _command(*, slug: str, params: list[ParamSpec]) -> TemplateCommand:
+def _command(
+    *,
+    slug: str,
+    params: list[ParamSpec],
+    image_repository: str | None = None,
+    internal_port: int | None = None,
+    secret_env: str | None = None,
+    command: list[str] | None = None,
+    secret_value_template: str | None = None,
+    is_deployable: bool = True,
+) -> TemplateCommand:
     return TemplateCommand(
         slug=slug,
         name="PostgreSQL",
@@ -85,6 +95,12 @@ def _command(*, slug: str, params: list[ParamSpec]) -> TemplateCommand:
         is_active=True,
         engine=EngineKind.DOCKER,
         params=params,
+        image_repository=image_repository,
+        internal_port=internal_port,
+        secret_env=secret_env,
+        command=command,
+        secret_value_template=secret_value_template,
+        is_deployable=is_deployable,
     )
 
 
@@ -139,6 +155,46 @@ class TestSeederConvergence:
         assert by_key["schema"].env_var == "POSTGRES_SCHEMA"
         # Pas de duplication : un seul template porte ce slug.
         assert len([t for t in await repository.list_all() if str(t.slug) == slug.value]) == 1
+
+    async def test_reseed_actualise_les_champs_niveau_template(self, session: AsyncSession) -> None:
+        """Les champs scalaires niveau-template convergent via update (vrai repo).
+
+        Regression : `_apply_scalar_fields` omettait image_repository / internal_port
+        / secret_env et les champs v2 (command / secret_value_template /
+        is_deployable) -> un update convergent ne les actualisait jamais en base.
+        """
+        repository = SqlAlchemyTemplateRepository(session)
+        seeder = CatalogSeeder(repository)
+        slug = Slug("seed-scalars-convergent")
+
+        await seeder.seed(dataset=[_command(slug=slug.value, params=[_param(env_var=None)])])
+        await session.commit()
+
+        outcome = await seeder.seed(
+            dataset=[
+                _command(
+                    slug=slug.value,
+                    params=[_param(env_var=None)],
+                    image_repository="keycloak",
+                    internal_port=8080,
+                    secret_env="KEYCLOAK_ADMIN_PASSWORD",
+                    command=["start-dev"],
+                    secret_value_template="neo4j/{secret}",
+                    is_deployable=False,
+                )
+            ]
+        )
+        await session.commit()
+
+        assert outcome.updated == 1
+        updated = await repository.get_by_slug(slug)
+        assert updated is not None
+        assert updated.image_repository == "keycloak"
+        assert updated.internal_port == 8080
+        assert updated.secret_env == "KEYCLOAK_ADMIN_PASSWORD"
+        assert updated.command == ["start-dev"]
+        assert updated.secret_value_template == "neo4j/{secret}"
+        assert updated.is_deployable is False
 
     async def test_reseed_identique_est_un_no_op(self, session: AsyncSession) -> None:
         repository = SqlAlchemyTemplateRepository(session)
