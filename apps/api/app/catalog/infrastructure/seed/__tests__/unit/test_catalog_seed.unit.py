@@ -368,17 +368,21 @@ class TestSeedModeleProvisioningV2:
         # Sans commande serveur l'image Keycloak affiche l'aide et sort.
         assert _BY_SLUG["keycloak"].command == ["start-dev"]
 
+    def test_minio_porte_la_commande_server(self) -> None:
+        # Sans sous-commande l'image MinIO affiche l'aide et sort : il faut `server`.
+        assert _BY_SLUG["minio"].command == ["server", "/data", "--console-address", ":9001"]
+
     def test_neo4j_porte_le_gabarit_de_valeur_du_secret(self) -> None:
         # NEO4J_AUTH attend `user/password` : la valeur injectee devient `neo4j/<secret>`.
         item = _BY_SLUG["neo4j"]
         assert item.secret_env == "NEO4J_AUTH"
         assert item.secret_value_template == "neo4j/{secret}"
 
-    def test_seul_keycloak_porte_une_commande(self) -> None:
-        # Seul Keycloak surcharge la commande au seed ; les autres gardent la commande
-        # par defaut de leur image (command=None).
+    def test_seuls_keycloak_et_minio_portent_une_commande(self) -> None:
+        # Keycloak et MinIO surchargent la commande au seed (sinon l'image affiche
+        # l'aide et sort) ; les autres gardent la commande par defaut (command=None).
         with_command = {item.slug for item in CATALOG_SEED if item.command is not None}
-        assert with_command == {"keycloak"}
+        assert with_command == {"keycloak", "minio"}
 
     def test_seul_neo4j_porte_un_gabarit_de_valeur(self) -> None:
         with_template = {

@@ -197,6 +197,9 @@ _MINIO = TemplateCommand(
     image_repository="minio/minio",
     internal_port=9000,
     secret_env="MINIO_ROOT_PASSWORD",
+    # Sans sous-commande l'image MinIO affiche l'aide et sort : on demarre le serveur
+    # objet sur /data et on fixe le port console (sinon port dynamique + avertissement).
+    command=["server", "/data", "--console-address", ":9001"],
     versions=[
         VersionSpec(
             version="RELEASE.2025-04-22T22-12-26Z", is_default=True, is_lts=False, eol_date=None
