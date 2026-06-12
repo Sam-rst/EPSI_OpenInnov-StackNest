@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.param_type import ParamType
 from app.chat.application.__tests__.fakes import FakeCatalogReader, make_param, make_template
 from app.chat.domain.exceptions.invalid_tool_args import InvalidToolArgsException
@@ -107,6 +108,54 @@ class TestListMyDeployments:
 
         assert "secret" not in result["deployments"][0]
         assert "password" not in result["deployments"][0]
+
+
+class TestDeployabilityExposure:
+    """La deployabilite est exposee au modele (liste + detail) pour qu'il evite
+    de proposer un deploiement voue a l'echec (409)."""
+
+    async def test_service_docker_deployable_expose_deployable_true(self) -> None:
+        template = make_template(engine=EngineKind.DOCKER, is_deployable=True)
+        executor = _executor(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(name=ToolName.LIST_CATALOG.value, args={})
+
+        result = await executor.execute(call, owner_id=uuid4())
+
+        item = result["templates"][0]
+        assert item["deployable"] is True
+        assert item["blocked_reason"] is None
+
+    async def test_template_terraform_expose_blocked_reason_terraform(self) -> None:
+        template = make_template(engine=EngineKind.TERRAFORM, is_deployable=True)
+        executor = _executor(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(name=ToolName.LIST_CATALOG.value, args={})
+
+        result = await executor.execute(call, owner_id=uuid4())
+
+        item = result["templates"][0]
+        assert item["deployable"] is False
+        assert item["blocked_reason"] == "terraform"
+
+    async def test_runtime_docker_non_deployable_expose_blocked_reason_runtime(self) -> None:
+        template = make_template(engine=EngineKind.DOCKER, is_deployable=False)
+        executor = _executor(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(name=ToolName.LIST_CATALOG.value, args={})
+
+        result = await executor.execute(call, owner_id=uuid4())
+
+        item = result["templates"][0]
+        assert item["deployable"] is False
+        assert item["blocked_reason"] == "runtime"
+
+    async def test_detail_expose_aussi_la_deployabilite(self) -> None:
+        template = make_template(engine=EngineKind.TERRAFORM, is_deployable=True, versions=["1"])
+        executor = _executor(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(name=ToolName.GET_TEMPLATE.value, args={"template_id": str(template.id)})
+
+        result = await executor.execute(call, owner_id=uuid4())
+
+        assert result["template"]["deployable"] is False
+        assert result["template"]["blocked_reason"] == "terraform"
 
 
 class TestUnknownReadTool:

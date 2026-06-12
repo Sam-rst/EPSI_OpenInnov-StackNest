@@ -33,6 +33,7 @@ def make_template(
     slug: str = "postgresql",
     name: str = "PostgreSQL",
     engine: EngineKind = EngineKind.DOCKER,
+    is_deployable: bool = True,
     versions: list[str] | None = None,
     params: list[TemplateParam] | None = None,
 ) -> Template:
@@ -57,6 +58,7 @@ def make_template(
         provider="PostgreSQL Global Development Group",
         description="Base de donnees relationnelle open source.",
         engine=engine,
+        is_deployable=is_deployable,
         versions=template_versions,
         params=params if params is not None else [],
         image_repository="postgres",
