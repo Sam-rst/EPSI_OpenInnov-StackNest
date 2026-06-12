@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.param_type import ParamType
 from app.chat.application.__tests__.fakes import (
     FakeCatalogReader,
@@ -183,6 +184,47 @@ class TestDeployValidation:
         proposal = await gate.validate(call, owner_id=uuid4())
 
         assert proposal.args["version"] == "16"
+
+
+class TestDeployabilityGuard:
+    """La gate refuse un deploy ciblant un template non deployable, avec un
+    message honnete (backstop chat avant le 409 de CreateDeployment)."""
+
+    async def test_deploy_template_terraform_leve_invalid_args(self) -> None:
+        template = make_template(engine=EngineKind.TERRAFORM, versions=["1"])
+        gate = _gate(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="deploy_template",
+            args={"template_id": str(template.id), "version": "1", "name": "x", "params": {}},
+        )
+
+        with pytest.raises(InvalidToolArgsException) as error:
+            await gate.validate(call, owner_id=uuid4())
+        assert "pas encore deployable" in error.value.message.lower()
+
+    async def test_deploy_runtime_non_deployable_leve_invalid_args(self) -> None:
+        template = make_template(engine=EngineKind.DOCKER, is_deployable=False, versions=["20"])
+        gate = _gate(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="deploy_template",
+            args={"template_id": str(template.id), "version": "20", "name": "x", "params": {}},
+        )
+
+        with pytest.raises(InvalidToolArgsException) as error:
+            await gate.validate(call, owner_id=uuid4())
+        assert "pas encore deployable" in error.value.message.lower()
+
+    async def test_deploy_template_deployable_passe_sans_regression(self) -> None:
+        template = make_template(engine=EngineKind.DOCKER, is_deployable=True, versions=["16"])
+        gate = _gate(FakeCatalogReader([template]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="deploy_template",
+            args={"template_id": str(template.id), "version": "16", "name": "db", "params": {}},
+        )
+
+        proposal = await gate.validate(call, owner_id=uuid4())
+
+        assert proposal.kind is ActionKind.DEPLOY
 
 
 class TestLifecycleValidation:

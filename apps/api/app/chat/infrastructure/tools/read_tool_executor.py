@@ -15,6 +15,7 @@ from app.catalog.domain.entities.template import Template
 from app.catalog.domain.enums.param_type import ParamType
 from app.chat.domain.exceptions.invalid_tool_args import InvalidToolArgsException
 from app.chat.domain.interfaces.catalog_reader import CatalogReader
+from app.chat.domain.value_objects.template_deployability import TemplateDeployability
 from app.chat.domain.value_objects.tool_call import ToolCall
 from app.chat.infrastructure.tools.tool_names import ToolName
 from app.deployment.domain.entities.deployment import Deployment
@@ -82,6 +83,11 @@ class ReadToolExecutor:
 
     @staticmethod
     def _template_summary(template: Template) -> dict[str, Any]:
+        # La deployabilite est exposee au modele pour qu'il evite de proposer un
+        # deploiement voue a l'echec (Terraform pas branche, runtime langage
+        # bloque) : il explique alors le motif et propose une alternative reelle.
+        deployability = TemplateDeployability.from_template(template)
+        reason = deployability.blocked_reason
         return {
             "id": str(template.id),
             "slug": str(template.slug),
@@ -89,6 +95,8 @@ class ReadToolExecutor:
             "category": template.category.value,
             "engine": template.engine.value,
             "popular": template.popular,
+            "deployable": deployability.deployable,
+            "blocked_reason": reason.value if reason is not None else None,
         }
 
     @classmethod

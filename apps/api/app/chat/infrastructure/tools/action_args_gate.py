@@ -21,10 +21,12 @@ from uuid import UUID
 from app.catalog.domain.entities.template import Template
 from app.catalog.domain.enums.param_type import ParamType
 from app.chat.domain.enums.action_kind import ActionKind
+from app.chat.domain.enums.blocked_reason import BlockedReason
 from app.chat.domain.exceptions.invalid_tool_args import InvalidToolArgsException
 from app.chat.domain.exceptions.unknown_template import UnknownTemplateException
 from app.chat.domain.interfaces.catalog_reader import CatalogReader
 from app.chat.domain.value_objects.action_proposal import ActionProposal
+from app.chat.domain.value_objects.template_deployability import TemplateDeployability
 from app.chat.domain.value_objects.tool_call import ToolCall
 from app.chat.infrastructure.tools.tool_names import ACTION_TOOL_KINDS, ToolName
 from app.deployment.domain.entities.deployment import Deployment
@@ -63,6 +65,7 @@ class ActionArgsGate:
 
     async def _validate_deploy(self, args: dict[str, Any], *, owner_id: UUID) -> ActionProposal:
         template = await self._load_template(args.get("template_id"))
+        self._ensure_deployable(template)
         version = self._resolve_version(template, args.get("version"))
         name = self._require_name(args.get("name"))
         params = self._validate_params(template, args.get("params") or {})
@@ -101,6 +104,27 @@ class ActionArgsGate:
         if template is None:
             raise UnknownTemplateException()
         return template
+
+    @staticmethod
+    def _ensure_deployable(template: Template) -> None:
+        """Refuse honnetement un deploy ciblant un template non deployable.
+
+        Backstop chat (avant le 409 de `CreateDeployment`) : un template Terraform
+        ou un runtime langage bloque ne doit jamais produire une proposition
+        confirmable. Le motif explicite permet a l'IA d'expliquer et de proposer
+        une alternative reelle plutot que d'echouer cote deploiement.
+        """
+        deployability = TemplateDeployability.from_template(template)
+        if deployability.deployable:
+            return
+        raisons = {
+            BlockedReason.TERRAFORM: (
+                "les deploiements Terraform (VM, reseau, bucket) arrivent bientot"
+            ),
+            BlockedReason.RUNTIME: "le runtime de ce langage sera bientot disponible",
+        }
+        detail = raisons[deployability.blocked_reason] if deployability.blocked_reason else ""
+        raise InvalidToolArgsException(f"Ce service n'est pas encore deployable : {detail}.")
 
     async def _load_owned_deployment(self, raw_id: Any, owner_id: UUID) -> Deployment:
         deployment_id = self._parse_uuid(raw_id, field="deployment_id")

@@ -22,7 +22,7 @@ from app.chat.application.__tests__.fakes import (
 )
 from app.chat.application.commands.send_message_command import SendMessageCommand
 from app.chat.application.conversation_titler import ConversationTitler
-from app.chat.application.send_message import SendMessage
+from app.chat.application.send_message import _SYSTEM_PROMPT, SendMessage
 from app.chat.domain.entities.conversation import Conversation
 from app.chat.domain.entities.message import Message
 from app.chat.domain.enums.action_status import ActionStatus
@@ -419,6 +419,19 @@ class TestActionTool:
         assert actions.added == []
         assert "action_proposed" not in publisher.names()
         assert "error" in publisher.names()
+
+
+class TestSystemPromptDeployability:
+    """Le prompt systeme cadre l'IA pour ne jamais proposer un service non
+    deployable et expliquer honnetement pourquoi (cf. detection cote outils)."""
+
+    def test_le_prompt_interdit_de_deployer_un_service_non_deployable(self) -> None:
+        assert "deploy_template" in _SYSTEM_PROMPT
+        assert "deployable" in _SYSTEM_PROMPT
+
+    def test_le_prompt_explique_les_motifs_de_blocage(self) -> None:
+        assert "terraform" in _SYSTEM_PROMPT.lower()
+        assert "runtime" in _SYSTEM_PROMPT.lower()
 
 
 class _ScriptedProvider(FakeLLMProvider):
