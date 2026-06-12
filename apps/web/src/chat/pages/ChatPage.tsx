@@ -89,10 +89,15 @@ export function ChatPage() {
   const { seedMessages } = useConversation(activeId ?? '')
   const stream = useChatStream(activeId ?? '')
 
-  const messages = useMemo(
-    () => [...seedMessages, ...stream.messages],
-    [seedMessages, stream.messages],
-  )
+  // Amorce REST + messages live du tour. `useChatStream` miroite ses messages
+  // figés dans le cache du seed (Fix 3 : persistance au changement de page) : on
+  // déduplique donc par `id` pour ne pas afficher deux fois un message présent
+  // dans les deux sources. Le live prime (statut d'action le plus à jour).
+  const messages = useMemo(() => {
+    const liveById = new Map(stream.messages.map((message) => [message.id, message]))
+    const fromSeed = seedMessages.filter((message) => !liveById.has(message.id))
+    return [...fromSeed, ...stream.messages]
+  }, [seedMessages, stream.messages])
 
   // Sélectionner un fil = naviguer vers son URL (le fil actif suit l'URL).
   const handleSelect = (id: string): void => {

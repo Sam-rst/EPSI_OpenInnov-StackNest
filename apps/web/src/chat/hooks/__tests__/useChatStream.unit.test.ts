@@ -140,6 +140,9 @@ async function sendAfterOpen(
 
 describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => {
   beforeEach(() => {
+    // Cache neuf par test : le `testQueryClient` est partagé, on évite la fuite
+    // d'état (titre / messages miroités) d'un test sur le suivant.
+    testQueryClient.clear()
     FakeStream.instances = []
     fetchEventSourceMock.mockReset()
     refreshAccessTokenMock.mockReset()
@@ -412,6 +415,34 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
         CHAT_QUERY_KEYS.conversations,
       )
       expect(fils?.[0]?.title).toBe('Déploiement Redis')
+    })
+  })
+
+  describe('persistance des messages figés (Fix 3)', () => {
+    it('miroite la proposition figée dans le cache des messages du fil', async () => {
+      // Le tour figé est miroité dans le cache `conversationMessages` : au démontage
+      // de la page, la carte survit (servie depuis ce cache) sans nouvel event SSE.
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
+      const stream = await sendAfterOpen(result.current.send, 'go')
+
+      act(() => stream.emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal()))
+      await waitFor(() => expect(result.current.messages).toHaveLength(2))
+
+      const cached = testQueryClient.getQueryData<readonly { action?: { id: string } }[]>(
+        CHAT_QUERY_KEYS.conversationMessages('c1'),
+      )
+      // Le message utilisateur + la bulle porteuse de l'action sont persistés.
+      expect(cached).toHaveLength(2)
+      expect(cached?.[1]?.action?.id).toBe('act-1')
+    })
+
+    it('ne touche pas au cache des messages tant qu’aucun message figé n’existe', () => {
+      renderHook(() => useChatStream('c1'), { wrapper })
+
+      // Aucun tour entamé : le cache reste vierge (pas d'écriture parasite).
+      expect(
+        testQueryClient.getQueryData(CHAT_QUERY_KEYS.conversationMessages('c1')),
+      ).toBeUndefined()
     })
   })
 

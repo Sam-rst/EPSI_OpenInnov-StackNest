@@ -162,6 +162,32 @@ function applyActionResult(
   })
 }
 
+/**
+ * Fusionne les messages figés du tour live dans la liste d'amorce mise en cache
+ * (React Query), de sorte qu'ils survivent au démontage de la page (Fix 3 : la
+ * carte de proposition ne disparaît plus lors d'une navigation interne). On met à
+ * jour par `id` les messages déjà présents (ex. statut d'action) et on ajoute les
+ * nouveaux à la suite, sans jamais retirer un message d'amorce REST. Renvoie la
+ * référence d'entrée inchangée si rien ne bouge (évite un re-render parasite).
+ */
+function mergeLiveMessages(
+  seed: readonly Message[] | undefined,
+  live: readonly Message[],
+): readonly Message[] | undefined {
+  if (live.length === 0) {
+    return seed
+  }
+  const base = seed ?? []
+  const liveById = new Map(live.map((message) => [message.id, message]))
+  const merged = base.map((message) => liveById.get(message.id) ?? message)
+  const knownIds = new Set(base.map((message) => message.id))
+  const appended = live.filter((message) => !knownIds.has(message.id))
+  if (appended.length === 0 && merged.every((message, index) => message === base[index])) {
+    return seed
+  }
+  return [...merged, ...appended]
+}
+
 /** Applique un statut au message portant l'action ; sans toucher aux autres. */
 function withActionStatus(
   messages: readonly Message[],
@@ -481,6 +507,23 @@ export function useChatStream(conversationId: string): UseChatStreamResult {
     },
     [conversationId],
   )
+
+  // Fix 3 — persistance de la proposition au changement de page. Les messages
+  // figés du tour vivent dans un `useState` local, perdu au démontage de la page
+  // (navigation SPA interne). On les miroite donc dans le cache des messages du fil
+  // (`useConversation`) : au remontage, ils sont déjà servis depuis le cache, sans
+  // disparition ni nouvel event SSE. On patche DIRECTEMENT le cache (pas
+  // d'invalidation) — comme pour le titre auto — car le back peut ne pas avoir
+  // encore persisté la proposition. La fusion par `id` préserve l'amorce REST.
+  useEffect(() => {
+    if (conversationId === '' || state.keyedId !== conversationId || state.messages.length === 0) {
+      return
+    }
+    queryClient.setQueryData<readonly Message[]>(
+      CHAT_QUERY_KEYS.conversationMessages(conversationId),
+      (seed) => mergeLiveMessages(seed, state.messages),
+    )
+  }, [conversationId, queryClient, state.keyedId, state.messages])
 
   // Tant que la progression stockée ne correspond pas au fil demandé (changement
   // d'id, avant la réinitialisation par l'effet), on expose un état vierge.
