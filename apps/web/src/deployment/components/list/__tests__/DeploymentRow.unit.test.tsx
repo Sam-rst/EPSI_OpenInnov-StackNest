@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { DeploymentStatus } from '../../../types/enums/DeploymentStatus'
 import type { Deployment } from '../../../types/models/Deployment'
@@ -27,8 +27,16 @@ function deployment(overrides: Partial<Deployment> = {}): Deployment {
   }
 }
 
+interface RowSelectionStub {
+  selected?: boolean
+  onToggle?: () => void
+}
+
 /** Une `<tr>` ne peut être montée seule : on l'enveloppe dans une vraie table. */
-function renderRow(model: Deployment) {
+function renderRow(model: Deployment, selection?: RowSelectionStub) {
+  const rowSelection = selection
+    ? { selected: selection.selected ?? false, onToggle: selection.onToggle ?? vi.fn() }
+    : undefined
   return render(
     <MemoryRouter initialEntries={['/deployments']}>
       <Routes>
@@ -37,7 +45,7 @@ function renderRow(model: Deployment) {
           element={
             <table>
               <tbody>
-                <DeploymentRow deployment={model} />
+                <DeploymentRow deployment={model} selection={rowSelection} />
               </tbody>
             </table>
           }
@@ -102,5 +110,28 @@ describe('DeploymentRow', () => {
     const row = screen.getByRole('link', { name: /postgres-prod/ })
     expect(row).toHaveAttribute('tabindex', '0')
     expect(row.className).toMatch(/cursor-pointer/)
+  })
+
+  it('n’affiche pas de case à cocher quand la sélection est désactivée', () => {
+    renderRow(deployment())
+
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('affiche une case à cocher quand la sélection est active', () => {
+    renderRow(deployment(), { selected: true })
+
+    expect(screen.getByRole('checkbox', { name: /postgres-prod/ })).toBeChecked()
+  })
+
+  it('coche/décoche via onToggle sans naviguer vers le détail (stopPropagation)', async () => {
+    const onToggle = vi.fn()
+    const user = userEvent.setup()
+    renderRow(deployment(), { selected: false, onToggle })
+
+    await user.click(screen.getByRole('checkbox', { name: /postgres-prod/ }))
+
+    expect(onToggle).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Page détail dep-1')).not.toBeInTheDocument()
   })
 })
