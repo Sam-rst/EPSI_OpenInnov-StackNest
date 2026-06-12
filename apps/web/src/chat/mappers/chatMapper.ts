@@ -8,10 +8,16 @@ import type {
 } from '../types/dto/ChatStreamEventDTO'
 import type { ConversationDTO } from '../types/dto/ConversationDTO'
 import type { MessageDTO } from '../types/dto/MessageDTO'
+import { ActionKind } from '../types/enums/ActionKind'
 import { ActionStatus } from '../types/enums/ActionStatus'
 import { MessageRole } from '../types/enums/MessageRole'
 import { toActionKind, toMessageRole } from '../types/guards/chatGuards'
-import type { ActionProposal, ActionRecapEntry } from '../types/models/ActionProposal'
+import type {
+  ActionProposal,
+  ActionRecapEntry,
+  StackLinkRecap,
+  StackServiceRecap,
+} from '../types/models/ActionProposal'
 import { ChatStreamEventName, type ChatStreamEvent } from '../types/models/ChatStreamEvent'
 import type { Conversation } from '../types/models/Conversation'
 import type { Message } from '../types/models/Message'
@@ -75,18 +81,70 @@ function flattenRecap(recap: Readonly<Record<string, unknown>>): ActionRecapEntr
   })
 }
 
+/** Extrait les services d'une composition de stack depuis le récap typé. */
+function parseStackServices(recap: Readonly<Record<string, unknown>>): StackServiceRecap[] {
+  const raw = recap['services']
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw.flatMap((entry) =>
+    isRecord(entry)
+      ? [
+          {
+            alias: stringifyRecapValue(entry['alias']),
+            version: stringifyRecapValue(entry['version']),
+          },
+        ]
+      : [],
+  )
+}
+
+/** Extrait les liens de câblage d'une composition de stack depuis le récap typé. */
+function parseStackLinks(recap: Readonly<Record<string, unknown>>): StackLinkRecap[] {
+  const raw = recap['links']
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw.flatMap((entry) =>
+    isRecord(entry)
+      ? [{ from: stringifyRecapValue(entry['from']), to: stringifyRecapValue(entry['to']) }]
+      : [],
+  )
+}
+
 /**
  * Construit une `ActionProposal` UI à partir de l'événement SSE `action_proposed`
  * (`{action_id, kind, restatement, recap}`). Le back ne transmet ni image figée ni
  * `template_id` exploitable côté UI : `image` / `templateId` restent `null`
  * (« Modifier » ouvre alors la config déploiement vierge). La `version`, si
  * présente dans le récap, alimente l'identité affichée.
+ *
+ * Pour une composition de stack (`compose_stack`), le récap est structuré
+ * (`{name, services:[{alias, version}], links:[{from, to}]}`) : on l'expose en
+ * `stackServices` / `stackLinks` (la carte affiche le câblage), sans aplatir les
+ * tableaux en lignes clé/valeur.
  */
 export function mapActionProposed(dto: ActionProposedEventDTO): ActionProposal {
+  const kind = toActionKind(dto.kind)
+  if (kind === ActionKind.COMPOSE_STACK) {
+    return {
+      id: dto.action_id,
+      kind,
+      status: ActionStatus.PROPOSED,
+      intent: dto.restatement,
+      templateId: null,
+      version: null,
+      image: null,
+      params: [],
+      quotas: [],
+      stackServices: parseStackServices(dto.recap),
+      stackLinks: parseStackLinks(dto.recap),
+    }
+  }
   const versionValue = dto.recap['version']
   return {
     id: dto.action_id,
-    kind: toActionKind(dto.kind),
+    kind,
     status: ActionStatus.PROPOSED,
     intent: dto.restatement,
     templateId: null,
@@ -94,6 +152,8 @@ export function mapActionProposed(dto: ActionProposedEventDTO): ActionProposal {
     image: null,
     params: flattenRecap(dto.recap),
     quotas: [],
+    stackServices: [],
+    stackLinks: [],
   }
 }
 
@@ -148,6 +208,7 @@ export function mapStreamEvent(eventName: string, data: string): ChatStreamEvent
         actionId: dto.action_id,
         status: resultStatus(dto.success),
         deploymentId: dto.deployment_id ?? null,
+        stackId: dto.stack_id ?? null,
         message: null,
       }
     }

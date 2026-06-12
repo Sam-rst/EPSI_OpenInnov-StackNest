@@ -84,6 +84,8 @@ describe('Message', () => {
         image: 'postgres:16-alpine',
         params: [],
         quotas: [],
+        stackServices: [],
+        stackLinks: [],
       },
     })
 

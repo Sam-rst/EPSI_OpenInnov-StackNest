@@ -26,8 +26,28 @@ function proposal(overrides: Partial<ActionProposal> = {}): ActionProposal {
     image: 'postgres:16-alpine',
     params: [{ label: 'Base de données', value: 'app' }],
     quotas: [{ label: 'CPU', value: '1 vCPU' }],
+    stackServices: [],
+    stackLinks: [],
     ...overrides,
   }
+}
+
+function stackProposal(overrides: Partial<ActionProposal> = {}): ActionProposal {
+  return proposal({
+    kind: ActionKind.COMPOSE_STACK,
+    intent: 'Composer la stack « mon-app » (2 services : db, api).',
+    templateId: null,
+    version: null,
+    image: null,
+    params: [],
+    quotas: [],
+    stackServices: [
+      { alias: 'db', version: '16' },
+      { alias: 'api', version: '20' },
+    ],
+    stackLinks: [{ from: 'api', to: 'db' }],
+    ...overrides,
+  })
 }
 
 function renderCard(overrides: Partial<Parameters<typeof ActionCard>[0]> = {}) {
@@ -108,5 +128,48 @@ describe('ActionCard', () => {
     renderCard({ action: proposal({ status: ActionStatus.PROPOSED }) })
 
     expect(screen.queryByRole('button', { name: /Voir le déploiement/ })).toBeNull()
+  })
+
+  describe('composition de stack', () => {
+    it('affiche les services (alias + version) et le câblage', () => {
+      renderCard({ action: stackProposal() })
+
+      expect(screen.getByText(/Composer la stack/)).toBeInTheDocument()
+      expect(screen.getByText('Services')).toBeInTheDocument()
+      expect(screen.getByText('Câblage')).toBeInTheDocument()
+      // db et api apparaissent dans les services ET dans le câblage (api -> db).
+      expect(screen.getAllByText('db').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('api').length).toBeGreaterThanOrEqual(1)
+      // La version figée de chaque service est affichée.
+      expect(screen.getByText('16')).toBeInTheDocument()
+      expect(screen.getByText('20')).toBeInTheDocument()
+    })
+
+    it('affiche un CTA « Voir la stack » une fois exécutée avec une stack', async () => {
+      const user = userEvent.setup()
+      renderCard({
+        action: stackProposal({ status: ActionStatus.EXECUTED, stackId: 'stack-7' }),
+      })
+
+      const cta = screen.getByRole('button', { name: /Voir la stack/ })
+      expect(cta).toBeInTheDocument()
+
+      await user.click(cta)
+      expect(navigateMock).toHaveBeenCalledWith('/stacks/stack-7')
+    })
+
+    it('n’affiche pas le CTA stack tant que l’action n’est pas exécutée', () => {
+      renderCard({ action: stackProposal({ status: ActionStatus.PROPOSED }) })
+
+      expect(screen.queryByRole('button', { name: /Voir la stack/ })).toBeNull()
+    })
+
+    it('masque le bouton « Modifier » pour une composition de stack', () => {
+      // « Modifier » ouvre la config déploiement (service unique) : hors sujet
+      // pour une composition multi-services au MVP.
+      renderCard({ action: stackProposal() })
+
+      expect(screen.queryByRole('button', { name: /Modifier/ })).toBeNull()
+    })
   })
 })

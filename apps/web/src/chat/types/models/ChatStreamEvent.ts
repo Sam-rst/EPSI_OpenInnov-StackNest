@@ -34,6 +34,8 @@ export interface ActionResultEvent {
   status: ActionStatus
   /** Identifiant du déploiement créé (action `deploy`), ou `null`. */
   deploymentId: string | null
+  /** Identifiant de la stack créée (action `compose_stack`), ou `null`. */
+  stackId: string | null
   /** Libellé humain du résultat, ou `null`. */
   message: string | null
 }

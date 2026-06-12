@@ -124,6 +124,22 @@ function deployProposal(): Record<string, unknown> {
   }
 }
 
+function stackProposal(): Record<string, unknown> {
+  return {
+    action_id: 'act-stack',
+    kind: 'compose_stack',
+    restatement: 'Composer la stack « mon-app » (2 services : db, api).',
+    recap: {
+      name: 'mon-app',
+      services: [
+        { alias: 'db', version: '16' },
+        { alias: 'api', version: '20' },
+      ],
+      links: [{ from: 'api', to: 'db' }],
+    },
+  }
+}
+
 /** Ouvre le flux courant (succès 200) puis envoie un message ; renvoie le flux. */
 async function sendAfterOpen(
   send: (content: string) => void,
@@ -557,6 +573,30 @@ describe('useChatStream (machine d’état + résilience SSE sur /chat)', () => 
       // Le déploiement créé est aussi rattaché à l'action elle-même : la carte peut
       // afficher un CTA « Voir le déploiement → » sans dépendre de l'état global.
       expect(result.current.messages[1]?.action?.deploymentId).toBe('dep-1')
+    })
+
+    it('marque la composition de stack exécutée et rattache le stack_id', async () => {
+      const { result } = renderHook(() => useChatStream('c1'), { wrapper })
+      const stream = await sendAfterOpen(result.current.send, 'go')
+      act(() => stream.emit(ChatStreamEventName.ACTION_PROPOSED, stackProposal()))
+      await waitFor(() => expect(result.current.messages).toHaveLength(2))
+
+      act(() =>
+        stream.emit(ChatStreamEventName.ACTION_RESULT, {
+          action_id: 'act-stack',
+          kind: 'compose_stack',
+          success: true,
+          deployment_id: null,
+          stack_id: 'stack-1',
+        }),
+      )
+
+      await waitFor(() =>
+        expect(result.current.messages[1]?.action?.status).toBe(ActionStatus.EXECUTED),
+      )
+      // La stack créée est rattachée à l'action : la carte affiche un CTA
+      // « Voir la stack → » contextuel (≠ CTA déploiement).
+      expect(result.current.messages[1]?.action?.stackId).toBe('stack-1')
     })
 
     it('marque l’action annulée localement et ne la redégrade pas sur action_result', async () => {

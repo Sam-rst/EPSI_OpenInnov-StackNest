@@ -149,14 +149,16 @@ function applyActionResult(
     if (message.action.status === ActionStatus.REJECTED) {
       return message
     }
-    // On rattache le déploiement créé à l'action elle-même : la carte affiche
-    // alors un CTA « Voir le déploiement → » contextuel (≠ état global du tour).
+    // On rattache la ressource créée à l'action elle-même : la carte affiche
+    // alors un CTA contextuel (« Voir le déploiement → » ou « Voir la stack → »),
+    // distinct de l'état global du tour.
     return {
       ...message,
       action: {
         ...message.action,
         status: event.status,
         deploymentId: event.deploymentId ?? message.action.deploymentId ?? null,
+        stackId: event.stackId ?? message.action.stackId ?? null,
       },
     }
   })
