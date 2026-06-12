@@ -15,6 +15,13 @@ describe('navigation config', () => {
     expect(admin).toHaveLength(2)
   })
 
+  it('place le Dashboard en première position de la navigation', () => {
+    const main = SIDEBAR_NAV.filter((item) => item.group === 'main')
+
+    expect(SIDEBAR_NAV[0]?.id).toBe('dashboard')
+    expect(main[0]?.id).toBe('dashboard')
+  })
+
   it('expose une entrée Stacks vers le composeur', () => {
     const stacks = SIDEBAR_NAV.find((item) => item.id === 'stacks')
 
