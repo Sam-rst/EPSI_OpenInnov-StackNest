@@ -29,10 +29,12 @@ from app.chat.domain.interfaces.chat_event_subscriber import ChatEventSubscriber
 from app.chat.domain.interfaces.conversation_repository import ConversationRepository
 from app.chat.domain.interfaces.deployment_actions import DeploymentActions
 from app.chat.domain.interfaces.llm_provider import LLMProvider
+from app.chat.domain.interfaces.stack_actions import StackActions
 from app.chat.infrastructure.adapters.catalog_reader_adapter import CatalogReaderAdapter
 from app.chat.infrastructure.adapters.deployment_actions_adapter import (
     DeploymentActionsAdapter,
 )
+from app.chat.infrastructure.adapters.stack_actions_adapter import StackActionsAdapter
 from app.chat.infrastructure.events.redis_chat_event_publisher import (
     RedisChatEventPublisher,
 )
@@ -60,6 +62,14 @@ from app.deployment.infrastructure.repositories.sqlalchemy_deployment_repository
 from app.deployment.presentation.dependencies.deployment_providers import (
     get_deployment_repository,
     get_job_queue,
+)
+from app.stack.domain.interfaces.stack_job_queue import StackJobQueue
+from app.stack.domain.interfaces.stack_repository import StackRepository
+from app.stack.domain.interfaces.stack_template_reader import StackTemplateReader
+from app.stack.presentation.dependencies.stack_providers import (
+    get_stack_job_queue,
+    get_stack_repository,
+    get_stack_template_reader,
 )
 
 SessionDep = Annotated[AsyncSession, Depends(get_request_session)]
@@ -112,3 +122,12 @@ def get_deployment_actions(
     """Provider de la delegation aux use cases de deploiement (aucune duplication)."""
     reader = CatalogTemplateProvisioningReader(SqlAlchemyTemplateRepository(session))
     return DeploymentActionsAdapter(repository=repository, queue=queue, reader=reader)
+
+
+def get_stack_actions(
+    repository: Annotated[StackRepository, Depends(get_stack_repository)],
+    queue: Annotated[StackJobQueue, Depends(get_stack_job_queue)],
+    reader: Annotated[StackTemplateReader, Depends(get_stack_template_reader)],
+) -> StackActions:
+    """Provider de la delegation au use case de composition de stack (aucune duplication)."""
+    return StackActionsAdapter(repository=repository, queue=queue, reader=reader)

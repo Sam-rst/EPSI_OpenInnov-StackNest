@@ -1,18 +1,20 @@
 """Tests unitaires de la construction des ToolDefinition depuis le catalogue.
 
 Verifie que la boite a outils exposee au LLM (1re couche anti-hallucination) est
-fermee : 3 outils de lecture + 4 outils d'action, dont le schema de
-`deploy_template` enumere les templates et versions REELS du catalogue (le
-modele ne peut referencer que ce qui existe).
+fermee : 3 outils de lecture + 5 outils d'action, dont les schemas de
+`deploy_template` et `propose_stack` enumerent les templates et versions REELS
+(deployables) du catalogue (le modele ne peut referencer que ce qui existe).
 """
 
+from app.catalog.domain.enums.engine_kind import EngineKind
 from app.chat.application.__tests__.fakes import FakeCatalogReader, make_template
+from app.chat.domain.value_objects.tool_definition import ToolDefinition
 from app.chat.infrastructure.tools.tool_catalog_builder import ToolCatalogBuilder
 from app.chat.infrastructure.tools.tool_names import ToolName
 
 
 class TestToolCatalogBuilder:
-    async def test_construit_les_sept_outils_attendus(self) -> None:
+    async def test_construit_tous_les_outils_attendus(self) -> None:
         builder = ToolCatalogBuilder(FakeCatalogReader([make_template()]))
 
         tools = await builder.build()
@@ -66,3 +68,58 @@ class TestToolCatalogBuilder:
 
         deploy = next(tool for tool in tools if tool.name == ToolName.DEPLOY_TEMPLATE.value)
         assert deploy.params_schema["properties"]["template_id"]["enum"] == []
+
+
+class TestProposeStackTool:
+    @staticmethod
+    def _propose_stack(tools: list[ToolDefinition]) -> ToolDefinition:
+        return next(tool for tool in tools if tool.name == ToolName.PROPOSE_STACK.value)
+
+    async def test_enumere_uniquement_les_templates_deployables(self) -> None:
+        postgres = make_template(slug="postgresql", name="PostgreSQL", versions=["16"])
+        # Template Terraform (non deployable) : doit etre EXCLU de l'enum stack.
+        vm = make_template(slug="vm", name="VM", engine=EngineKind.TERRAFORM, versions=["1"])
+        # Runtime Docker non deployable : exclu egalement.
+        node = make_template(slug="node", name="Node", is_deployable=False, versions=["20"])
+        builder = ToolCatalogBuilder(FakeCatalogReader([postgres, vm, node]))
+
+        tools = await builder.build()
+
+        service_schema = self._propose_stack(tools).params_schema["properties"]["services"]
+        template_enum = service_schema["items"]["properties"]["template_id"]["enum"]
+        assert str(postgres.id) in template_enum
+        assert str(vm.id) not in template_enum
+        assert str(node.id) not in template_enum
+
+    async def test_requiert_name_et_services(self) -> None:
+        builder = ToolCatalogBuilder(FakeCatalogReader([make_template()]))
+
+        tools = await builder.build()
+
+        schema = self._propose_stack(tools).params_schema
+        assert "name" in schema["required"]
+        assert "services" in schema["required"]
+
+    async def test_le_schema_decrit_services_et_liens(self) -> None:
+        builder = ToolCatalogBuilder(FakeCatalogReader([make_template()]))
+
+        tools = await builder.build()
+
+        properties = self._propose_stack(tools).params_schema["properties"]
+        service_item = properties["services"]["items"]["properties"]
+        assert "alias" in service_item
+        assert "template_id" in service_item
+        link_item = properties["links"]["items"]["properties"]
+        assert "from_alias" in link_item
+        assert "to_alias" in link_item
+        assert "var_mappings" in link_item
+
+    async def test_la_description_documente_les_expressions_de_cablage(self) -> None:
+        # La description guide le LLM sur les expressions `{to.alias}` etc.
+        builder = ToolCatalogBuilder(FakeCatalogReader([make_template()]))
+
+        tools = await builder.build()
+
+        description = self._propose_stack(tools).description
+        assert "{to.alias}" in description
+        assert "{to.secret}" in description

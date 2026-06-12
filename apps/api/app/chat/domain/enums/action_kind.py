@@ -14,13 +14,17 @@ class ActionKind(StrEnum):
     `destroy` est volontairement absent : detruire est irreversible et reste
     dans l'UI de deploiement au MVP (cf. design decision 2, renvoye en V2).
 
-    - `deploy`     : provisionner une ressource a partir d'un template.
-    - `stop`       : arreter un deploiement existant.
-    - `start`      : redemarrer un deploiement arrete.
-    - `regenerate` : regenerer le secret (mot de passe) d'un deploiement.
+    - `deploy`        : provisionner une ressource a partir d'un template.
+    - `stop`          : arreter un deploiement existant.
+    - `start`         : redemarrer un deploiement arrete.
+    - `regenerate`    : regenerer le secret (mot de passe) d'un deploiement.
+    - `compose_stack` : composer une stack multi-services cablee (plusieurs
+      templates relies par des liens), provisionnee en une fois — pendant chat
+      du composeur de stacks.
     """
 
     DEPLOY = "deploy"
     STOP = "stop"
     START = "start"
     REGENERATE = "regenerate"
+    COMPOSE_STACK = "compose_stack"

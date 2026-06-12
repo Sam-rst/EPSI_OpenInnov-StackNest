@@ -16,6 +16,7 @@ from app.chat.application.__tests__.fakes import (
     FakeChatEventPublisher,
     FakeConversationRepository,
     FakeDeploymentActions,
+    FakeStackActions,
 )
 from app.chat.application.confirm_action import ConfirmAction
 from app.chat.domain.entities.chat_action import ChatAction
@@ -50,9 +51,14 @@ def _build(
     actions: FakeChatActionRepository,
     publisher: FakeChatEventPublisher,
     delegate: FakeDeploymentActions,
+    stack_delegate: FakeStackActions | None = None,
 ) -> ConfirmAction:
     return ConfirmAction(
-        conversations=conversations, actions=actions, publisher=publisher, delegate=delegate
+        conversations=conversations,
+        actions=actions,
+        publisher=publisher,
+        delegate=delegate,
+        stack_delegate=stack_delegate or FakeStackActions(),
     )
 
 
@@ -119,6 +125,82 @@ class TestLifecycleDelegation:
         await confirm.execute(action_id=action.id, owner_id=owner)
 
         assert delegate.calls[0][0] == "regenerate"
+
+
+class TestComposeStackDelegation:
+    @staticmethod
+    def _compose_args() -> dict[str, Any]:
+        return {
+            "name": "mon-app",
+            "services": [
+                {"template_id": str(uuid4()), "alias": "db", "version": "16", "params": {}},
+                {"template_id": str(uuid4()), "alias": "api", "version": "20", "params": {}},
+            ],
+            "links": [{"from_alias": "api", "to_alias": "db", "var_mappings": {}}],
+        }
+
+    async def test_confirme_un_compose_stack_delegue_a_create_stack(self) -> None:
+        owner = uuid4()
+        conversation = _conversation(owner)
+        action = _action(conversation.id, kind=ActionKind.COMPOSE_STACK, args=self._compose_args())
+        actions = FakeChatActionRepository([action])
+        publisher = FakeChatEventPublisher()
+        stack_delegate = FakeStackActions(stack_id="stack-456")
+        confirm = _build(
+            FakeConversationRepository([conversation]),
+            actions,
+            publisher,
+            FakeDeploymentActions(),
+            stack_delegate,
+        )
+
+        await confirm.execute(action_id=action.id, owner_id=owner)
+
+        assert len(stack_delegate.calls) == 1
+        call = stack_delegate.calls[0]
+        assert call["name"] == "mon-app"
+        assert {service.alias for service in call["services"]} == {"db", "api"}
+        assert call["links"][0].from_alias == "api"
+        assert actions.updated[-1].status is ActionStatus.EXECUTED
+
+    async def test_action_result_porte_le_stack_id_jamais_deployment_id(self) -> None:
+        owner = uuid4()
+        conversation = _conversation(owner)
+        action = _action(conversation.id, kind=ActionKind.COMPOSE_STACK, args=self._compose_args())
+        publisher = FakeChatEventPublisher()
+        confirm = _build(
+            FakeConversationRepository([conversation]),
+            FakeChatActionRepository([action]),
+            publisher,
+            FakeDeploymentActions(),
+            FakeStackActions(stack_id="stack-456"),
+        )
+
+        await confirm.execute(action_id=action.id, owner_id=owner)
+
+        result = next(payload for _, name, payload in publisher.events if name == "action_result")
+        assert result["stack_id"] == "stack-456"
+        assert result["deployment_id"] is None
+        assert result["success"] is True
+
+    async def test_compose_stack_ne_persiste_pas_de_deployment_id(self) -> None:
+        # Invariant FK : un stack_id ne doit JAMAIS aller dans la colonne
+        # deployment_id (FK vers deployments) — elle reste nulle pour une stack.
+        owner = uuid4()
+        conversation = _conversation(owner)
+        action = _action(conversation.id, kind=ActionKind.COMPOSE_STACK, args=self._compose_args())
+        actions = FakeChatActionRepository([action])
+        confirm = _build(
+            FakeConversationRepository([conversation]),
+            actions,
+            FakeChatEventPublisher(),
+            FakeDeploymentActions(),
+            FakeStackActions(stack_id="stack-456"),
+        )
+
+        await confirm.execute(action_id=action.id, owner_id=owner)
+
+        assert actions.updated[-1].deployment_id is None
 
 
 class TestGuards:

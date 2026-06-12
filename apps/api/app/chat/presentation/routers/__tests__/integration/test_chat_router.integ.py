@@ -35,6 +35,7 @@ from app.chat.application.__tests__.fakes import (
     FakeChatEventPublisher,
     FakeConversationRepository,
     FakeDeploymentActions,
+    FakeStackActions,
     make_template,
 )
 from app.chat.domain.entities.chat_action import ChatAction
@@ -57,6 +58,7 @@ from app.chat.presentation.dependencies.chat_providers import (
     get_conversation_repository,
     get_deployment_actions,
     get_llm_provider,
+    get_stack_actions,
 )
 from app.deployment.application.__tests__.fakes import FakeDeploymentRepository
 from app.main import create_app
@@ -116,6 +118,7 @@ async def context() -> AsyncIterator[dict[str, object]]:
     catalog = FakeCatalogReader([template])
     deployments = FakeDeploymentRepository()
     delegate = FakeDeploymentActions(deployment_id="dep-xyz")
+    stack_delegate = FakeStackActions(stack_id="stack-xyz")
     subscriber = _FakeChatEventSubscriber(
         [ChatEvent("token", {"delta": "Bonjour"}), ChatEvent("message", {"content": "Bonjour"})]
     )
@@ -130,6 +133,7 @@ async def context() -> AsyncIterator[dict[str, object]]:
     app.dependency_overrides[get_chat_event_publisher] = lambda: publisher
     app.dependency_overrides[get_chat_event_subscriber] = lambda: subscriber
     app.dependency_overrides[get_deployment_actions] = lambda: delegate
+    app.dependency_overrides[get_stack_actions] = lambda: stack_delegate
     app.dependency_overrides[get_llm_provider] = lambda: FakeLLMProvider(text="Bonjour")
 
     transport = httpx.ASGITransport(app=app)
@@ -143,6 +147,7 @@ async def context() -> AsyncIterator[dict[str, object]]:
             "actions": actions,
             "publisher": publisher,
             "delegate": delegate,
+            "stack_delegate": stack_delegate,
             "template": template,
         }
 
@@ -399,6 +404,42 @@ class TestActions:
 
         assert response.status_code == 202, response.text
         assert [name for name, _ in delegate.calls] == ["deploy"]
+
+    async def test_confirmation_compose_stack_delegue_et_publie_le_stack_id(
+        self, context: dict[str, object]
+    ) -> None:
+        http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
+        user: User = context["user"]  # type: ignore[assignment]
+        conversations: FakeConversationRepository = context["conversations"]  # type: ignore[assignment]
+        actions: FakeChatActionRepository = context["actions"]  # type: ignore[assignment]
+        stack_delegate: FakeStackActions = context["stack_delegate"]  # type: ignore[assignment]
+        publisher: FakeChatEventPublisher = context["publisher"]  # type: ignore[assignment]
+        template: Template = context["template"]  # type: ignore[assignment]
+        fil = Conversation(id=uuid4(), owner_id=user.id, title="fil")
+        await conversations.add(fil)
+        action = ChatAction(
+            id=uuid4(),
+            conversation_id=fil.id,
+            message_id=uuid4(),
+            kind=ActionKind.COMPOSE_STACK,
+            status=ActionStatus.PROPOSED,
+            args={
+                "name": "mon-app",
+                "services": [
+                    {"template_id": str(template.id), "alias": "db", "version": "16", "params": {}}
+                ],
+                "links": [],
+            },
+        )
+        await actions.add(action)
+
+        response = await http.post(f"/chat/actions/{action.id}/confirm", headers=_auth(user))
+
+        assert response.status_code == 202, response.text
+        assert len(stack_delegate.calls) == 1
+        result = next(payload for _, name, payload in publisher.events if name == "action_result")
+        assert result["stack_id"] == "stack-xyz"
+        assert result["deployment_id"] is None
 
     async def test_rejet_passe_l_action_en_rejected(self, context: dict[str, object]) -> None:
         http: httpx.AsyncClient = context["http"]  # type: ignore[assignment]
