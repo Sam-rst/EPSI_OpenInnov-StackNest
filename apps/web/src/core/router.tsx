@@ -20,6 +20,7 @@ import { ChatPage } from '../chat/pages/ChatPage'
 import { StacksPage } from '../stack/pages/StacksPage'
 import { StackBuilderPage } from '../stack/pages/StackBuilderPage'
 import { StackDetailPage } from '../stack/pages/StackDetailPage'
+import { StackServiceDetailPage } from '../stack/pages/StackServiceDetailPage'
 import { TeamPage } from '../team/pages/TeamPage'
 import { SettingsPage } from '../settings/pages/SettingsPage'
 
@@ -54,6 +55,8 @@ export const routes: RouteObject[] = [
       { path: 'stacks', element: requireAuth(<StacksPage />) },
       { path: 'stacks/new', element: requireAuth(<StackBuilderPage />) },
       { path: 'stacks/:id', element: requireAuth(<StackDetailPage />) },
+      // Détail d'un service membre d'une stack (informationnel + action stack-level).
+      { path: 'stacks/:id/services/:alias', element: requireAuth(<StackServiceDetailPage />) },
       { path: 'chat', element: requireAuth(<ChatPage />) },
       // Fil actif porté par l'URL : un fil sélectionné est partageable / rechargeable.
       { path: 'chat/:id', element: requireAuth(<ChatPage />) },
