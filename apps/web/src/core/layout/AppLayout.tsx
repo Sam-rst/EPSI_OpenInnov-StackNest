@@ -44,7 +44,13 @@ export function AppLayout() {
   }, [isOpen, close])
 
   return (
-    <div className="bg-surface text-text-primary flex min-h-0 flex-1 overflow-hidden">
+    // h-dvh : ancre de hauteur du shell. Sans elle, le shell prend la hauteur de
+    // son contenu (le parent #root n'est pas un conteneur flex, donc `flex-1` ne
+    // résout rien) et `<main>` ne pourrait jamais scroller en interne — c'est la
+    // « zone main scrollable » décrite plus haut. Avec h-dvh, `<main>` (flex-1
+    // overflow-y-auto) est borné et scrolle dans sa colonne, et une page en
+    // hauteur pleine (ex. Chat) peut s'appuyer sur un `h-full` qui se résout.
+    <div className="bg-surface text-text-primary flex h-dvh overflow-hidden">
       <Sidebar isOpen={isOpen} onDismiss={close} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onMenuClick={toggle} menuExpanded={isOpen} />

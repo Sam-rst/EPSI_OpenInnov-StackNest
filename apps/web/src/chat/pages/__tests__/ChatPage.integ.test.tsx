@@ -154,6 +154,28 @@ describe('ChatPage (parcours chat IA → API REST + SSE)', () => {
     expect(await screen.findByText('postgres-prod')).toBeInTheDocument()
   })
 
+  it('borne la chaîne de hauteur pour que chaque colonne scrolle (Fix #5)', async () => {
+    const { container } = renderChat()
+    await screen.findByText(/Décris-moi ton besoin/)
+
+    // Le grid 3 colonnes borne son unique rangée : sans grid-rows-[minmax(0,1fr)],
+    // les colonnes grandissent avec leur contenu au lieu de scroller en interne.
+    const grid = container.querySelector('div.grid')
+    expect(grid).not.toBeNull()
+    expect(grid?.className).toContain('grid-rows-[minmax(0,1fr)]')
+    expect(grid?.className).toContain('h-full')
+    expect(grid?.className).toContain('overflow-hidden')
+
+    // Les wrappers de colonne propagent la hauteur bornée (min-h-0 + h-full
+    // responsive) à leur <aside> interne, dont la liste scrolle via overflow-y-auto.
+    const sidebarWrapper = container.querySelector('div.md\\:block')
+    const asideWrapper = container.querySelector('div.xl\\:block')
+    expect(sidebarWrapper?.className).toContain('min-h-0')
+    expect(sidebarWrapper?.className).toContain('md:h-full')
+    expect(asideWrapper?.className).toContain('min-h-0')
+    expect(asideWrapper?.className).toContain('xl:h-full')
+  })
+
   it('ouvre le flux SSE de la conversation active avec le Bearer', async () => {
     renderChat()
     await screen.findByText(/Décris-moi ton besoin/)

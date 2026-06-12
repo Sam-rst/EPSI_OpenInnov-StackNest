@@ -23,6 +23,7 @@ export interface TopBarTitle {
 }
 
 export const SIDEBAR_NAV: readonly NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'bar-chart-3', group: 'main', to: '/dashboard' },
   { id: 'catalog', label: 'Catalogue', icon: 'layout-grid', group: 'main', to: '/catalog' },
   { id: 'deployments', label: 'Déploiements', icon: 'activity', group: 'main', to: '/deployments' },
   { id: 'stacks', label: 'Stacks', icon: 'layers', group: 'main', to: '/stacks' },
@@ -34,7 +35,6 @@ export const SIDEBAR_NAV: readonly NavItem[] = [
     to: '/chat',
     badge: 'Nouveau',
   },
-  { id: 'dashboard', label: 'Dashboard', icon: 'bar-chart-3', group: 'main', to: '/dashboard' },
   { id: 'team', label: 'Équipe', icon: 'users', group: 'admin', to: '/team' },
   { id: 'settings', label: 'Paramètres', icon: 'settings', group: 'admin', to: '/settings' },
 ]

@@ -10,16 +10,22 @@ interface BadgeProps {
   children: ReactNode
 }
 
+/**
+ * Tons sémantiques de la charte. Contraste piloté par thème : en clair, texte
+ * sombre saturé sur fond translucide ; en sombre, texte clair (variante `dark:`)
+ * car la même teinte foncée deviendrait illisible sur surface bleu nuit. Les fonds
+ * sont plus opaques en sombre pour rester perceptibles. Ratios visés ≥ AA (4.5:1).
+ */
 const TONES: Record<BadgeTone, string> = {
   neutral: 'bg-surface-sunken text-text-secondary border-border',
-  cyan: 'bg-[color-mix(in_oklch,var(--color-cyan)_14%,transparent)] text-cyan border-[color-mix(in_oklch,var(--color-cyan)_30%,transparent)]',
+  cyan: 'bg-[color-mix(in_oklch,var(--color-cyan)_16%,transparent)] dark:bg-[color-mix(in_oklch,var(--color-cyan)_26%,transparent)] text-cyan-700 dark:text-[#5fd6db] border-[color-mix(in_oklch,var(--color-cyan)_34%,transparent)]',
   yellow:
-    'bg-[color-mix(in_oklch,var(--color-yellow)_18%,transparent)] text-[#9b5805] border-[color-mix(in_oklch,var(--color-yellow)_36%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--color-yellow)_28%,transparent)] dark:bg-[color-mix(in_oklch,var(--color-yellow)_24%,transparent)] text-[#7a4604] dark:text-[#ffd07a] border-[color-mix(in_oklch,var(--color-yellow)_48%,transparent)]',
   success:
-    'bg-[color-mix(in_oklch,#22c55e_14%,transparent)] text-[#0e7d3a] border-[color-mix(in_oklch,#22c55e_30%,transparent)]',
+    'bg-[color-mix(in_oklch,#22c55e_20%,transparent)] dark:bg-[color-mix(in_oklch,#22c55e_24%,transparent)] text-[#0a6b32] dark:text-[#6ee7a0] border-[color-mix(in_oklch,#22c55e_40%,transparent)]',
   danger:
-    'bg-[color-mix(in_oklch,#c42b1c_14%,transparent)] text-[#a52215] border-[color-mix(in_oklch,#c42b1c_30%,transparent)]',
-  warn: 'bg-[color-mix(in_oklch,var(--color-yellow)_14%,transparent)] text-[#9b5805] border-[color-mix(in_oklch,var(--color-yellow)_30%,transparent)]',
+    'bg-[color-mix(in_oklch,#c42b1c_20%,transparent)] dark:bg-[color-mix(in_oklch,#c42b1c_28%,transparent)] text-[#911c10] dark:text-[#ff9b8f] border-[color-mix(in_oklch,#c42b1c_40%,transparent)]',
+  warn: 'bg-[color-mix(in_oklch,var(--color-yellow)_28%,transparent)] dark:bg-[color-mix(in_oklch,var(--color-yellow)_24%,transparent)] text-[#7a4604] dark:text-[#ffd07a] border-[color-mix(in_oklch,var(--color-yellow)_46%,transparent)]',
 }
 
 const BASE =
