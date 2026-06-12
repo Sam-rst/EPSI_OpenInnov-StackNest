@@ -2,22 +2,27 @@ import type { KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { formatDeploymentDate } from './formatDeploymentDate'
+import { SelectionCheckbox } from './SelectionCheckbox'
+import type { RowSelection } from './rowSelection'
 import { Badge, Icon } from '../../../shared/components/ui'
 import { toneForStatus } from '../../types/enums/DeploymentStatus'
 import type { Deployment } from '../../types/models/Deployment'
 
 interface DeploymentRowProps {
   deployment: Deployment
+  /** État de sélection injecté quand le mode sélection multiple est actif. */
+  selection?: RowSelection
 }
 
 /** Touches qui activent un lien accessible (parité avec un clic). */
 const ACTIVATION_KEYS: ReadonlySet<string> = new Set(['Enter', ' '])
 
 /**
- * Ligne de la table des déploiements : nom · template+version · statut · accès · date.
+ * Ligne de la table des déploiements : (case) · nom · template+version · statut · accès · date.
  * Toute la ligne est un lien accessible vers le détail (clic + clavier Enter/Espace).
+ * La case à cocher (mode sélection) stoppe la propagation pour ne pas naviguer.
  */
-export function DeploymentRow({ deployment }: DeploymentRowProps) {
+export function DeploymentRow({ deployment, selection }: DeploymentRowProps) {
   const navigate = useNavigate()
   const detailPath = `/deployments/${deployment.id}`
 
@@ -41,6 +46,15 @@ export function DeploymentRow({ deployment }: DeploymentRowProps) {
       onKeyDown={handleKeyDown}
       className="border-border hover:bg-surface-sunken focus-visible:ring-cyan cursor-pointer border-t transition outline-none focus-visible:ring-2 focus-visible:ring-inset"
     >
+      {selection && (
+        <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+          <SelectionCheckbox
+            checked={selection.selected}
+            onChange={selection.onToggle}
+            label={`Sélectionner ${deployment.name}`}
+          />
+        </td>
+      )}
       <td className="px-4 py-3">
         <span className="text-text-primary inline-flex items-center gap-2 font-medium">
           <Icon name="box" size={15} className="text-cyan" />

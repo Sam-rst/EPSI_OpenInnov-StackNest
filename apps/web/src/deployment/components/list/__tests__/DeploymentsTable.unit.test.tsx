@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { DeploymentStatus } from '../../../types/enums/DeploymentStatus'
 import type { Deployment } from '../../../types/models/Deployment'
-import { DeploymentsTable } from '../DeploymentsTable'
+import { DeploymentsTable, type TableSelection } from '../DeploymentsTable'
 
 function deployment(overrides: Partial<Deployment> = {}): Deployment {
   return {
@@ -26,12 +27,23 @@ function deployment(overrides: Partial<Deployment> = {}): Deployment {
   }
 }
 
-function renderTable(deployments: readonly Deployment[]) {
+function renderTable(deployments: readonly Deployment[], selection?: TableSelection) {
   return render(
     <MemoryRouter>
-      <DeploymentsTable deployments={deployments} />
+      <DeploymentsTable deployments={deployments} selection={selection} />
     </MemoryRouter>,
   )
+}
+
+function selectionStub(overrides: Partial<TableSelection> = {}): TableSelection {
+  return {
+    allSelected: false,
+    someSelected: false,
+    onToggleAll: vi.fn(),
+    isSelected: () => false,
+    onToggle: vi.fn(),
+    ...overrides,
+  }
 }
 
 describe('DeploymentsTable (responsive)', () => {
@@ -72,5 +84,53 @@ describe('DeploymentsTable (responsive)', () => {
     // Présent dans les deux modes (table + cartes), donc 2 occurrences attendues par nom.
     expect(screen.getAllByText('postgres-prod')).toHaveLength(2)
     expect(screen.getAllByText('redis-cache')).toHaveLength(2)
+  })
+
+  it('sans sélection : aucune case à cocher (comportement existant préservé)', () => {
+    renderTable([deployment()])
+
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('avec sélection : case d’en-tête « tout sélectionner » dans la table', () => {
+    renderTable([deployment()], selectionStub())
+
+    expect(screen.getByRole('checkbox', { name: /Tout sélectionner/ })).toBeInTheDocument()
+  })
+
+  it('case d’en-tête indéterminée quand sélection partielle', () => {
+    renderTable([deployment()], selectionStub({ someSelected: true }))
+
+    const headerBox = screen.getByRole('checkbox', { name: /Tout sélectionner/ })
+    expect(headerBox).toHaveProperty('indeterminate', true)
+  })
+
+  it('case d’en-tête cochée quand tout est sélectionné', () => {
+    renderTable([deployment()], selectionStub({ allSelected: true }))
+
+    expect(screen.getByRole('checkbox', { name: /Tout sélectionner/ })).toBeChecked()
+  })
+
+  it('déclenche onToggleAll au clic sur la case d’en-tête', async () => {
+    const onToggleAll = vi.fn()
+    const user = userEvent.setup()
+    renderTable([deployment()], selectionStub({ onToggleAll }))
+
+    await user.click(screen.getByRole('checkbox', { name: /Tout sélectionner/ }))
+
+    expect(onToggleAll).toHaveBeenCalledTimes(1)
+  })
+
+  it('reflète l’état coché d’une ligne et déclenche onToggle', async () => {
+    const onToggle = vi.fn()
+    const user = userEvent.setup()
+    renderTable([deployment()], selectionStub({ isSelected: (id) => id === 'dep-1', onToggle }))
+
+    const table = screen.getByRole('table')
+    const rowBox = within(table).getByRole('checkbox', { name: /Sélectionner postgres-prod/ })
+    expect(rowBox).toBeChecked()
+
+    await user.click(rowBox)
+    expect(onToggle).toHaveBeenCalledWith('dep-1')
   })
 })

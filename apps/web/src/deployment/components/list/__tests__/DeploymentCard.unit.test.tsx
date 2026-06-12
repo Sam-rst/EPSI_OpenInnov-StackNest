@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { DeploymentStatus } from '../../../types/enums/DeploymentStatus'
 import type { Deployment } from '../../../types/models/Deployment'
@@ -27,11 +27,22 @@ function deployment(overrides: Partial<Deployment> = {}): Deployment {
   }
 }
 
-function renderCard(model: Deployment) {
+interface CardSelectionStub {
+  selected?: boolean
+  onToggle?: () => void
+}
+
+function renderCard(model: Deployment, selection?: CardSelectionStub) {
+  const cardSelection = selection
+    ? { selected: selection.selected ?? false, onToggle: selection.onToggle ?? vi.fn() }
+    : undefined
   return render(
     <MemoryRouter initialEntries={['/deployments']}>
       <Routes>
-        <Route path="/deployments" element={<DeploymentCard deployment={model} />} />
+        <Route
+          path="/deployments"
+          element={<DeploymentCard deployment={model} selection={cardSelection} />}
+        />
         <Route path="/deployments/:id" element={<div>Page détail dep-1</div>} />
       </Routes>
     </MemoryRouter>,
@@ -67,5 +78,28 @@ describe('DeploymentCard (affichage mobile)', () => {
     renderCard(deployment({ templateName: undefined }))
 
     expect(screen.getByText(/pg16 · 16/)).toBeInTheDocument()
+  })
+
+  it('n’affiche pas de case à cocher hors mode sélection', () => {
+    renderCard(deployment())
+
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('affiche une case à cocher reflétant l’état en mode sélection', () => {
+    renderCard(deployment(), { selected: true })
+
+    expect(screen.getByRole('checkbox', { name: /postgres-prod/ })).toBeChecked()
+  })
+
+  it('coche via onToggle sans naviguer vers le détail (stopPropagation)', async () => {
+    const onToggle = vi.fn()
+    const user = userEvent.setup()
+    renderCard(deployment(), { selected: false, onToggle })
+
+    await user.click(screen.getByRole('checkbox', { name: /postgres-prod/ }))
+
+    expect(onToggle).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Page détail dep-1')).not.toBeInTheDocument()
   })
 })
