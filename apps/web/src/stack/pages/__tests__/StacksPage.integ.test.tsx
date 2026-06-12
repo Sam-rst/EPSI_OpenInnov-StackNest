@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -49,30 +49,91 @@ function renderPage() {
   )
 }
 
+/** Récupère la table desktop (le rendu monte aussi les cartes mobiles). */
+function desktopTable(): HTMLElement {
+  return screen.getByRole('table')
+}
+
 describe('StacksPage', () => {
   afterEach(() => {
     server.resetHandlers()
   })
 
-  it('liste les stacks avec nom, statut et nb de services', async () => {
+  it('liste les stacks dans une table avec nom, statut et nb de services', async () => {
     server.use(http.get('*/stacks', () => HttpResponse.json([stackDto()])))
 
     renderPage()
 
-    expect(await screen.findByText('ma-stack')).toBeInTheDocument()
-    expect(screen.getByText('En ligne')).toBeInTheDocument()
-    expect(screen.getByText('1 service')).toBeInTheDocument()
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+    const table = desktopTable()
+    expect(within(table).getByText('ma-stack')).toBeInTheDocument()
+    expect(within(table).getByText('En ligne')).toBeInTheDocument()
+    expect(within(table).getByText('1 service')).toBeInTheDocument()
   })
 
-  it('navigue vers le détail au clic sur une carte', async () => {
+  it('rend aussi des cartes pour le responsive mobile', async () => {
     server.use(http.get('*/stacks', () => HttpResponse.json([stackDto()])))
 
     renderPage()
-    await screen.findByText('ma-stack')
+    await screen.findByRole('table')
 
-    await userEvent.click(screen.getByText('ma-stack'))
+    expect(screen.getByTestId('stacks-cards')).toBeInTheDocument()
+  })
+
+  it('navigue vers le détail au clic sur une ligne', async () => {
+    server.use(http.get('*/stacks', () => HttpResponse.json([stackDto()])))
+
+    renderPage()
+    await screen.findByRole('table')
+
+    await userEvent.click(within(desktopTable()).getByText('ma-stack'))
 
     expect(await screen.findByText('Détail stack')).toBeInTheDocument()
+  })
+
+  it('affiche la barre groupée et détruit la sélection après confirmation', async () => {
+    const deleted: string[] = []
+    server.use(
+      http.get('*/stacks', () =>
+        HttpResponse.json([stackDto(), stackDto({ id: 'stack-2', name: 'autre-stack' })]),
+      ),
+      http.delete('*/stacks/:id', ({ params }) => {
+        deleted.push(params.id as string)
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+
+    renderPage()
+    await screen.findByRole('table')
+
+    // Sélectionne une stack via sa case (dans la table desktop).
+    await userEvent.click(within(desktopTable()).getByLabelText('Sélectionner la stack ma-stack'))
+
+    // La barre groupée apparaît.
+    const bar = screen.getByRole('region', { name: 'Actions groupées' })
+    expect(within(bar).getByText('1 stack sélectionnée')).toBeInTheDocument()
+
+    // Déclenche la destruction + confirme.
+    await userEvent.click(within(bar).getByRole('button', { name: /Détruire la sélection/ }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Détruire' }))
+
+    await waitFor(() => expect(deleted).toEqual(['stack-1']))
+  })
+
+  it('sélectionne toutes les stacks via la case d’en-tête', async () => {
+    server.use(
+      http.get('*/stacks', () =>
+        HttpResponse.json([stackDto(), stackDto({ id: 'stack-2', name: 'autre-stack' })]),
+      ),
+    )
+
+    renderPage()
+    await screen.findByRole('table')
+
+    await userEvent.click(within(desktopTable()).getByLabelText('Tout sélectionner'))
+
+    expect(screen.getByText('2 stacks sélectionnées')).toBeInTheDocument()
   })
 
   it('affiche un état vide honnête sans stack', async () => {
