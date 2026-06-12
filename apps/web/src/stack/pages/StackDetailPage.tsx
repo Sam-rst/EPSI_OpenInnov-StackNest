@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { EmptyState } from '../../shared/components/EmptyState'
 import { Badge, Button, Icon } from '../../shared/components/ui'
 import { StackServiceRow } from '../components/StackServiceRow'
+import { StackWiringRow } from '../components/StackWiringRow'
 import { useDeleteStack } from '../hooks/useDeleteStack'
 import { useStack } from '../hooks/useStack'
 import { useStackEvents } from '../hooks/useStackEvents'
@@ -109,6 +110,7 @@ export function StackDetailPage() {
             {stack.services.map((service) => (
               <StackServiceRow
                 key={service.id}
+                stackId={stack.id}
                 service={service}
                 liveStatus={events.serviceStatuses[service.alias]}
               />
@@ -116,6 +118,19 @@ export function StackDetailPage() {
           </div>
         )}
       </section>
+
+      {stack.links.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-text-secondary mb-3 text-[13px] font-semibold tracking-wide uppercase">
+            Câblage
+          </h2>
+          <div className="space-y-2">
+            {stack.links.map((link) => (
+              <StackWiringRow key={link.id} link={link} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

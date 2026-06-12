@@ -1,5 +1,6 @@
 import type { EventSourceMessage, FetchEventSourceInit } from '@microsoft/fetch-event-source'
 import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -75,6 +76,7 @@ function renderDetail() {
       <MemoryRouter initialEntries={['/stacks/stack-1']}>
         <Routes>
           <Route path="/stacks/:id" element={<StackDetailPage />} />
+          <Route path="/stacks/:id/services/:alias" element={<div>Détail service</div>} />
           <Route path="/stacks" element={<div>Liste stacks</div>} />
         </Routes>
       </MemoryRouter>
@@ -145,6 +147,42 @@ describe('StackDetailPage', () => {
     // Aucune trame émise (lot 3 SSE non livré) : la page reste sur le statut REST.
     expect(await screen.findByText('ma-stack')).toBeInTheDocument()
     expect(screen.getByText('En ligne')).toBeInTheDocument()
+  })
+
+  it('affiche le câblage (liens) entre services', async () => {
+    server.use(
+      http.get('*/stacks/stack-1', () =>
+        HttpResponse.json(
+          stackDto({
+            links: [
+              {
+                id: 'l1',
+                from_service_id: 's-api',
+                to_service_id: 's-db',
+                var_mappings: { DB_HOST: '{to.alias}' },
+              },
+            ],
+          }),
+        ),
+      ),
+    )
+
+    renderDetail()
+    await screen.findByText('ma-stack')
+
+    expect(screen.getByText('Câblage')).toBeInTheDocument()
+    expect(screen.getByText('DB_HOST')).toBeInTheDocument()
+  })
+
+  it('navigue vers le détail du service au clic sur une ligne service', async () => {
+    server.use(http.get('*/stacks/stack-1', () => HttpResponse.json(stackDto())))
+
+    renderDetail()
+    await screen.findByText('ma-stack')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Voir le service db' }))
+
+    expect(await screen.findByText('Détail service')).toBeInTheDocument()
   })
 
   it('affiche un état d’erreur pour une stack introuvable', async () => {
