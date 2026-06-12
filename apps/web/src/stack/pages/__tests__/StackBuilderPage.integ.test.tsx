@@ -9,7 +9,7 @@ import { createQueryWrapper } from '../../../../tests/utils/queryWrapper'
 import { StackBuilderPage } from '../StackBuilderPage'
 
 /** Carte catalogue (miroir `TemplateCardDTO`). */
-function cardDto(id: string, name: string, engine = 'docker') {
+function cardDto(id: string, name: string, engine = 'docker', extra: Record<string, unknown> = {}) {
   return {
     id,
     slug: id,
@@ -21,6 +21,7 @@ function cardDto(id: string, name: string, engine = 'docker') {
     tags: [],
     description: `${name} service`,
     popular: false,
+    ...extra,
   }
 }
 
@@ -117,6 +118,55 @@ describe('StackBuilderPage', () => {
     expect(await screen.findByText('Détail stack créée')).toBeInTheDocument()
     expect(body?.name).toBe('ma-stack')
     expect((body?.services as unknown[]).length).toBe(1)
+  })
+
+  it('filtre les services proposés via la recherche', async () => {
+    server.use(
+      http.get('*/catalog/templates', () =>
+        HttpResponse.json([cardDto('pg16', 'PostgreSQL'), cardDto('redis', 'Redis')]),
+      ),
+    )
+
+    renderBuilder()
+    await screen.findByText('PostgreSQL')
+    expect(screen.getByText('Redis')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText('Rechercher un service'), 'redis')
+
+    expect(screen.getByText('Redis')).toBeInTheDocument()
+    expect(screen.queryByText('PostgreSQL')).toBeNull()
+  })
+
+  it('restreint aux services populaires', async () => {
+    server.use(
+      http.get('*/catalog/templates', () =>
+        HttpResponse.json([
+          cardDto('pg16', 'PostgreSQL', 'docker', { popular: true }),
+          cardDto('redis', 'Redis', 'docker', { popular: false }),
+        ]),
+      ),
+    )
+
+    renderBuilder()
+    await screen.findByText('PostgreSQL')
+
+    await userEvent.click(screen.getByLabelText('Populaires uniquement'))
+
+    expect(screen.getByText('PostgreSQL')).toBeInTheDocument()
+    expect(screen.queryByText('Redis')).toBeNull()
+  })
+
+  it('affiche un message quand aucun service ne correspond aux filtres', async () => {
+    server.use(
+      http.get('*/catalog/templates', () => HttpResponse.json([cardDto('pg16', 'PostgreSQL')])),
+    )
+
+    renderBuilder()
+    await screen.findByText('PostgreSQL')
+
+    await userEvent.type(screen.getByLabelText('Rechercher un service'), 'zzz')
+
+    expect(screen.getByText('Aucun service ne correspond aux filtres.')).toBeInTheDocument()
   })
 
   it('bloque le déploiement tant qu’aucun service n’est ajouté', async () => {
