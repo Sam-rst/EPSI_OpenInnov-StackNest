@@ -1,8 +1,10 @@
 import type { EventSourceMessage, FetchEventSourceInit } from '@microsoft/fetch-event-source'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { server } from '../../../../tests/mocks/server'
@@ -328,6 +330,56 @@ describe('ChatPage (parcours chat IA → API REST + SSE)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/chat/c2')
     })
+  })
+
+  it('conserve la carte de proposition après un aller-retour de navigation SPA (Fix 3)', async () => {
+    // Le détail REST du fil reste VIDE (le back n'a pas encore persisté la
+    // proposition) : la carte ne peut donc survivre au démontage QUE si l'event SSE
+    // `action_proposed` a été miroité dans le cache des messages du fil. Avec un
+    // cache `staleTime: Infinity`, aucun refetch ne vient écraser ce miroir au
+    // remontage — on prouve la persistance par l'état durable, pas par le réseau.
+    const user = userEvent.setup()
+    const persistentClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Infinity },
+        mutations: { retry: false },
+      },
+    })
+    function PersistentWrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={persistentClient}>{children}</QueryClientProvider>
+    }
+
+    render(
+      <PersistentWrapper>
+        <MemoryRouter initialEntries={['/chat/c1']}>
+          <Link to="/ailleurs">Aller ailleurs</Link>
+          <Link to="/chat/c1">Revenir au chat</Link>
+          <Routes>
+            <Route path="/chat/:id" element={<ChatPage />} />
+            <Route path="/ailleurs" element={<div>Autre page</div>} />
+          </Routes>
+          <LocationProbe />
+        </MemoryRouter>
+      </PersistentWrapper>,
+    )
+
+    await screen.findByText(/Décris-moi ton besoin/)
+    await waitFor(() => expect(fetchEventSourceMock).toHaveBeenCalled())
+
+    // Une proposition arrive par le flux SSE pendant le tour live.
+    act(() => {
+      emit(ChatStreamEventName.ACTION_PROPOSED, deployProposal())
+    })
+    expect(await screen.findByText(/Déployer un PostgreSQL 16 isolé/)).toBeInTheDocument()
+
+    // On quitte le chat (ChatPage démonte) puis on y revient (remontage).
+    await user.click(screen.getByText('Aller ailleurs'))
+    await screen.findByText('Autre page')
+    await user.click(screen.getByText('Revenir au chat'))
+
+    // La carte doit réapparaître IMMÉDIATEMENT, sans nouvel `action_proposed`.
+    expect(await screen.findByText(/Déployer un PostgreSQL 16 isolé/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Confirmer/ })).toBeEnabled()
   })
 
   it('crée une nouvelle conversation', async () => {
