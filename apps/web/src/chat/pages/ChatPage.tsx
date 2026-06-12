@@ -184,13 +184,20 @@ export function ChatPage() {
     // chacune des colonnes ⇒ chaque colonne scrolle indépendamment, jamais la page.
     // Responsive : sidebar inline ≥ md, aside inline ≥ xl ; en-dessous, tiroirs.
     <>
-      <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[260px_1fr] xl:grid-cols-[260px_1fr_280px]">
+      {/* grid-rows-[minmax(0,1fr)] : borne l'unique rangée du grid. Sans elle, la
+          rangée implicite est dimensionnée sur son contenu (`auto`) : les colonnes
+          grandiraient au lieu de scroller, poussant le composer hors de l'écran.
+          Chaque colonne (wrapper) porte ensuite `min-h-0 h-full` pour propager cette
+          hauteur bornée à son `<aside>` interne (qui scrolle via overflow-y-auto). */}
+      <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[260px_1fr] xl:grid-cols-[260px_1fr_280px]">
         {/* Titre accessible : la mise en page n'affiche pas de bandeau de titre,
             mais l'écran reste annoncé aux lecteurs d'écran. */}
         <h1 className="sr-only">Chat IA</h1>
 
-        {/* Sidebar en colonne à partir de md ; en tiroir en-dessous (cf. plus bas). */}
-        <div className="hidden md:block">{sidebar}</div>
+        {/* Sidebar en colonne à partir de md ; en tiroir en-dessous (cf. plus bas).
+            min-h-0 h-full : maillon de la chaîne de hauteur — sans lui, le `h-full`
+            de la ConversationsSidebar ne se résout pas et sa liste ne scrolle pas. */}
+        <div className="hidden min-h-0 md:block md:h-full">{sidebar}</div>
 
         {/* min-h-0 : la colonne centrale est un enfant flex du grid ; sans cette
             contrainte, MessageList grandirait avec son contenu au lieu de scroller
@@ -251,8 +258,10 @@ export function ChatPage() {
           />
         </div>
 
-        {/* Aside des déploiements en colonne à partir de xl ; en tiroir en-dessous. */}
-        <div className="hidden xl:block">{aside}</div>
+        {/* Aside des déploiements en colonne à partir de xl ; en tiroir en-dessous.
+            min-h-0 h-full : même maillon de hauteur que la sidebar, pour que la liste
+            des déploiements scrolle dans sa colonne au lieu de la faire grandir. */}
+        <div className="hidden min-h-0 xl:block xl:h-full">{aside}</div>
       </div>
 
       {/* Tiroirs mobiles : mêmes panneaux, présentés en superposition coulissante.
