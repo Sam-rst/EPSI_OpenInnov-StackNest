@@ -19,7 +19,21 @@ describe('Badge', () => {
   it('applique le tone demandé', () => {
     render(<Badge tone="yellow">Populaire</Badge>)
 
-    expect(screen.getByText('Populaire').className).toContain('text-[#9b5805]')
+    expect(screen.getByText('Populaire').className).toContain('text-[#7a4604]')
+  })
+
+  it('renforce le contraste du tone yellow en thème sombre (texte clair)', () => {
+    render(<Badge tone="yellow">Populaire</Badge>)
+
+    // En sombre, le texte ambré foncé deviendrait illisible : on bascule sur un
+    // jaune clair via la variante `dark:` pour garantir le ratio AA.
+    expect(screen.getByText('Populaire').className).toContain('dark:text-[#ffd07a]')
+  })
+
+  it('renforce le contraste du tone warn en thème sombre (texte clair)', () => {
+    render(<Badge tone="warn">Bientôt disponible</Badge>)
+
+    expect(screen.getByText('Bientôt disponible').className).toContain('dark:text-[#ffd07a]')
   })
 
   it('conserve les classes de base (badge pill)', () => {
