@@ -170,6 +170,37 @@ describe('chatMapper', () => {
       }
     })
 
+    it('mappe une proposition de composition de stack (services + liens câblés)', () => {
+      const event = mapStreamEvent(
+        'action_proposed',
+        JSON.stringify(
+          deployProposalDto({
+            kind: 'compose_stack',
+            restatement: 'Composer la stack « mon-app » (2 services : db, api).',
+            recap: {
+              name: 'mon-app',
+              services: [
+                { alias: 'db', version: '16' },
+                { alias: 'api', version: '20' },
+              ],
+              links: [{ from: 'api', to: 'db' }],
+            },
+          }),
+        ),
+      )
+
+      expect(event.type).toBe('action_proposed')
+      if (event.type === 'action_proposed') {
+        const action = event.action
+        expect(action.kind).toBe(ActionKind.COMPOSE_STACK)
+        expect(action.stackServices).toEqual([
+          { alias: 'db', version: '16' },
+          { alias: 'api', version: '20' },
+        ])
+        expect(action.stackLinks).toEqual([{ from: 'api', to: 'db' }])
+      }
+    })
+
     it('mappe une proposition de cycle de vie (recap deployment + status)', () => {
       const event = mapStreamEvent(
         'action_proposed',
@@ -204,6 +235,29 @@ describe('chatMapper', () => {
         actionId: 'a1',
         status: ActionStatus.EXECUTED,
         deploymentId: 'dep-1',
+        stackId: null,
+        message: null,
+      })
+    })
+
+    it('mappe un résultat de composition de stack réussi (porte le stack_id)', () => {
+      const event = mapStreamEvent(
+        'action_result',
+        JSON.stringify({
+          action_id: 'a3',
+          kind: 'compose_stack',
+          success: true,
+          deployment_id: null,
+          stack_id: 'stack-1',
+        }),
+      )
+
+      expect(event).toEqual({
+        type: 'action_result',
+        actionId: 'a3',
+        status: ActionStatus.EXECUTED,
+        deploymentId: null,
+        stackId: 'stack-1',
         message: null,
       })
     })
@@ -218,6 +272,7 @@ describe('chatMapper', () => {
       if (event.type === 'action_result') {
         expect(event.status).toBe(ActionStatus.FAILED)
         expect(event.deploymentId).toBeNull()
+        expect(event.stackId).toBeNull()
       }
     })
 

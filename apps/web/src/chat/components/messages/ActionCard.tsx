@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 
 import { Badge, Button, Icon } from '../../../shared/components/ui'
-import { ACTION_KIND_LABELS } from '../../types/enums/ActionKind'
+import { ACTION_KIND_LABELS, ActionKind } from '../../types/enums/ActionKind'
 import {
   ACTION_STATUS_LABELS,
   ACTION_STATUS_TONES,
@@ -10,6 +10,8 @@ import {
 import type { ActionProposal } from '../../types/models/ActionProposal'
 import { ActionRecap } from './ActionRecap'
 import { DeploymentResultCta } from './DeploymentResultCta'
+import { StackComposition } from './StackComposition'
+import { StackResultCta } from './StackResultCta'
 
 interface ActionCardProps {
   action: ActionProposal
@@ -48,19 +50,20 @@ function ImageLine({ action }: { action: ActionProposal }) {
 export function ActionCard({ action, onConfirm, onReject }: ActionCardProps) {
   const navigate = useNavigate()
   const isPending = action.status === ActionStatus.PROPOSED
-  // Action `deploy` exécutée avec succès : on propose un CTA vers le suivi du
-  // déploiement créé (item #7) — visible, jamais une redirection automatique.
+  const isStack = action.kind === ActionKind.COMPOSE_STACK
+  const isExecuted = action.status === ActionStatus.EXECUTED
+  // Action exécutée avec succès : on propose un CTA vers le suivi de la ressource
+  // créée (visible, jamais une redirection automatique) — déploiement ou stack.
   const executedDeploymentId =
-    action.status === ActionStatus.EXECUTED && action.deploymentId != null
-      ? action.deploymentId
-      : null
+    isExecuted && action.deploymentId != null ? action.deploymentId : null
+  const executedStackId = isExecuted && action.stackId != null ? action.stackId : null
 
   return (
     <div className="border-border bg-surface mt-3 rounded-lg border p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-cyan flex h-7 w-7 items-center justify-center rounded-md bg-[color-mix(in_oklch,var(--color-cyan)_14%,transparent)]">
-            <Icon name="rocket" size={14} />
+            <Icon name={isStack ? 'layers' : 'rocket'} size={14} />
           </span>
           <div className="text-text-secondary font-mono text-[10px] tracking-[0.12em] uppercase">
             {ACTION_KIND_LABELS[action.kind]}
@@ -73,9 +76,15 @@ export function ActionCard({ action, onConfirm, onReject }: ActionCardProps) {
 
       <p className="text-text-primary mt-2.5 text-[13.5px] leading-relaxed">{action.intent}</p>
 
-      <ImageLine action={action} />
-      <ActionRecap title="Paramètres" entries={action.params} />
-      <ActionRecap title="Quotas" entries={action.quotas} />
+      {isStack ? (
+        <StackComposition services={action.stackServices} links={action.stackLinks} />
+      ) : (
+        <>
+          <ImageLine action={action} />
+          <ActionRecap title="Paramètres" entries={action.params} />
+          <ActionRecap title="Quotas" entries={action.quotas} />
+        </>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button
@@ -87,15 +96,17 @@ export function ActionCard({ action, onConfirm, onReject }: ActionCardProps) {
         >
           Confirmer
         </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon="sliders-horizontal"
-          disabled={!isPending}
-          onClick={() => navigate(configUrlFor(action))}
-        >
-          Modifier
-        </Button>
+        {!isStack && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="sliders-horizontal"
+            disabled={!isPending}
+            onClick={() => navigate(configUrlFor(action))}
+          >
+            Modifier
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -108,6 +119,7 @@ export function ActionCard({ action, onConfirm, onReject }: ActionCardProps) {
       </div>
 
       {executedDeploymentId !== null && <DeploymentResultCta deploymentId={executedDeploymentId} />}
+      {executedStackId !== null && <StackResultCta stackId={executedStackId} />}
     </div>
   )
 }

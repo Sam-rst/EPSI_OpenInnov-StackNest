@@ -24,7 +24,12 @@ from app.chat.domain.interfaces.chat_event_publisher import ChatEventPublisher
 from app.chat.domain.interfaces.conversation_repository import ConversationRepository
 from app.chat.domain.interfaces.deployment_actions import DeploymentActions
 from app.chat.domain.interfaces.proposed_action_reader import ProposedActionReader
+from app.chat.domain.interfaces.stack_actions import StackActions
 from app.chat.domain.value_objects.proposed_action import ProposedAction
+from app.chat.domain.value_objects.stack_composition_spec import (
+    StackLinkSpec,
+    StackServiceSpec,
+)
 
 
 def make_template(
@@ -235,3 +240,24 @@ class FakeDeploymentActions(DeploymentActions):
     async def regenerate_password(self, *, owner_id: UUID, deployment_id: UUID) -> str:
         self.calls.append(("regenerate", {"owner_id": owner_id, "deployment_id": deployment_id}))
         return str(deployment_id)
+
+
+class FakeStackActions(StackActions):
+    """Delegue factice de composition de stack : enregistre l'appel, renvoie un id."""
+
+    def __init__(self, stack_id: str | None = None) -> None:
+        self._stack_id = stack_id or str(uuid4())
+        self.calls: list[dict[str, Any]] = []
+
+    async def compose(
+        self,
+        *,
+        owner_id: UUID,
+        name: str,
+        services: tuple[StackServiceSpec, ...],
+        links: tuple[StackLinkSpec, ...],
+    ) -> str:
+        self.calls.append(
+            {"owner_id": owner_id, "name": name, "services": services, "links": links}
+        )
+        return self._stack_id

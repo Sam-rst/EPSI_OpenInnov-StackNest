@@ -26,11 +26,17 @@ from app.chat.domain.exceptions.invalid_tool_args import InvalidToolArgsExceptio
 from app.chat.domain.exceptions.unknown_template import UnknownTemplateException
 from app.chat.domain.interfaces.catalog_reader import CatalogReader
 from app.chat.domain.value_objects.action_proposal import ActionProposal
+from app.chat.domain.value_objects.stack_composition_spec import (
+    StackLinkSpec,
+    StackServiceSpec,
+)
 from app.chat.domain.value_objects.template_deployability import TemplateDeployability
 from app.chat.domain.value_objects.tool_call import ToolCall
 from app.chat.infrastructure.tools.tool_names import ACTION_TOOL_KINDS, ToolName
 from app.deployment.domain.entities.deployment import Deployment
 from app.deployment.domain.interfaces.deployment_repository import DeploymentRepository
+from app.stack.domain.exceptions.invalid_stack import InvalidStackException
+from app.stack.domain.services.stack_validator import StackValidator
 
 
 class ActionArgsGate:
@@ -42,15 +48,24 @@ class ActionArgsGate:
     comme inexistant).
     """
 
-    def __init__(self, *, catalog: CatalogReader, deployments: DeploymentRepository) -> None:
+    def __init__(
+        self,
+        *,
+        catalog: CatalogReader,
+        deployments: DeploymentRepository,
+        stack_validator: StackValidator | None = None,
+    ) -> None:
         self._catalog = catalog
         self._deployments = deployments
+        self._stack_validator = stack_validator or StackValidator()
 
     async def validate(self, call: ToolCall, *, owner_id: UUID) -> ActionProposal:
         """Valide l'appel d'outil et renvoie une `ActionProposal` confirmable."""
         tool = self._resolve_action_tool(call.name)
         if tool is ToolName.DEPLOY_TEMPLATE:
             return await self._validate_deploy(call.args, owner_id=owner_id)
+        if tool is ToolName.PROPOSE_STACK:
+            return await self._validate_compose_stack(call.args)
         return await self._validate_lifecycle(tool, call.args, owner_id=owner_id)
 
     @staticmethod
@@ -85,6 +100,109 @@ class ActionArgsGate:
                 "params": params,
             },
         )
+
+    async def _validate_compose_stack(self, args: dict[str, Any]) -> ActionProposal:
+        """Valide une composition de stack (services reels/deployables + structure).
+
+        Chaque service est valide comme un deploy (template reel, deployable,
+        version, params sans secret) ; la structure (alias uniques, liens vers des
+        alias existants, pas d'auto-lien, DAG acyclique) est confiee au
+        `StackValidator` du domaine stack (source de verite unique, pas de
+        duplication). Les args produits sont rejouables tels quels par la gate.
+        """
+        name = self._require_name(args.get("name"))
+        services = await self._validate_stack_services(args.get("services"))
+        links = self._parse_stack_links(args.get("links") or [])
+        self._run_stack_validator(services, links)
+        return self._stack_proposal(name, services, links)
+
+    async def _validate_stack_services(self, raw_services: Any) -> list[StackServiceSpec]:
+        if not isinstance(raw_services, list) or not raw_services:
+            raise InvalidToolArgsException("Une stack doit comporter au moins un service.")
+        return [await self._validate_stack_service(raw) for raw in raw_services]
+
+    async def _validate_stack_service(self, raw: Any) -> StackServiceSpec:
+        if not isinstance(raw, dict):
+            raise InvalidToolArgsException("Chaque service doit etre un objet.")
+        template = await self._load_template(raw.get("template_id"))
+        self._ensure_deployable(template)
+        return StackServiceSpec(
+            template_id=template.id,
+            alias=self._require_alias(raw.get("alias")),
+            version=self._resolve_version(template, raw.get("version")),
+            params=self._validate_params(template, raw.get("params") or {}),
+        )
+
+    @staticmethod
+    def _parse_stack_links(raw_links: Any) -> list[StackLinkSpec]:
+        if not isinstance(raw_links, list):
+            raise InvalidToolArgsException("Les liens doivent etre une liste.")
+        return [ActionArgsGate._parse_stack_link(raw) for raw in raw_links]
+
+    @staticmethod
+    def _parse_stack_link(raw: Any) -> StackLinkSpec:
+        if not isinstance(raw, dict):
+            raise InvalidToolArgsException("Chaque lien doit etre un objet.")
+        mappings = raw.get("var_mappings") or {}
+        if not isinstance(mappings, dict):
+            raise InvalidToolArgsException("Le mapping de variables doit etre un objet.")
+        return StackLinkSpec(
+            from_alias=ActionArgsGate._require_alias(raw.get("from_alias")),
+            to_alias=ActionArgsGate._require_alias(raw.get("to_alias")),
+            var_mappings={str(key): str(value) for key, value in mappings.items()},
+        )
+
+    def _run_stack_validator(
+        self, services: list[StackServiceSpec], links: list[StackLinkSpec]
+    ) -> None:
+        """Delegue la validation structurelle au domaine stack (erreurs traduites en 422 chat)."""
+        try:
+            self._stack_validator.validate(services, links)
+        except InvalidStackException as error:
+            raise InvalidToolArgsException(error.message) from error
+
+    @staticmethod
+    def _stack_proposal(
+        name: str, services: list[StackServiceSpec], links: list[StackLinkSpec]
+    ) -> ActionProposal:
+        services_recap = [
+            {
+                "alias": service.alias,
+                "template_id": str(service.template_id),
+                "version": service.version,
+                "params": service.params,
+            }
+            for service in services
+        ]
+        links_payload = [
+            {
+                "from_alias": link.from_alias,
+                "to_alias": link.to_alias,
+                "var_mappings": link.var_mappings,
+            }
+            for link in links
+        ]
+        return ActionProposal(
+            kind=ActionKind.COMPOSE_STACK,
+            args={"name": name, "services": services_recap, "links": links_payload},
+            restatement=ActionArgsGate._stack_restatement(name, services),
+            recap={
+                "name": name,
+                "services": [{"alias": s.alias, "version": s.version} for s in services],
+                "links": [{"from": link.from_alias, "to": link.to_alias} for link in links],
+            },
+        )
+
+    @staticmethod
+    def _stack_restatement(name: str, services: list[StackServiceSpec]) -> str:
+        aliases = ", ".join(service.alias for service in services)
+        return f"Composer la stack « {name} » ({len(services)} services : {aliases})."
+
+    @staticmethod
+    def _require_alias(raw_alias: Any) -> str:
+        if not isinstance(raw_alias, str) or not raw_alias.strip():
+            raise InvalidToolArgsException("L'alias d'un service est requis.")
+        return raw_alias.strip()
 
     async def _validate_lifecycle(
         self, tool: ToolName, args: dict[str, Any], *, owner_id: UUID

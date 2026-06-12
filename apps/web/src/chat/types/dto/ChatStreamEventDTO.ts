@@ -45,12 +45,14 @@ export interface ActionProposedEventDTO {
 /** Résultat d'exécution d'une action confirmée (succès booléen). */
 export interface ActionResultEventDTO {
   action_id: string
-  /** Nature brute de l'action (`deploy` / `stop` / …). */
+  /** Nature brute de l'action (`deploy` / `stop` / … / `compose_stack`). */
   kind: string
-  /** `true` si la délégation au déploiement a réussi, `false` sinon. */
+  /** `true` si la délégation (déploiement ou composition) a réussi, `false` sinon. */
   success: boolean
   /** Identifiant du déploiement créé (action `deploy` réussie), ou `null`. */
   deployment_id?: string | null
+  /** Identifiant de la stack créée (action `compose_stack` réussie), ou `null`. */
+  stack_id?: string | null
 }
 
 /** Erreur métier honnête remontée dans le flux. */

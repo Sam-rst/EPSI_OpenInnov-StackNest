@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.catalog.domain.entities.template import Template
 from app.catalog.domain.enums.engine_kind import EngineKind
 from app.catalog.domain.enums.param_type import ParamType
 from app.chat.application.__tests__.fakes import (
@@ -282,6 +283,231 @@ class TestLifecycleValidation:
 
         with pytest.raises(InvalidToolArgsException):
             await gate.validate(call, owner_id=uuid4())
+
+
+class TestComposeStackValidation:
+    """La gate valide une proposition `compose_stack` : chaque service = template
+    reel et deployable, structure validee par le StackValidator, secrets exclus."""
+
+    @staticmethod
+    def _two_templates() -> tuple[Template, Template]:
+        db = make_template(slug="postgresql", name="PostgreSQL", versions=["16"])
+        api = make_template(slug="node", name="Node", versions=["20"])
+        return db, api
+
+    async def test_composition_conforme_renvoie_une_proposition(self) -> None:
+        db, api = self._two_templates()
+        gate = _gate(FakeCatalogReader([db, api]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "mon-app",
+                "services": [
+                    {"template_id": str(db.id), "alias": "db", "version": "16"},
+                    {"template_id": str(api.id), "alias": "api", "version": "20"},
+                ],
+                "links": [
+                    {
+                        "from_alias": "api",
+                        "to_alias": "db",
+                        "var_mappings": {"DATABASE_HOST": "{to.alias}"},
+                    }
+                ],
+            },
+        )
+
+        proposal = await gate.validate(call, owner_id=uuid4())
+
+        assert proposal.kind is ActionKind.COMPOSE_STACK
+        assert proposal.args["name"] == "mon-app"
+        aliases = {service["alias"] for service in proposal.args["services"]}
+        assert aliases == {"db", "api"}
+        assert proposal.restatement.strip() != ""
+        assert len(proposal.recap["services"]) == 2
+        assert proposal.recap["links"][0]["from"] == "api"
+
+    async def test_service_non_deployable_leve_invalid_args(self) -> None:
+        terraform = make_template(slug="vm", engine=EngineKind.TERRAFORM, versions=["1"])
+        gate = _gate(FakeCatalogReader([terraform]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "x",
+                "services": [{"template_id": str(terraform.id), "alias": "vm", "version": "1"}],
+            },
+        )
+
+        with pytest.raises(InvalidToolArgsException) as error:
+            await gate.validate(call, owner_id=uuid4())
+        assert "pas encore deployable" in error.value.message.lower()
+
+    async def test_template_inconnu_leve_unknown_template(self) -> None:
+        gate = _gate(FakeCatalogReader([]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "x",
+                "services": [{"template_id": str(uuid4()), "alias": "db", "version": "16"}],
+            },
+        )
+
+        with pytest.raises(UnknownTemplateException):
+            await gate.validate(call, owner_id=uuid4())
+
+    async def test_alias_duplique_leve_invalid_args(self) -> None:
+        db, _ = self._two_templates()
+        gate = _gate(FakeCatalogReader([db]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "x",
+                "services": [
+                    {"template_id": str(db.id), "alias": "db", "version": "16"},
+                    {"template_id": str(db.id), "alias": "db", "version": "16"},
+                ],
+            },
+        )
+
+        with pytest.raises(InvalidToolArgsException):
+            await gate.validate(call, owner_id=uuid4())
+
+    async def test_lien_vers_alias_inexistant_leve_invalid_args(self) -> None:
+        db, _ = self._two_templates()
+        gate = _gate(FakeCatalogReader([db]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "x",
+                "services": [{"template_id": str(db.id), "alias": "db", "version": "16"}],
+                "links": [{"from_alias": "db", "to_alias": "absent"}],
+            },
+        )
+
+        with pytest.raises(InvalidToolArgsException):
+            await gate.validate(call, owner_id=uuid4())
+
+    async def test_auto_lien_leve_invalid_args(self) -> None:
+        db, _ = self._two_templates()
+        gate = _gate(FakeCatalogReader([db]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "x",
+                "services": [{"template_id": str(db.id), "alias": "db", "version": "16"}],
+                "links": [{"from_alias": "db", "to_alias": "db"}],
+            },
+        )
+
+        with pytest.raises(InvalidToolArgsException):
+            await gate.validate(call, owner_id=uuid4())
+
+    async def test_cycle_leve_invalid_args(self) -> None:
+        db, api = self._two_templates()
+        gate = _gate(FakeCatalogReader([db, api]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "x",
+                "services": [
+                    {"template_id": str(db.id), "alias": "db", "version": "16"},
+                    {"template_id": str(api.id), "alias": "api", "version": "20"},
+                ],
+                "links": [
+                    {"from_alias": "db", "to_alias": "api"},
+                    {"from_alias": "api", "to_alias": "db"},
+                ],
+            },
+        )
+
+        with pytest.raises(InvalidToolArgsException):
+            await gate.validate(call, owner_id=uuid4())
+
+    async def test_aucun_service_leve_invalid_args(self) -> None:
+        gate = _gate(FakeCatalogReader([]), FakeDeploymentRepository())
+        call = ToolCall(name="propose_stack", args={"name": "x", "services": []})
+
+        with pytest.raises(InvalidToolArgsException):
+            await gate.validate(call, owner_id=uuid4())
+
+    async def test_nom_vide_leve_invalid_args(self) -> None:
+        db, _ = self._two_templates()
+        gate = _gate(FakeCatalogReader([db]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "   ",
+                "services": [{"template_id": str(db.id), "alias": "db", "version": "16"}],
+            },
+        )
+
+        with pytest.raises(InvalidToolArgsException):
+            await gate.validate(call, owner_id=uuid4())
+
+    async def test_param_secret_jamais_propage(self) -> None:
+        db = make_template(
+            slug="postgresql",
+            versions=["16"],
+            params=[
+                make_param(key="db_name", required=True),
+                make_param(key="password", param_type=ParamType.SECRET, required=True),
+            ],
+        )
+        gate = _gate(FakeCatalogReader([db]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "x",
+                "services": [
+                    {
+                        "template_id": str(db.id),
+                        "alias": "db",
+                        "version": "16",
+                        "params": {"db_name": "app", "password": "secret123"},
+                    }
+                ],
+            },
+        )
+
+        proposal = await gate.validate(call, owner_id=uuid4())
+
+        service_args = proposal.args["services"][0]
+        assert "password" not in service_args["params"]
+        assert service_args["params"] == {"db_name": "app"}
+
+    async def test_version_par_defaut_si_absente(self) -> None:
+        db = make_template(slug="postgresql", versions=["16", "15"])
+        gate = _gate(FakeCatalogReader([db]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={"name": "x", "services": [{"template_id": str(db.id), "alias": "db"}]},
+        )
+
+        proposal = await gate.validate(call, owner_id=uuid4())
+
+        assert proposal.args["services"][0]["version"] == "16"
+
+    async def test_args_valides_rejouables_par_la_gate(self) -> None:
+        # Les args produits doivent etre re-validables tels quels (rechargement du fil).
+        db, api = self._two_templates()
+        gate = _gate(FakeCatalogReader([db, api]), FakeDeploymentRepository())
+        call = ToolCall(
+            name="propose_stack",
+            args={
+                "name": "mon-app",
+                "services": [
+                    {"template_id": str(db.id), "alias": "db", "version": "16"},
+                    {"template_id": str(api.id), "alias": "api", "version": "20"},
+                ],
+                "links": [{"from_alias": "api", "to_alias": "db"}],
+            },
+        )
+
+        first = await gate.validate(call, owner_id=uuid4())
+        replayed = await gate.validate(
+            ToolCall(name="propose_stack", args=first.args), owner_id=uuid4()
+        )
+
+        assert replayed.recap == first.recap
 
 
 class TestUnknownTool:

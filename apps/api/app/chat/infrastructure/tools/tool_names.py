@@ -30,6 +30,7 @@ class ToolName(StrEnum):
     STOP_DEPLOYMENT = "stop_deployment"
     START_DEPLOYMENT = "start_deployment"
     REGENERATE_PASSWORD = "regenerate_password"
+    PROPOSE_STACK = "propose_stack"
 
 
 # Correspondance outil d'action -> nature d'action (ActionKind), utilisee par la
@@ -39,6 +40,7 @@ ACTION_TOOL_KINDS: dict[ToolName, ActionKind] = {
     ToolName.STOP_DEPLOYMENT: ActionKind.STOP,
     ToolName.START_DEPLOYMENT: ActionKind.START,
     ToolName.REGENERATE_PASSWORD: ActionKind.REGENERATE,
+    ToolName.PROPOSE_STACK: ActionKind.COMPOSE_STACK,
 }
 
 # Correspondance inverse nature d'action -> outil : permet de reconstruire le

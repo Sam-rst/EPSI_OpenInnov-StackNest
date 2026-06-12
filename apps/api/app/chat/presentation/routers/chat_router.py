@@ -34,6 +34,7 @@ from app.chat.domain.interfaces.chat_event_subscriber import ChatEventSubscriber
 from app.chat.domain.interfaces.conversation_repository import ConversationRepository
 from app.chat.domain.interfaces.deployment_actions import DeploymentActions
 from app.chat.domain.interfaces.llm_provider import LLMProvider
+from app.chat.domain.interfaces.stack_actions import StackActions
 from app.chat.infrastructure.tools.action_args_gate import ActionArgsGate
 from app.chat.infrastructure.tools.gate_proposed_action_reader import GateProposedActionReader
 from app.chat.infrastructure.tools.read_tool_executor import ReadToolExecutor
@@ -47,6 +48,7 @@ from app.chat.presentation.dependencies.chat_providers import (
     get_conversation_repository,
     get_deployment_actions,
     get_llm_provider,
+    get_stack_actions,
 )
 from app.chat.presentation.schemas.conversation_schemas import (
     ConversationDetailResponse,
@@ -70,6 +72,7 @@ ProviderDep = Annotated[LLMProvider, Depends(get_llm_provider)]
 PublisherDep = Annotated[ChatEventPublisher, Depends(get_chat_event_publisher)]
 SubscriberDep = Annotated[ChatEventSubscriber, Depends(get_chat_event_subscriber)]
 DelegateDep = Annotated[DeploymentActions, Depends(get_deployment_actions)]
+StackDelegateDep = Annotated[StackActions, Depends(get_stack_actions)]
 
 # En-tetes SSE : flux non bufferise, connexion maintenue ouverte ; desactive le
 # buffering Nginx (reverse-proxy) pour que chaque event parte immediatement.
@@ -237,11 +240,16 @@ async def confirm_action(
     actions: ActionsDep,
     publisher: PublisherDep,
     delegate: DelegateDep,
+    stack_delegate: StackDelegateDep,
     user: CurrentUserDep,
 ) -> None:
     """Confirme l'action de l'utilisateur (404 si inconnue / non possedee / non proposed)."""
     await ConfirmAction(
-        conversations=conversations, actions=actions, publisher=publisher, delegate=delegate
+        conversations=conversations,
+        actions=actions,
+        publisher=publisher,
+        delegate=delegate,
+        stack_delegate=stack_delegate,
     ).execute(action_id=action_id, owner_id=user.id)
 
 
