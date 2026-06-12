@@ -84,4 +84,23 @@ describe('DeploymentRow', () => {
 
     expect(screen.getByText('Page détail dep-1')).toBeInTheDocument()
   })
+
+  it('navigue vers le détail à la touche Espace (parité avec un lien natif)', async () => {
+    const user = userEvent.setup()
+    renderRow(deployment())
+
+    const row = screen.getByRole('link', { name: /postgres-prod/ })
+    row.focus()
+    await user.keyboard('[Space]')
+
+    expect(screen.getByText('Page détail dep-1')).toBeInTheDocument()
+  })
+
+  it('est focusable au clavier et signale l’interactivité (curseur pointeur)', () => {
+    renderRow(deployment())
+
+    const row = screen.getByRole('link', { name: /postgres-prod/ })
+    expect(row).toHaveAttribute('tabindex', '0')
+    expect(row.className).toMatch(/cursor-pointer/)
+  })
 })
