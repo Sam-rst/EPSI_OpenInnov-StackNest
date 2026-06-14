@@ -4,6 +4,7 @@ import { HttpResponse, http } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { BETA_BANNER_TEXT } from '../../../shared/components/BetaBanner'
 import { server } from '../../../../tests/mocks/server'
 import { createQueryWrapper } from '../../../../tests/utils/queryWrapper'
 import { StackBuilderPage } from '../StackBuilderPage'
@@ -68,6 +69,14 @@ function renderBuilder() {
 describe('StackBuilderPage', () => {
   afterEach(() => {
     server.resetHandlers()
+  })
+
+  it('affiche un rappel bêta honnête en tête du composeur', async () => {
+    server.use(http.get('*/catalog/templates', () => HttpResponse.json([])))
+
+    renderBuilder()
+
+    expect(await screen.findByText(BETA_BANNER_TEXT)).toBeInTheDocument()
   })
 
   it('ne propose que les services Docker (Terraform exclus)', async () => {

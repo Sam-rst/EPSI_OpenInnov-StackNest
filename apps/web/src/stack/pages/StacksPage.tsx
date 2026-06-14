@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { BetaBanner } from '../../shared/components/BetaBanner'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { EmptyState } from '../../shared/components/EmptyState'
 import { Button } from '../../shared/components/ui'
@@ -42,6 +43,8 @@ export function StacksPage() {
           Composer une stack
         </Button>
       </header>
+
+      <BetaBanner className="mb-6" />
 
       {loading && <p className="text-text-muted text-[13.5px]">Chargement des stacks…</p>}
 

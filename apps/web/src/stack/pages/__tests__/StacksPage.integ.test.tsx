@@ -4,6 +4,7 @@ import { HttpResponse, http } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { BETA_BANNER_TEXT } from '../../../shared/components/BetaBanner'
 import { server } from '../../../../tests/mocks/server'
 import { createQueryWrapper } from '../../../../tests/utils/queryWrapper'
 import type { StackDTO } from '../../types/dto/StackDTO'
@@ -57,6 +58,14 @@ function desktopTable(): HTMLElement {
 describe('StacksPage', () => {
   afterEach(() => {
     server.resetHandlers()
+  })
+
+  it('affiche un rappel bêta honnête en tête de page', async () => {
+    server.use(http.get('*/stacks', () => HttpResponse.json([stackDto()])))
+
+    renderPage()
+
+    expect(await screen.findByText(BETA_BANNER_TEXT)).toBeInTheDocument()
   })
 
   it('liste les stacks dans une table avec nom, statut et nb de services', async () => {

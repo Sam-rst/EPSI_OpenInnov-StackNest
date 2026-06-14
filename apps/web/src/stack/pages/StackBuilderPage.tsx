@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import type { CatalogItem } from '../../catalog/domain/models/CatalogItem'
 import { getTemplateConfig } from '../../deployment/services/templateConfigService'
 import { deploymentErrorMessage } from '../../deployment/services/deploymentErrorMessage'
+import { BetaBanner } from '../../shared/components/BetaBanner'
 import { EmptyState } from '../../shared/components/EmptyState'
 import { Button, Icon } from '../../shared/components/ui'
 import { StackCatalogPanel } from '../components/StackCatalogPanel'
@@ -80,6 +81,8 @@ export function StackBuilderPage() {
           Compose.
         </p>
       </header>
+
+      <BetaBanner className="mb-6" />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_1fr]">
         <StackCatalogPanel onAdd={(item) => void handleAdd(item)} />

@@ -3,6 +3,7 @@ import { HttpResponse, http } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { BETA_BANNER_TEXT } from '../../../shared/components/BetaBanner'
 import { server } from '../../../../tests/mocks/server'
 import { createQueryWrapper } from '../../../../tests/utils/queryWrapper'
 import type { StackDTO } from '../../types/dto/StackDTO'
@@ -82,6 +83,14 @@ describe('StackServiceDetailPage', () => {
 
   afterEach(() => {
     server.resetHandlers()
+  })
+
+  it('affiche un rappel bêta honnête en tête du détail service', async () => {
+    server.use(http.get('*/stacks/stack-1', () => HttpResponse.json(stackDto())))
+
+    renderServiceDetail('db')
+
+    expect(await screen.findByText(BETA_BANNER_TEXT)).toBeInTheDocument()
   })
 
   it('affiche les infos du service (image, version, port, conteneur, statut)', async () => {
