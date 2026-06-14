@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
+import { BetaBanner } from '../../shared/components/BetaBanner'
 import { EmptyState } from '../../shared/components/EmptyState'
 import { Badge, Button, Icon } from '../../shared/components/ui'
 import { StackServiceParams } from '../components/StackServiceParams'
@@ -84,6 +85,8 @@ export function StackServiceDetailPage() {
   return (
     <div className="mx-auto max-w-[1280px] p-8">
       <BackLink stackId={id} />
+
+      <BetaBanner className="mb-6" />
 
       <header className="mb-6 flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
