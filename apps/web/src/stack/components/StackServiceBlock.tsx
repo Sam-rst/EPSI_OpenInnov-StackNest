@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { ParamField } from '../../deployment/components/config/ParamField'
-import { Badge, Button, Icon } from '../../shared/components/ui'
+import { Badge, Button, Icon, Select } from '../../shared/components/ui'
 import type { CompositionLink, CompositionService } from '../types/models/StackComposition'
 import { StackLinkRow } from './StackLinkRow'
 
@@ -22,6 +22,10 @@ interface StackServiceBlockProps {
 
 const CONTROL_CLASS =
   'border-border bg-surface focus:border-cyan h-9 rounded-md border px-2.5 text-[13px] text-text-primary outline-none transition'
+
+// Surcharge la taille de la primitive Select pour ce bloc compact (h-9, 13px,
+// sans-serif), en gardant la place du chevron (pr-8).
+const SELECT_CLASS = 'h-9 px-2.5 pr-8 font-sans text-[13px]'
 
 /**
  * Bloc d'un service dans la « stack en cours » : alias éditable, version,
@@ -91,21 +95,21 @@ export function StackServiceBlock({
             className={`${CONTROL_CLASS} w-full font-mono`}
           />
         </label>
-        <label className="block">
+        <div className="block">
           <span className="text-text-secondary mb-1.5 block text-[12px] font-medium">Version</span>
-          <select
+          <Select
             aria-label={`Version de ${service.template.name}`}
             value={service.version}
-            onChange={(event) => onVersion(event.target.value)}
-            className={`${CONTROL_CLASS} w-full`}
+            onChange={onVersion}
+            className={SELECT_CLASS}
           >
             {service.template.versions.map((version) => (
               <option key={version.version} value={version.version}>
                 {version.version}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </div>
       </div>
 
       {service.template.params.length > 0 && (
@@ -133,19 +137,21 @@ export function StackServiceBlock({
         ))}
         {availableProviders.length > 0 && (
           <div className="flex items-center gap-2">
-            <select
-              aria-label={`Lier ${service.alias} à un service`}
-              value={linkTarget}
-              onChange={(event) => setLinkTarget(event.target.value)}
-              className={`${CONTROL_CLASS} flex-1`}
-            >
-              <option value="">Lier à…</option>
-              {availableProviders.map((provider) => (
-                <option key={provider.localId} value={provider.localId}>
-                  {provider.alias}
-                </option>
-              ))}
-            </select>
+            <div className="flex-1">
+              <Select
+                aria-label={`Lier ${service.alias} à un service`}
+                value={linkTarget}
+                onChange={setLinkTarget}
+                className={SELECT_CLASS}
+              >
+                <option value="">Lier à…</option>
+                {availableProviders.map((provider) => (
+                  <option key={provider.localId} value={provider.localId}>
+                    {provider.alias}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <Button
               type="button"
               variant="secondary"

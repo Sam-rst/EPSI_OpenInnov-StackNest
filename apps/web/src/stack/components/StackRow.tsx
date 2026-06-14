@@ -1,7 +1,7 @@
-import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { Badge, Icon } from '../../shared/components/ui'
+import { Badge, Checkbox, Icon } from '../../shared/components/ui'
 import { toneForStackStatus } from '../types/enums/StackStatus'
 import type { StackSummary } from '../types/models/Stack'
 import { formatStackDate } from './formatStackDate'
@@ -36,9 +36,13 @@ export function StackRow({ stack, selected, onToggleSelect }: StackRowProps) {
     }
   }
 
-  function handleSelect(event: ChangeEvent<HTMLInputElement> | MouseEvent) {
-    event.stopPropagation()
+  function handleSelect() {
     onToggleSelect(stack.id)
+  }
+
+  // Empêche le clic de la case de remonter à la ligne (qui navigue vers le détail).
+  function stopBubbling(event: MouseEvent) {
+    event.stopPropagation()
   }
 
   return (
@@ -50,13 +54,13 @@ export function StackRow({ stack, selected, onToggleSelect }: StackRowProps) {
       onKeyDown={handleKeyDown}
       className="border-border hover:bg-surface-sunken focus-visible:ring-cyan cursor-pointer border-t transition outline-none focus-visible:ring-2 focus-visible:ring-inset"
     >
-      <td className="w-10 px-4 py-3" onClick={(event) => event.stopPropagation()}>
-        <input
-          type="checkbox"
+      <td className="w-10 px-4 py-3" onClick={stopBubbling}>
+        <Checkbox
           checked={selected}
           onChange={handleSelect}
+          onClick={stopBubbling}
           aria-label={`Sélectionner la stack ${stack.name}`}
-          className="accent-cyan h-4 w-4 cursor-pointer align-middle"
+          className="align-middle"
         />
       </td>
       <td className="px-4 py-3">

@@ -1,4 +1,6 @@
-import { useEffect, useRef, type MouseEvent } from 'react'
+import type { MouseEvent } from 'react'
+
+import { Checkbox } from '../../../shared/components/ui'
 
 interface SelectionCheckboxProps {
   checked: boolean
@@ -10,10 +12,10 @@ interface SelectionCheckboxProps {
 }
 
 /**
- * Case à cocher de sélection d'une ligne/carte de déploiement. Stoppe la
+ * Case à cocher de sélection d'une ligne/carte de déploiement. S'appuie sur la
+ * primitive `Checkbox` de la charte (affordance, focus, indéterminé). Stoppe la
  * propagation du clic pour ne pas déclencher la navigation de la ligne cliquable
- * (la ligne reste un lien, la case sélectionne). Gère l'état indéterminé pour la
- * case d'en-tête « tout sélectionner ».
+ * (la ligne reste un lien, la case sélectionne).
  */
 export function SelectionCheckbox({
   checked,
@@ -21,28 +23,18 @@ export function SelectionCheckbox({
   onChange,
   label,
 }: SelectionCheckboxProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.indeterminate = indeterminate
-    }
-  }, [indeterminate])
-
-  // Empêche le clic (et le mousedown du drag de focus) de remonter à la ligne.
-  function stopBubbling(event: MouseEvent<HTMLElement>) {
+  // Empêche le clic de remonter à la ligne cliquable parente (navigation).
+  function stopBubbling(event: MouseEvent<HTMLInputElement>) {
     event.stopPropagation()
   }
 
   return (
-    <input
-      ref={inputRef}
-      type="checkbox"
+    <Checkbox
       checked={checked}
+      indeterminate={indeterminate}
       aria-label={label}
       onChange={onChange}
       onClick={stopBubbling}
-      className="accent-cyan border-border focus-visible:ring-cyan h-4 w-4 cursor-pointer rounded outline-none focus-visible:ring-2"
     />
   )
 }

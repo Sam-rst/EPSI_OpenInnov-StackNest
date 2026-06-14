@@ -1,3 +1,4 @@
+import { Select } from '../../../shared/components/ui'
 import { Card } from '../common/Card'
 import { Field } from '../common/Field'
 import { ParamField } from './ParamField'
@@ -17,9 +18,6 @@ interface CapacityCardProps {
   onParam: (key: string, value: string) => void
   onPreset: (preset: ResourcePreset) => void
 }
-
-const SELECT_CLASS =
-  'border-border bg-surface focus:border-cyan h-10 w-full rounded-md border px-3 font-mono text-[13px] text-text-primary outline-none transition'
 
 function versionLabel(version: TemplateConfigVersion): string {
   if (version.isLts) return `${version.version} (LTS)`
@@ -45,18 +43,13 @@ export function CapacityCard({
         Capacité
       </h2>
       <Field label="Version" htmlFor="dep-version">
-        <select
-          id="dep-version"
-          value={version}
-          onChange={(event) => onVersion(event.target.value)}
-          className={SELECT_CLASS}
-        >
+        <Select id="dep-version" value={version} onChange={onVersion}>
           {versions.map((entry) => (
             <option key={entry.version} value={entry.version}>
               {versionLabel(entry)}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
 
       {params.length > 0 && (
