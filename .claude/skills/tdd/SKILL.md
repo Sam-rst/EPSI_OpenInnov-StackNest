@@ -128,19 +128,53 @@ The Blue phase is a LOOP. After EACH change, run the tests. If they stay green, 
 
 **Craft checklist — all must pass to exit Blue:**
 
-| # | Criterion | Check |
-|---|---|---|
-| 1 | Tests still GREEN | Run after every single change |
-| 2 | Explicit naming | Variables, functions, classes — readable without context |
-| 3 | Functions <= 20 lines | Single responsibility |
-| 4 | Early return | Max 2 levels of indentation |
-| 5 | No duplication | DRY — but no premature abstraction |
-| 6 | No magic values | Named constants, Enums |
-| 7 | Explicit types | No `any` (TS), no implicit types (Python) |
-| 8 | Typed exceptions | DomainException, not generic Exception |
-| 9 | Value Objects | Types with business validation are VOs (frozen dataclass) |
-| 10 | 1 file = 1 class | Respected across all layers |
-| 11 | Lint + type check = 0 | ruff + mypy (back), eslint + prettier (front) |
+| #   | Criterion             | Check                                                     |
+| --- | --------------------- | --------------------------------------------------------- |
+| 1   | Tests still GREEN     | Run after every single change                             |
+| 2   | Explicit naming       | Variables, functions, classes — readable without context  |
+| 3   | Functions <= 20 lines | Single responsibility                                     |
+| 4   | Early return          | Max 2 levels of indentation                               |
+| 5   | No duplication        | DRY — but no premature abstraction                        |
+| 6   | No magic values       | Named constants, Enums                                    |
+| 7   | Explicit types        | No `any` (TS), no implicit types (Python)                 |
+| 8   | Typed exceptions      | DomainException, not generic Exception                    |
+| 9   | Value Objects         | Types with business validation are VOs (frozen dataclass) |
+| 10  | 1 file = 1 class      | Respected across all layers                               |
+| 11  | Frontend ≤ 150 lignes | ESLint warning sur max-lines                              |
+| 12  | Lint + type check = 0 | Voir Definition of Done ci-dessous (BLOQUANT)             |
+
+## ✅ Definition of Done — phase Blue obligatoire (BLOQUANTE)
+
+Le ticket n'est **pas terminé** tant que ces commandes orchestrées par les frameworks ne sont pas toutes vertes. Utilise toujours les orchestrateurs (`poe`, `npm run`), pas les commandes brutes.
+
+```bash
+# Backend (apps/api) — toutes en une commande via poe
+cd apps/api && uv run poe check
+# Détail (lancé par poe check) : lint + format:check + typecheck + test
+
+# Frontend (apps/web) — toutes en une commande via npm
+cd apps/web && npm run check
+# Détail (lancé par check) : typecheck + lint + format:check + test
+
+# Ou depuis la racine, les deux d'un coup
+npm run check
+```
+
+**Doc à mettre à jour** quand applicable :
+
+- `apps/api/docs/guide-developpeur.md` si nouvelle convention backend
+- `apps/web/docs/guide-developpeur.md` si nouvelle convention frontend
+- `CLAUDE.md` si l'architecture / les règles changent
+- `README.md` si commande, prérequis ou setup change
+
+**Garde-fous techniques** (BLOQUANTS, déjà configurés) :
+
+- `.husky/pre-commit` lance `poe precommit` + `npm run precommit` → bloque le commit si rouge
+- `.husky/commit-msg` valide le format `type(STN-XX): ...` → bloque sinon
+- Hook Claude `Stop` lance `node .claude/hooks/quality-check.cjs --mode=stop` → bloque la fin de tour si rouge
+- Hook Claude `PostToolUse` (Edit/Write) lance le check sur le scope concerné → bloque le retour de l'outil si rouge
+
+Tu n'as **PAS** à bypasser ces hooks. Si un hook bloque, investiguer et fixer la cause.
 
 **The refactoring loop:**
 
@@ -153,11 +187,12 @@ for each criterion not yet met:
 ```
 
 **Common Blue phase refactorings:**
+
 - Extract a Value Object (e.g., TemplateName with validation)
 - Rename a variable/function for clarity
 - Extract a private method to respect <= 20 lines
 - Replace magic string with Enum
-- Add guard clause in entity (__post_init__)
+- Add guard clause in entity (**post_init**)
 - Move a class to its own file (1 file = 1 class)
 
 8. When ALL criteria pass:
@@ -168,12 +203,12 @@ git add -A && git commit -m "refactor(STN-XX): blue — [what was refactored]"
 
 ## Commit Convention
 
-| Phase | Prefix | Example |
-|---|---|---|
-| RED | `test(STN-XX):` | `test(STN-15): red — tests creation template` |
-| GREEN | `feat(STN-XX):` | `feat(STN-15): green — creation template` |
-| GREEN (bugfix) | `fix(STN-XX):` | `fix(STN-20): green — fix duplicate name check` |
-| BLUE | `refactor(STN-XX):` | `refactor(STN-15): blue — extraction VO TemplateName` |
+| Phase          | Prefix              | Example                                               |
+| -------------- | ------------------- | ----------------------------------------------------- |
+| RED            | `test(STN-XX):`     | `test(STN-15): red — tests creation template`         |
+| GREEN          | `feat(STN-XX):`     | `feat(STN-15): green — creation template`             |
+| GREEN (bugfix) | `fix(STN-XX):`      | `fix(STN-20): green — fix duplicate name check`       |
+| BLUE           | `refactor(STN-XX):` | `refactor(STN-15): blue — extraction VO TemplateName` |
 
 Commits are in **French** for the description, English for the prefix.
 
@@ -181,17 +216,17 @@ Commits are in **French** for the description, English for the prefix.
 
 Choose the right test level based on what you're testing:
 
-| What | Level | Backend | Frontend |
-|---|---|---|---|
-| Use case logic | unit | mock repo | — |
-| Entity/VO validation | unit | no mock | — |
-| Mapper conversion | unit | no mock | no mock |
-| Component render | unit | — | Testing Library |
-| Hook behavior | unit | — | React Query mock |
-| Repository + DB | integ | testcontainers | — |
-| Endpoint HTTP | integ | httpx AsyncClient | — |
-| Page + API | integ | — | MSW |
-| Full flow | e2e | all real services | Playwright |
+| What                 | Level | Backend           | Frontend         |
+| -------------------- | ----- | ----------------- | ---------------- |
+| Use case logic       | unit  | mock repo         | —                |
+| Entity/VO validation | unit  | no mock           | —                |
+| Mapper conversion    | unit  | no mock           | no mock          |
+| Component render     | unit  | —                 | Testing Library  |
+| Hook behavior        | unit  | —                 | React Query mock |
+| Repository + DB      | integ | testcontainers    | —                |
+| Endpoint HTTP        | integ | httpx AsyncClient | —                |
+| Page + API           | integ | —                 | MSW              |
+| Full flow            | e2e   | all real services | Playwright       |
 
 **Start with unit tests (RED), implement (GREEN), refactor (BLUE). Add integration/E2E tests for the same rule AFTER the unit cycle is complete.**
 
@@ -212,6 +247,7 @@ Ticket STN-15: "Créer un template dans le catalogue"
 **Rule 1: "Un template a un nom, une description et une catégorie"**
 
 🔴 RED:
+
 ```
 tests/unit/catalog/domain/test_template_entity.unit.py
 → test_template_has_name_description_category()
@@ -220,6 +256,7 @@ tests/unit/catalog/domain/test_template_entity.unit.py
 ```
 
 🟢 GREEN:
+
 ```
 apps/api/app/catalog/domain/entities/template.py
 → @dataclass Template with name, description, category
@@ -228,8 +265,9 @@ apps/api/app/catalog/domain/entities/template.py
 ```
 
 🔵 BLUE:
+
 ```
-→ Check: naming OK? types explicit? guard clauses? 
+→ Check: naming OK? types explicit? guard clauses?
 → Add __post_init__ validation (name min 2 chars)
 → RUN → GREEN ✓
 → Add TemplateCategory enum (not magic string)

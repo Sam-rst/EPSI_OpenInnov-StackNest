@@ -1,0 +1,33 @@
+#!/usr/bin/env sh
+# StackNest — commit-msg hook (BLOQUANT)
+# Format obligatoire : type(STN-XX): description en français
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(head -n1 "$COMMIT_MSG_FILE")
+
+# Pattern : feat|fix|refactor|test|docs|chore|build|ci|perf|style(STN-NNN): ...
+PATTERN='^(feat|fix|refactor|test|docs|chore|build|ci|perf|style)\(STN-[0-9]+\): .+'
+
+if ! echo "$COMMIT_MSG" | grep -qE "$PATTERN"; then
+  echo ""
+  echo "❌ Commit refusé — format invalide."
+  echo ""
+  echo "Format attendu :"
+  echo "  type(STN-XX): description en français"
+  echo ""
+  echo "Types autorisés : feat | fix | refactor | test | docs | chore | build | ci | perf | style"
+  echo ""
+  echo "Exemples :"
+  echo "  feat(STN-24): green — composant EnvBadge avec map env→couleur"
+  echo "  test(STN-24): red — tests EnvBadge dev/test/preview/prod"
+  echo "  refactor(STN-24): blue — extraction VO EnvColor"
+  echo ""
+  echo "Voir CLAUDE.md \"Règles non-négociables\""
+  exit 1
+fi
+
+# Refus de Co-Authored-By
+if grep -q "Co-Authored-By" "$COMMIT_MSG_FILE"; then
+  echo "❌ Commit refusé — Co-Authored-By interdit (convention projet)."
+  exit 1
+fi
