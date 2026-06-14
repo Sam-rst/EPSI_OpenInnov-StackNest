@@ -61,6 +61,72 @@ sur du « 1 service à la fois » manuel.
 
 ---
 
+## 3 bis. Marché, positionnement & modèle économique
+
+> Synthèse du volet business. Détail complet, tableau comparatif sourcé et grille freemium :
+> `docs/rendu/business-strategie.md`. **Tarifs concurrents consultés le 14 juin 2026.** Le modèle
+> hébergé + self-host est une **hypothèse stratégique** (à valider), pas un engagement produit du MVP.
+
+### Problématique marché
+
+Le besoin d'**autonomie encadrée** existe pour **deux publics** : l'**entreprise** (sortir du ticket
+Ops sans tomber dans le « chacun ses conteneurs ») et l'**étudiant** (provisionner vite, gratuitement,
+sans compétence infra pour ses TP). Le marché du déploiement self-service se segmente en trois
+familles : **PaaS hébergés** (Railway, Render, Fly.io, Heroku, Koyeb), **IDP / platform engineering**
+(Qovery, Northflank, Porter, Humanitec, Platform.sh) et **self-hosted open-core** (Coolify, Dokploy).
+Tendance de fond : les **free tiers s'érodent** (Heroku a supprimé le sien en 2022, Fly.io n'en
+propose plus aux nouveaux comptes).
+
+### Concurrents & tarifs (consultés le 14 juin 2026)
+
+| Concurrent | Modèle | Free tier | 1er payant |
+|---|---|---|---|
+| **Railway** | Hébergé | Essai $5 one-shot | Hobby $5/mois ; Pro $20/mois/siège + conso |
+| **Render** | Hébergé | Hobby gratuit (750 h, Postgres exp. 30 j) | Starter $7/mois/service |
+| **Fly.io** | Hébergé (usage) | Aucun (essai 2 h / 7 j) | ~$1,94/mois (conso min.) |
+| **Heroku** | Hébergé | Aucun (supprimé nov. 2022) | Eco $5 ; Basic $7/mois |
+| **Koyeb** | Hébergé (usage) | Starter gratuit (1 service + 1 Postgres, 1 user) | Pro $29/mois + conso |
+| **Northflank** | Hébergé / IDP | Developer Sandbox (2 services, 1 DB, non-prod) | Developer $10/mois |
+| **Qovery** | IDP (BYOC) | 1 000 min déploiement/mois | $29/user actif/mois + $0,016/min |
+| **Platform.sh** | PaaS managé | Essai 30 j | Development €12,25 ; Essential €22/mois |
+| **Porter** | IDP (BYOC) | Programme startup (25 vCPU/50 Go, 6 mois) | Team custom *(à re-vérifier)* |
+| **Humanitec** | IDP grands comptes | — | Custom *(à re-vérifier)* |
+| **Coolify** | Self-host open-core | Self-hosted gratuit à vie (Apache 2.0) | Cloud $5/mois (2 serveurs) |
+| **Dokploy** | Self-host open-core | Self-hosted gratuit (open source) | Cloud $4,50/mois (1 serveur) |
+
+### Différenciateurs StackNest
+
+À l'intersection des trois familles : **simplicité d'un PaaS** + **cadrage d'un IDP** + **souveraineté
+d'un self-hosted**, avec deux innovations — le **chat IA qui agit** (boîte à outils fermée + validation
+déterministe + confirmation) et le **composeur de stack** multi-services (liens `{to.*}`) — et un
+**freemium étudiant à 0 €**. Catalogue **maîtrisé** (versions, LTS/EOL, gates) là où les PaaS laissent
+tout configurer.
+
+### Stratégie d'insertion (bottom-up)
+
+*Land-and-expand* par les étudiants : habituer les **étudiants** à StackNest sur leurs **TP** (gratuit)
+→ ils deviennent **ambassadeurs** → une fois **embauchés**, ils **réintroduisent** l'outil en entreprise
+→ l'entreprise adopte un **plan payant**. Modèle prouvé par Docker, GitHub, Notion, Figma. Leviers :
+free tier non-prod, self-hostabilité (diffusion gratuite), ancrage académique EPSI, open-core.
+
+### Modèle économique — freemium hébergé + open-core (hypothèse)
+
+Principe : **assez gratuit pour qu'un étudiant fasse ses TP, pas assez pour qu'une entreprise y
+échappe.** Grille proposée (prix = hypothèses à valider) :
+
+| Plan | Cible | Prix | Justification benchmark |
+|---|---|---|---|
+| **Free** | Étudiant / TP | 0 € (non-prod, 1 user, quotas serrés) | Aligné Render Hobby / Northflank Sandbox / Koyeb Starter |
+| **Pro** | Dev indé | ~9 €/mois/user | Sous Railway Pro ($20) / Koyeb ($29) |
+| **Team** | PME / équipe | ~25 €/mois/user (SSO, RBAC) | Aligné Qovery ($29/user) / Render Standard ($25) |
+| **Entreprise** | Grand compte | Sur devis (SLA, données dédiées, UE) | Cohérent Humanitec / Porter (custom) |
+| **Self-hosted** | Labo / souveraineté | Gratuit (open-core) | Modèle Coolify / Dokploy |
+
+L'offre **hébergée** porte le revenu récurrent (et la question RGPD/données cloud) ; l'offre
+**self-hosted open-core** maximise la diffusion et nourrit le *land-and-expand*.
+
+---
+
 ## 4. Périmètre livré (MVP) vs roadmap
 
 ### Livré (MVP — état actuel du code)

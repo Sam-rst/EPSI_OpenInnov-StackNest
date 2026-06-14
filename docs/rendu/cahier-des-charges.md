@@ -12,7 +12,29 @@ technique de **provisionner des ressources IT en autonomie** (bases de données,
 runtimes, stacks multi-services), sans passer par un ticket Ops, et avec un cadrage de la plateforme
 (catalogue maîtrisé, versions, sécurité). Deux portes d'entrée : **UI web** et **assistant IA**.
 
-**Besoins primaires :**
+### 1.1 Problématique & définition du besoin (cas entreprise + cas étudiant)
+
+Le besoin d'**autonomie encadrée** vise **deux publics** :
+
+- **Cas entreprise** — obtenir une ressource passe par un **ticket Ops** (délai, friction) ou par des
+  conteneurs « à la main » (hétérogénéité, versions EOL, secrets en clair). Besoin : **rendre les
+  équipes autonomes** tout en **gardant le contrôle**.
+- **Cas étudiant** — pour un **TP / projet de cours**, il faut une BDD + un runtime **en minutes**,
+  **budget 0 €**, **sans compétence infra**. Besoin : **provisionner vite et gratuitement**.
+
+### 1.2 Personas
+
+| Persona | Profil | Cas | Besoin | Plan cible |
+|---|---|---|---|---|
+| **Lucas, 21 ans** | Étudiant | Étudiant (TP) | BDD + runtime en < 2 min, budget 0 €, zéro infra | **Free** / self-hosted |
+| **Sarah, 32 ans** | Dev senior | Entreprise | Sandbox isolé pour tester une migration sans impacter l'équipe | **Pro / Team** |
+| **Marc, 38 ans** | Lead dev PME | Entreprise | Automatiser des envs de test, budget maîtrisé, souveraineté | **Team / Entreprise** ou self-hosted |
+
+> Le cas étudiant (Lucas, gratuit) **alimente** le cas entreprise : devenu salarié, l'ancien étudiant
+> **réintroduit** StackNest dans son équipe (stratégie d'insertion *bottom-up*, cf.
+> `docs/rendu/business-strategie.md`).
+
+### 1.3 Besoins primaires
 
 1. Parcourir un catalogue de ressources et en consulter le détail (versions, paramètres).
 2. Déployer une ressource réelle et en suivre la progression en temps réel.
@@ -99,6 +121,24 @@ runtimes, stacks multi-services), sans passer par un ticket Ops, et avec un cadr
 
 - Le système **doit** présenter une vue de synthèse (KPIs, ressources actives) agrégée à partir des
   déploiements et stacks.
+
+### 2.7 Exigences business *(hypothèse — modèle hébergé freemium + self-host open-core, à valider)*
+
+> Ces exigences cadrent le **modèle économique cible** (cf. `docs/rendu/business-strategie.md`). Elles
+> sont des **hypothèses stratégiques** non implémentées au MVP.
+
+- Le système **devrait** supporter un **modèle freemium** : un **tier Free** calibré pour l'usage
+  pédagogique (quotas serrés — nb de déploiements/stacks, ressources, rétention courte, **usage
+  non-production**, 1 utilisateur) et des tiers **payants** (Pro / Team / Entreprise) débloquant
+  davantage de ressources, RBAC/SSO, support et SLA. *(roadmap)*
+- Le système **devrait** appliquer des **quotas par plan** (déploiements actifs, ressources allouées,
+  rétention des logs, budget de tokens LLM). *(roadmap)*
+- En mode **hébergé (SaaS)**, le système **doit** garantir une **isolation multi-tenant** (scoping par
+  `owner_id` déjà en place ; **single-tenant** dédié pour l'offre Entreprise), une **localisation des
+  données dans l'UE**, le **chiffrement at-rest et in-transit**, la **réversibilité / export** des
+  données, et un **DPA** pour les offres payantes. *(roadmap pour l'offre hébergée)*
+- Le système **doit** rester **self-hostable** (cœur open-core déployable par l'utilisateur sur son
+  propre serveur), afin de préserver la **souveraineté** et l'**anti-lock-in**. *(déjà vrai au MVP)*
 
 ---
 
