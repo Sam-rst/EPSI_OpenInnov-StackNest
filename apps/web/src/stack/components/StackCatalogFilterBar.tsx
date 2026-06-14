@@ -1,4 +1,4 @@
-import { Icon } from '../../shared/components/ui'
+import { Checkbox, Icon, Select } from '../../shared/components/ui'
 import type { SortDir } from '../hooks/useStackCatalogFilters'
 
 interface StackCatalogFilterBarProps {
@@ -13,8 +13,9 @@ interface StackCatalogFilterBarProps {
   onSortDir: (value: SortDir) => void
 }
 
-const SELECT_CLASS =
-  'border-border bg-surface text-text-primary focus:border-cyan h-9 w-full rounded-md border px-2 text-[12.5px] outline-none transition'
+// Surcharge la taille par défaut de la primitive Select pour la barre compacte
+// (h-9, 12.5px, sans-serif), en conservant la place du chevron (pr-8).
+const SELECT_CLASS = 'h-9 px-2 pr-8 font-sans text-[12.5px]'
 
 /**
  * Barre de recherche / tri / filtre du volet catalogue du builder : trouver vite
@@ -51,11 +52,10 @@ export function StackCatalogFilterBar({
       </div>
 
       <div className="flex gap-2">
-        <label className="flex-1">
-          <span className="sr-only">Filtrer par catégorie</span>
-          <select
+        <div className="flex-1">
+          <Select
             value={filterCategory}
-            onChange={(event) => onFilterCategory(event.target.value)}
+            onChange={onFilterCategory}
             aria-label="Filtrer par catégorie"
             className={SELECT_CLASS}
           >
@@ -64,31 +64,22 @@ export function StackCatalogFilterBar({
                 {category}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="w-24">
-          <span className="sr-only">Trier</span>
-          <select
+          </Select>
+        </div>
+        <div className="w-24">
+          <Select
             value={sortDir}
-            onChange={(event) => onSortDir(event.target.value as SortDir)}
+            onChange={(value) => onSortDir(value as SortDir)}
             aria-label="Trier"
             className={SELECT_CLASS}
           >
             <option value="asc">A → Z</option>
             <option value="desc">Z → A</option>
-          </select>
-        </label>
+          </Select>
+        </div>
       </div>
 
-      <label className="text-text-secondary flex cursor-pointer items-center gap-2 text-[12.5px]">
-        <input
-          type="checkbox"
-          checked={popularOnly}
-          onChange={(event) => onPopularOnly(event.target.checked)}
-          className="accent-cyan h-3.5 w-3.5"
-        />
-        Populaires uniquement
-      </label>
+      <Checkbox checked={popularOnly} onChange={onPopularOnly} label="Populaires uniquement" />
     </div>
   )
 }

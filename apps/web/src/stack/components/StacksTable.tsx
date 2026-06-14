@@ -1,3 +1,4 @@
+import { Checkbox } from '../../shared/components/ui'
 import type { StackSummary } from '../types/models/Stack'
 import { StackListCard } from './StackListCard'
 import { StackRow } from './StackRow'
@@ -33,12 +34,11 @@ export function StacksTable({
           <thead className="bg-surface-sunken text-text-muted text-[11px] tracking-[0.06em] uppercase">
             <tr>
               <th className="w-10 px-4 py-2.5">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={allSelected}
                   onChange={onToggleAll}
                   aria-label="Tout sélectionner"
-                  className="accent-cyan h-4 w-4 cursor-pointer align-middle"
+                  className="align-middle"
                 />
               </th>
               {HEADERS.map((header, index) => (

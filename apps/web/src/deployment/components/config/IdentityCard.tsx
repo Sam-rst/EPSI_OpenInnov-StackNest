@@ -1,3 +1,4 @@
+import { Select } from '../../../shared/components/ui'
 import { Card } from '../common/Card'
 import { Field } from '../common/Field'
 import { DEPLOYMENT_ENVS, type DeploymentEnv } from '../../hooks/useDeploymentConfigForm'
@@ -42,18 +43,13 @@ export function IdentityCard({ name, env, nameError, onName, onEnv }: IdentityCa
       </Field>
       <div className="mt-3">
         <Field label="Environnement" htmlFor="dep-env">
-          <select
-            id="dep-env"
-            value={env}
-            onChange={(event) => onEnv(event.target.value as DeploymentEnv)}
-            className={INPUT_CLASS}
-          >
+          <Select id="dep-env" value={env} onChange={(value) => onEnv(value as DeploymentEnv)}>
             {DEPLOYMENT_ENVS.map((value) => (
               <option key={value} value={value}>
                 {value}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
       </div>
     </Card>

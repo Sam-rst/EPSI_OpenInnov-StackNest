@@ -1,3 +1,4 @@
+import { Select } from '../../../shared/components/ui'
 import { Field } from '../common/Field'
 import { ParamKind } from '../../types/enums/ParamKind'
 import type { TemplateConfigParam } from '../../types/models/TemplateConfig'
@@ -33,16 +34,10 @@ export function ParamField({ param, value, error, onChange }: ParamFieldProps) {
   if (param.type === ParamKind.BOOL) {
     return (
       <Field label={param.label} hint={hint} error={error} htmlFor={fieldId}>
-        <select
-          id={fieldId}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          aria-invalid={invalid}
-          className={controlClass}
-        >
+        <Select id={fieldId} value={value} onChange={onChange} invalid={invalid}>
           <option value="true">Activé</option>
           <option value="false">Désactivé</option>
-        </select>
+        </Select>
       </Field>
     )
   }
@@ -50,19 +45,13 @@ export function ParamField({ param, value, error, onChange }: ParamFieldProps) {
   if (param.type === ParamKind.SELECT && param.options) {
     return (
       <Field label={param.label} hint={hint} error={error} htmlFor={fieldId}>
-        <select
-          id={fieldId}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          aria-invalid={invalid}
-          className={controlClass}
-        >
+        <Select id={fieldId} value={value} onChange={onChange} invalid={invalid}>
           {param.options.map((option) => (
             <option key={option} value={option}>
               {option}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
     )
   }

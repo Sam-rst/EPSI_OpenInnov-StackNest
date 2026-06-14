@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 
-import { Button } from '../../../shared/components/ui'
+import { Button, Checkbox, Select } from '../../../shared/components/ui'
 import type { TemplateWriteDTO } from '../../types/dto/TemplateWriteDTO'
 import { TEMPLATE_CATEGORY_LABELS, TemplateCategory } from '../../types/enums/TemplateCategory'
 import { FormField } from './FormField'
@@ -35,6 +35,10 @@ const EMPTY_VALUES: TemplateFormValues = {
 const INPUT_CLASS =
   'border-border bg-surface-elevated text-text-primary focus-visible:outline-cyan h-9 rounded-md border px-3 text-[13px] focus-visible:outline focus-visible:outline-2'
 
+// Aligne la primitive Select sur les inputs admin (surface élevée, h-9, sans-serif),
+// en gardant la place du chevron (pr-9).
+const SELECT_CLASS = 'h-9 bg-surface-elevated px-3 pr-9 font-sans text-[13px]'
+
 const toPayload = (values: TemplateFormParsed): TemplateWriteDTO => ({
   slug: values.slug,
   name: values.name,
@@ -56,6 +60,7 @@ export function TemplateForm({
 }: TemplateFormProps) {
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<TemplateFormValues, unknown, TemplateFormParsed>({
@@ -83,13 +88,26 @@ export function TemplateForm({
           <input id="tpl-provider" className={INPUT_CLASS} {...register('provider')} />
         </FormField>
         <FormField id="tpl-category" label="Catégorie" error={errors.category?.message}>
-          <select id="tpl-category" className={INPUT_CLASS} {...register('category')}>
-            {Object.entries(TEMPLATE_CATEGORY_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="category"
+            render={({ field }) => (
+              <Select
+                id="tpl-category"
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                invalid={errors.category !== undefined}
+                className={SELECT_CLASS}
+              >
+                {Object.entries(TEMPLATE_CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          />
         </FormField>
         <FormField
           id="tpl-tags"
@@ -109,10 +127,18 @@ export function TemplateForm({
         />
       </FormField>
 
-      <label className="text-text-secondary flex items-center gap-2 text-[13px]">
-        <input type="checkbox" {...register('popular')} />
-        Mettre en avant (Populaire)
-      </label>
+      <Controller
+        control={control}
+        name="popular"
+        render={({ field }) => (
+          <Checkbox
+            checked={field.value ?? false}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+            label="Mettre en avant (Populaire)"
+          />
+        )}
+      />
 
       <div className="flex items-center gap-2">
         <Button type="submit" variant="cyan" disabled={submitting}>

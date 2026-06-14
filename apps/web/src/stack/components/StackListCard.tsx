@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 
-import { Badge, Icon } from '../../shared/components/ui'
+import { Badge, Checkbox, Icon } from '../../shared/components/ui'
 import { toneForStackStatus } from '../types/enums/StackStatus'
 import type { StackSummary } from '../types/models/Stack'
 
@@ -22,12 +22,11 @@ export function StackListCard({ stack, selected, onToggleSelect }: StackListCard
 
   return (
     <div className="border-border bg-surface-elevated flex items-start gap-3 rounded-lg border p-4">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={selected}
         onChange={() => onToggleSelect(stack.id)}
         aria-label={`Sélectionner la stack ${stack.name}`}
-        className="accent-cyan mt-1 h-4 w-4 shrink-0 cursor-pointer"
+        className="mt-1"
       />
       <button
         type="button"
