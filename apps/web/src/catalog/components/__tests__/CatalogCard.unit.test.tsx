@@ -138,6 +138,47 @@ describe('CatalogCard — moteur Docker (carte active)', () => {
   })
 })
 
+describe('CatalogCard — bandeau « Bientôt disponible » (anti-chevauchement + lisibilité)', () => {
+  const LONG_TITLE_ITEM: CatalogItem = {
+    ...TERRAFORM_ITEM,
+    id: 'managed-db',
+    name: 'Base managée',
+  }
+
+  it('rend le bandeau sur sa propre ligne (ruban), jamais en absolu par-dessus le titre', () => {
+    render(<CatalogCard item={LONG_TITLE_ITEM} onSelect={vi.fn()} />)
+
+    const ribbon = screen.getByTestId('catalog-card-soon-ribbon')
+    // Le ruban ne doit pas flotter en position absolue : il occupe sa propre
+    // ligne, donc ne peut pas recouvrir le titre (« Base managée », long).
+    expect(ribbon.className).not.toMatch(/\babsolute\b/)
+  })
+
+  it('place le bandeau hors de la rangée du titre (pas de chevauchement structurel)', () => {
+    render(<CatalogCard item={LONG_TITLE_ITEM} onSelect={vi.fn()} />)
+
+    const ribbon = screen.getByTestId('catalog-card-soon-ribbon')
+    const title = screen.getByText('Base managée')
+    // Le titre n'est jamais un descendant du ruban et vice-versa : zones disjointes.
+    expect(ribbon.contains(title)).toBe(false)
+    expect(title.closest('[data-testid="catalog-card-soon-ribbon"]')).toBeNull()
+  })
+
+  it('utilise le ton « warn » lisible (texte saturé clair + variante sombre AA)', () => {
+    render(<CatalogCard item={LONG_TITLE_ITEM} onSelect={vi.fn()} />)
+
+    const badge = screen.getByText('Bientôt disponible')
+    expect(badge.className).toContain('text-[#7a4604]')
+    expect(badge.className).toContain('dark:text-[#ffd07a]')
+  })
+
+  it('affiche le bandeau « Bientôt disponible »', () => {
+    render(<CatalogCard item={TERRAFORM_ITEM} onSelect={vi.fn()} />)
+
+    expect(screen.getByText('Bientôt disponible')).toBeInTheDocument()
+  })
+})
+
 describe('CatalogCard — moteur Terraform (carte bloquée)', () => {
   it('affiche le bandeau « Bientôt disponible »', () => {
     render(<CatalogCard item={TERRAFORM_ITEM} onSelect={vi.fn()} />)

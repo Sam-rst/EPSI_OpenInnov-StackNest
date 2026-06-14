@@ -8,12 +8,16 @@ interface CatalogCardProps {
   onSelect: (item: CatalogItem) => void
 }
 
-const CARD_BASE = 'relative w-full text-left rounded-lg border p-5 transition'
+const CARD_BASE = 'w-full text-left rounded-lg border p-5 transition'
 
 const CARD_ACTIVE =
   'group border-border bg-surface-elevated hover:border-cyan hover:-translate-y-0.5 hover:shadow-[0_12px_30px_-14px_rgba(13,146,151,0.4)]'
 
-const CARD_BLOCKED = 'border-border bg-surface-elevated opacity-60 cursor-not-allowed'
+// Carte bloquée : légèrement estompée pour signaler l'indisponibilité, sans
+// trop ternir le ruban « Bientôt disponible » (opacité 70 % suffit à distinguer
+// l'état tout en gardant le bandeau lisible — l'opacité du parent s'applique à
+// tous les enfants).
+const CARD_BLOCKED = 'border-border bg-surface-elevated opacity-70 cursor-not-allowed'
 
 const TERRAFORM_TOOLTIP = 'Déploiements Terraform bientôt disponibles'
 const NOT_DEPLOYABLE_TOOLTIP = 'Déploiement bientôt disponible'
@@ -53,9 +57,12 @@ export function CatalogCard({ item, onSelect }: CatalogCardProps) {
       className={cn(CARD_BASE, isBlocked ? CARD_BLOCKED : CARD_ACTIVE)}
     >
       {isBlocked && (
-        <span className="absolute top-3 right-3 z-10">
+        <div
+          data-testid="catalog-card-soon-ribbon"
+          className="mb-3 flex border-b border-[color-mix(in_oklch,var(--color-yellow)_30%,transparent)] pb-3"
+        >
           <Badge tone="warn">Bientôt disponible</Badge>
-        </span>
+        </div>
       )}
       <div className="flex items-start gap-3">
         <span className="text-cyan flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_oklch,var(--color-cyan)_14%,transparent)]">
