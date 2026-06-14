@@ -8,9 +8,13 @@
 
 ## 1. Objectif du deck
 
-Support visuel de l'**oral jury EPSI** : poser le problème, montrer la valeur, expliquer
-l'architecture et la stack, **renvoyer vers la démo live**, puis convaincre sur la qualité, la
-sécurité/RGPD et la roadmap. Le deck **appuie** la parole — il ne la remplace pas.
+Support visuel de l'**oral jury EPSI**, structuré sur le **plan de présentation imposé** (1 → 6) :
+poser la **problématique & le besoin** (marché + concurrents + différenciateurs), **présenter
+l'appli** (accompagnement, simplicité, déploiement rapide), exposer la **stratégie d'insertion**
+(bottom-up étudiant → entreprise), justifier le **pricing freemium**, **renvoyer vers la démo live**,
+puis traiter les **questions/réponses** (notamment la gestion des données client en cloud). Le deck
+**appuie** la parole — il ne la remplace pas. Le volet business est détaillé dans
+`docs/rendu/business-strategie.md`.
 
 ## 2. Audience
 
@@ -19,9 +23,11 @@ Jury **EPSI** (enseignants / professionnels) : profils mixtes tech et non-tech. 
 
 ## 3. Durée & format
 
-- **~5 minutes**, **6 à 8 slides** (≈ 40-50 s par slide).
+- **~5 minutes** de présentation (les 6 blocs du plan), **6 à 9 slides** (≈ 35-50 s par slide), puis
+  bascule vers la **démo live** (bloc 5) et les **Q&R** (bloc 6).
 - Slides aérées : 1 idée par slide, **3-5 bullets courts** max, visuel fort.
 - Une slide « démo » qui **renvoie** au live (pas de captures qui doublonnent la démo).
+- Le deck suit **exactement** le plan imposé 1 → 6 (cf. section 6 ci-dessous).
 
 ## 4. Ton
 
@@ -49,57 +55,93 @@ protection autour du logo, pas de recolorisation hors palette. Recommandation : 
 
 ---
 
-## 6. Plan slide par slide
+## 6. Plan slide par slide — calé sur le plan imposé (1 → 6)
 
-### Slide 1 — Couverture
+> Colonne vertébrale : **(1) Problématique & besoin → (2) Présentation de l'appli → (3) Stratégie
+> d'insertion → (4) Pricing → (5) Démo → (6) Q&R**. Chaque bloc = 1 à 2 slides. Le détail business
+> est dans `docs/rendu/business-strategie.md` ; le détail démo dans `docs/rendu/guide-demo.md`.
+
+### Slide 0 — Couverture (hors plan, ouverture)
 - **StackNest** + logo + baseline *« Build Fast. Deploy Smart. »*.
 - Sous-titre : *Internal Developer Platform — provisionnez en autonomie.*
 - Contexte : Oral jury EPSI Open Innovation · équipe de 7 (Dev / Cyber / Design-QA).
 - Fond bleu nuit, logo mono blanc/cyan, accent jaune sur la baseline.
 
-### Slide 2 — Problème & valeur
-- Obtenir une ressource = **ticket Ops** (délai, friction) ou conteneurs « à la main » (hétérogène, secrets en clair).
-- **StackNest** : guichet unique self-hosted, **catalogue maîtrisé**.
-- **2 portes** : UI web **+** chat IA. **2 granularités** : service unique **+** stack multi-services.
-- Personas : étudiant · dev senior · lead PME.
+---
 
-### Slide 3 — Architecture & stack
-- Schéma en blocs : `UI (Nginx)` → `API (FastAPI)` → `DB Postgres 16` / `Redis (arq + SSE)` → `Worker` → `Hôte Docker`.
-- **Plan de contrôle ≠ hôte d'exécution** (isolation).
-- Stack : FastAPI/Python 3.13 · React/Vite/TS · PostgreSQL 16 · Redis · Docker SDK · **LLM pluggable** (Ollama/OpenAI/Anthropic).
-- **Clean Architecture + vertical slicing** (back & front).
+### Bloc 1 — Problématique & besoin
 
-### Slide 4 — Fonctionnalités clés (renvoi démo)
-- Catalogue **45 templates** (31 déployables / 14 bloqués).
-- Déploiement Docker **live + SSE** + cycle de vie complet.
-- **Composeur de stack** Docker Compose (liens `{to.*}`).
-- **Chat IA** : propose *deploy* **et** *compose_stack*.
+#### Slide 1a — Le besoin (cas entreprise + cas étudiant)
+- **Entreprise** : obtenir une ressource = **ticket Ops** (délai, friction) ou conteneurs « à la main » (hétérogène, secrets en clair).
+- **Étudiant** : une BDD + un runtime pour un **TP**, en minutes, **budget 0 €**, **zéro compétence infra**.
+- Fil rouge commun : **autonomie encadrée**.
+
+#### Slide 1b — Marché, concurrents & différenciateurs
+- **3 familles** : PaaS hébergés (Railway, Render, Fly.io, Heroku, Koyeb) · IDP (Qovery, Northflank, Porter, Humanitec, Platform.sh) · self-hosted open-core (Coolify, Dokploy).
+- Tendance : **free tiers en érosion** (Heroku supprimé, Fly.io sans free).
+- **Ce que StackNest fait de mieux** : **chat IA qui agit** + **composeur de stack** + **catalogue maîtrisé** + **self-hostable/souverain** + **freemium étudiant 0 €**.
+- Visuel : mini-tableau comparatif (3-4 concurrents, positionnement + 1er prix sourcé).
+
+---
+
+### Bloc 2 — Présentation de l'application
+
+#### Slide 2 — Ce qu'on propose (accompagnement · simplicité · déploiement rapide)
+- **2 portes** (UI + chat IA) · **2 granularités** (service + stack) · catalogue **45 templates**.
+- **Accompagnement** : chat IA guidé, catalogue cadré (LTS/EOL, gates), defaults intelligents.
+- **Simplicité** : zéro commande infra, états clairs, UI 100 % FR.
+- **Déploiement rapide** : provisioning réel en minutes (Docker SDK + SSE), stack en un clic.
+- *(Option : 1 slide archi condensée — `UI → API → DB/Redis → Worker → Hôte Docker`, plan de contrôle ≠ exécution.)*
+
+---
+
+### Bloc 3 — Stratégie d'insertion (bottom-up)
+
+#### Slide 3 — De l'étudiant à l'entreprise (land-and-expand)
+- **Habituer les étudiants** (TP gratuits) → ils deviennent **ambassadeurs** → **embauchés**, ils **réintroduisent** StackNest en entreprise → l'entreprise **paie**.
+- Modèle prouvé : Docker, GitHub, Notion, Figma.
+- Leviers : free tier généreux **non-prod**, **self-hostable**, ancrage **académique EPSI**, **open-core**.
+- Visuel : flèche étudiant → ambassadeur → entreprise.
+
+---
+
+### Bloc 4 — Pricing freemium
+
+#### Slide 4 — Grille freemium + benchmark
+- Principe : **assez gratuit pour un TP, pas assez pour qu'une entreprise y échappe**.
+- **Free 0 €** (TP, non-prod) · **Pro ~9 €/u** · **Team ~25 €/u** (SSO/RBAC) · **Entreprise sur devis** (SLA, données dédiées) · **Self-hosted gratuit** (open-core).
+- Justifié par le marché : Railway $20/siège, Qovery $29/user, Render $7-25/service, Coolify/Dokploy gratuits en self-host. *(Tarifs consultés le 14 juin 2026.)*
+- Visuel : 4-5 colonnes de plans + accent sur Free et Entreprise.
+
+---
+
+### Bloc 5 — Démo
+
+#### Slide 5 — Renvoi à la démo live
 - Bandeau : **« → Démonstration en direct »**.
+- Fil : catalogue & gates → déploiement live → **chat IA (deploy + compose_stack)** → composeur de stack → actions en masse & dashboard.
+- Phrase : *« ce qu'un étudiant fait gratuitement, une entreprise le fait à l'échelle, payant. »*
 
-### Slide 5 — Qualité & méthodologie
-- **TDD strict** (Red → Green → Blue).
-- **~1 184 tests** back (pytest) · **903** front (Vitest) · couverture 80/90 %.
-- **CI multi-lanes** (lint / format / typecheck / sécurité / tests / build), gates **bloquants**.
-- **Dev multi-agents en worktrees** (stacks Docker isolées) + Trunk-Based Dev + rapports d'étonnement.
+---
 
-### Slide 6 — Sécurité & RGPD
-- **Secrets** générés worker-side, **jamais persistés**, affichés une fois.
-- **Compose-file via stdin** (jamais sur disque).
-- **Anti-hallucination** : boîte à outils fermée + validation déterministe + confirmation obligatoire.
-- **RGPD** : données minimales, **Ollama on-premise**, droit à l'oubli, rétention bornée.
+### Bloc 6 — Questions / réponses
 
-### Slide 7 — Roadmap
-- v2 stacks : cycle de vie **par service**, édition, répliques.
-- Vraie **pause** conteneur · provisioning **Terraform/Proxmox** (débloque les cartes infra).
-- **MFA TOTP** · 2ᵉ LLM « juge ».
-- Horizon : bêta-test & commercialisation (2027).
+#### Slide 6 — Q&R préparées (données cloud en tête)
+- **Gestion des données client en cloud** : localisation **UE**, chiffrement **at-rest/in-transit**, **RGPD/DPA**, **réversibilité/export**, **isolation multi-tenant** (single-tenant Entreprise).
+- **Anti-hallucination** : boîte à outils fermée + validation déterministe + confirmation.
+- **Secrets** jamais persistés, **compose-file via stdin**.
+- Autres : pricing vs concurrents, personas, coût LLM (Ollama 0 €), cartes Terraform bloquées.
 
-### Slide 8 — Clôture
-- Récap valeur : **autonomie encadrée, sûre, self-hosted**.
+---
+
+### Slide 7 — Clôture
+- Récap valeur : **autonomie encadrée, sûre, self-hosted, freemium**.
 - Rappel baseline *« Build Fast. Deploy Smart. »* + logo.
 - « Merci — questions ? »
 
-> Si réduction à **6 slides** : fusionner 2+3 (problème + archi) et 6+7 (sécurité + roadmap).
+> Si réduction à **6 slides** : fusionner 1a+1b (problématique en 1 slide) et garder 1 slide par bloc.
+> Les contenus **qualité/méthodo, sécurité détaillée et roadmap** (TDD, ~1 184 tests back / 903 front,
+> CI multi-lanes, worktrees) restent disponibles en **slides d'appui / annexe** pour le Q&R.
 
 ## 7. Recommandations visuelles
 
