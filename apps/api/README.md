@@ -77,7 +77,7 @@ docker run --rm -v "${PWD}":/app -w /app python:3.13-slim \
 
 | Variable | Defaut | Role |
 |---|---|---|
-| `APP_VERSION` | `0.0.0-dev` | Version applicative (injectee au build par la CI depuis `version.json`) |
+| `APP_VERSION` | `0.6.0` | Version applicative (injectee au build par la CI depuis `version.json`) |
 | `GIT_COMMIT` | `unknown` | SHA court du commit deploye |
 | `APP_ENV` | `dev` | `dev` / `test` / `preview` / `prod` |
 | `DEPLOYED_AT` | `1970-01-01T00:00:00Z` | Timestamp ISO 8601 du deploiement |

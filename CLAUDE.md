@@ -21,7 +21,7 @@ Le skill `/next-task` est committé dans `.claude/skills/next-task/` donc il voy
 
 ## Project Overview
 
-StackNest is an Internal Developer Platform (IDP) that enables technical teams to provision IT resources (VMs, databases, environments) autonomously via a web UI or an AI chatbot, using Terraform and Docker.
+StackNest is an Internal Developer Platform (IDP) that enables technical teams to provision IT resources (containers, databases, stacks) autonomously via a web UI or an AI chatbot. User deployments are orchestrated by a worker via the Docker SDK (containers) and `docker compose` (stacks); Terraform provisions the platform environments themselves.
 
 The entire UI is in **French** — all labels, text, and user-facing strings must remain in French.
 Commits must be in **French** and reference the Jira ticket (**STN-XX**, pas `EOS-XX`).
@@ -37,14 +37,15 @@ Commits must be in **French** and reference the Jira ticket (**STN-XX**, pas `EO
 - **Backend** : FastAPI (Python 3.13), uv, Clean Architecture vertical slicing
 - **Frontend** : React + Vite + TypeScript (SPA), Tailwind CSS
 - **Database** : PostgreSQL 16, SQLAlchemy async + Alembic
-- **IaC** : Terraform (Docker provider MVP, Proxmox stretch)
-- **Queue/Realtime** : Redis (job queue + pub/sub SSE)
-- **LLM** : Pluggable — Ollama (default) / OpenAI (fallback)
+- **Deploiements utilisateurs** : worker arq + **Docker SDK** (conteneurs) et `docker compose` (stacks)
+- **IaC** : Terraform (`infra/terraform/`) pour le provisioning des **environnements** (Docker provider MVP, Proxmox stretch)
+- **Queue/Realtime** : Redis (job queue arq + pub/sub SSE)
+- **LLM** : Pluggable — Ollama (default) / OpenAI / Anthropic (fallback)
 - **Infra** : Docker Compose, VM Proxmox (serveur Antony), VPN access
-- **CI** : GitHub Actions (cloud runner)
-- **CD** : Self-hosted GitHub Actions runner on Antony's server
+- **CI** : GitHub Actions (cloud runner) — `ci.yml` (push/PR) + `ci-nightly.yml` (taches lentes)
+- **CD** : Self-hosted GitHub Actions runner on Antony's server (manuel, `workflow_dispatch`)
 - **Monitoring** : Sentry (back + front), structlog JSON (logs)
-- **Pre-commit** : Husky + lint-staged
+- **Lint/format** : ruff (back, via `uv run poe`), eslint + prettier (front, scripts npm)
 
 ## Architecture
 
@@ -53,20 +54,26 @@ Commits must be in **French** and reference the Jira ticket (**STN-XX**, pas `EO
 ```
 stacknest/
 ├── apps/
-│   ├── api/          # FastAPI backend
+│   ├── api/          # FastAPI backend (API HTTP + worker arq, meme paquet app/)
 │   ├── web/          # React + Vite (web app) — SEUL front de production
-│   ├── web-mockup/   # Référence design (mockups Yassine) — HORS CI/quality gate
-│   └── worker/       # Worker Terraform
+│   └── web-mockup/   # Référence design (mockups Yassine) — HORS CI/quality gate
 ├── infra/
-│   ├── docker/       # docker-compose.{yml,dev,test,preview,prod}.yml
-│   ├── terraform/    # environments/ + modules/
-│   └── scripts/      # env.sh (start/stop envs)
-├── .github/workflows/ # ci.yml, cd.yml, security.yml, performance.yml
-├── configs/          # semgrep, spectral, checkov, k6
+│   ├── terraform/    # environments/ + modules/ (provisioning des environnements)
+│   └── ...
+├── scripts/          # worktree.sh (worktrees multi-agents)
+├── docker-compose.yml          # Stack de base (api, worker, ui, db, redis...)
+├── docker-compose.dev.yml      # Override dev (Mailhog, Ollama, hot-reload)
+├── docker-compose.preview.yml  # Override preview/QA
+├── .github/workflows/ # ci.yml (push/PR, 3 lanes api/web/infra) + ci-nightly.yml (e2e/mutation/secu)
 ├── docs/
-├── package.json      # Root — husky, lint-staged
-└── version.json      # SemVer centralisee
+├── sonar-project.properties
+└── version.json      # SemVer centralisee (source de la version injectee au build)
 ```
+
+> Il n'y a **pas** d'`apps/worker` ni de `package.json` racine : le worker de
+> déploiement vit dans `apps/api` (lancé via `arq app.worker_main.WorkerSettings`,
+> cf. `WorkerSettings`) et partage le paquet `app/` avec l'API. Les
+> `docker-compose*.yml` sont **à la racine** du dépôt.
 
 ### Docker Compose Services
 
@@ -74,26 +81,37 @@ stacknest/
 |---|---|
 | **ui** (Nginx) | SPA React, reverse-proxy `/api/` vers API |
 | **api** (FastAPI) | Logique metier, auth, catalogue, orchestration |
-| **worker** (Python + Terraform) | Execute les plans Terraform, isole du web |
+| **worker** (Python + arq) | Consomme la file `arq`, orchestre conteneurs (**Docker SDK** — `DockerSdkProvisioner`) et stacks (`docker compose` — `ComposeCliProvisioner`). Meme image que l'API, isole du web. |
 | **db** (PostgreSQL 16) | Users, catalogue, deploiements, conversations |
-| **redis** (Redis 7) | Queue jobs API→Worker + pub/sub SSE |
-| **ollama** (optionnel) | LLM local |
+| **redis** (Redis 7) | Queue jobs API→Worker (arq) + pub/sub SSE |
+| **ollama** (optionnel, override dev) | LLM local |
+
+> Terraform (`infra/terraform/`) sert au provisioning des **environnements**
+> (dev/test/preview/prod), **pas** aux déploiements utilisateurs : ceux-ci passent
+> par le worker arq via Docker SDK (conteneurs) et `docker compose` (stacks).
 
 ### Backend — Clean Architecture + Vertical Slicing
 
 ```
 apps/api/app/
-├── core/                    # Config, BDD, Redis, securite, deps partagees
+├── core/                    # Config, BDD, Redis, securite, deps partagees (bootstrap)
+├── shared/                  # Code transverse reutilise par >=2 slices
 ├── auth/                    # domain/ application/ infrastructure/ presentation/
 ├── catalog/                 # domain/ application/ infrastructure/ presentation/
-├── deployment/              # domain/ application/ infrastructure/ presentation/ worker/
-├── chat/                    # domain/ application/ infrastructure/ presentation/
-├── dashboard/               # domain/ application/ infrastructure/ presentation/
+├── deployment/              # domain/ application/ infrastructure/ presentation/ (worker arq)
+├── stack/                   # domain/ application/ infrastructure/ presentation/ (provisioning compose)
+├── chat/                    # domain/ application/ infrastructure/ presentation/ (LLM)
+├── email/                   # envoi d'emails (verification, reset)
+├── health/                  # liveness probe /health
 ├── main.py                  # Entrypoint API
-└── worker_main.py           # Entrypoint Worker
+└── worker_main.py           # Entrypoint Worker (arq — WorkerSettings)
 ```
 
-Each feature has its own domain/application/infrastructure/presentation layers. Features depend only on `core/` and communicate via domain interfaces.
+Slices metier reels : `auth, catalog, deployment, stack, chat` (+ `email`, `health`)
+plus `core`/`shared`. **Le dashboard est front-only** (`apps/web/`), il n'y a
+**pas** de slice backend `dashboard`.
+
+Each feature has its own domain/application/infrastructure/presentation layers. Features depend only on `core/`/`shared/` and communicate via domain interfaces.
 
 **1 fichier = 1 classe.** Domain: entities/, value_objects/, enums/, interfaces/, exceptions/, factories/. Infrastructure: models/, repositories/, mappers/. Presentation: schemas/.
 
@@ -183,7 +201,7 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 - **feature/STN-XX-description** : short-lived (<2 days), created from main
 - **hotfix/STN-XX-description** : critical prod fix, merge to main + tag patch
 - Never add `Co-Authored-By`
-- Pre-commit: Husky + lint-staged (auto lint/format)
+- Lint/format avant commit : ruff (back, `uv run poe fix`) et eslint/prettier (front). Pas de pre-commit Husky/lint-staged configure dans ce repo.
 - CI is automatic (push/PR). **CD is ALWAYS manual** (workflow_dispatch).
 
 ### PR conventions
@@ -221,8 +239,15 @@ Les 💡 Suggestions résiduelles et items de dette non-bloquants restent tracé
 - `v0.X.0-rc.N` : release candidate (test → preview)
 - `v0.X.0` : release (prod)
 - `v0.X.1` : hotfix
-- Version centralized in `version.json`
-- `GET /version` endpoint returns version + commit + env + deploy date
+- **Version courante : `0.6.0`** — centralisee dans `version.json` à la racine
+  (`{ version, name, description }`), reflétée dans `apps/api/pyproject.toml` et
+  `apps/web/package.json`.
+- **Chaine de propagation** : la CI lit `version.json` → injecte `APP_VERSION`
+  (+ `GIT_COMMIT`, `DEPLOYED_AT`) comme build args Docker (cf. `docker-compose.yml`
+  + `apps/api/Dockerfile` `ARG APP_VERSION`) → `ENV` runtime → lu par
+  `pydantic-settings` (`Settings.app_version`).
+- **`GET /version`** (slice `core`, sert `version + commit + env + deployed_at`)
+  lit ces env vars. Sans injection (dev local), les defaults reprennent `0.6.0`.
 
 ## Worktrees multi-agents (dev parallèle)
 
