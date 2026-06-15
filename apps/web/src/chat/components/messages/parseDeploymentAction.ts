@@ -6,7 +6,13 @@ export interface DeploymentActionHint {
   precedingText: string
 }
 
-/** Capture le 1er bloc ```json ... ``` du contenu (drapeau insensible aux retours). */
+// Capture le 1er bloc ```json ... ``` du contenu (drapeau insensible aux
+// retours). Le groupe `[\s\S]*?` est PARESSEUX et borne par des delimiteurs
+// fixes (```` ```json ```` ... ```` ``` ````) : aucun quantificateur imbrique
+// ni alternance ambigue, donc pas de backtracking super-lineaire (ReDoS).
+// L'entree est par ailleurs un message assistant de longueur bornee. Le hotspot
+// SonarCloud S5852 est donc safe-by-design — a marquer « reviewed / safe » cote
+// UI SonarCloud (necessite un token, non automatisable ici). NOSONAR
 const JSON_FENCE = /```json\s*\n?([\s\S]*?)```/i
 
 /** Lit un `template_id` / `templateId` chaîne non vide dans un objet inconnu. */

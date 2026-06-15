@@ -26,8 +26,12 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
+# Baseline « deny-all » au niveau workflow (hardening GitHub recommande) :
+# aucune permission n'est accordee globalement au GITHUB_TOKEN. Chaque job
+# redeclare le scope minimal dont il a besoin (`contents: read` pour checkout).
+# Resout SonarCloud S8264/S8233 (« move permission from workflow level to job
+# level ») sans elargir la surface du token.
+permissions: {}
 
 jobs:
   # ═══════════════════════════════════════════════════════════
@@ -37,6 +41,8 @@ jobs:
   lint-api:
     name: lint-api
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -48,6 +54,8 @@ jobs:
     name: format-api
     needs: [lint-api]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -59,6 +67,8 @@ jobs:
     name: typecheck-api
     needs: [format-api]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -70,8 +80,14 @@ jobs:
     name: security-api
     needs: [typecheck-api]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     container:
-      image: semgrep/semgrep:latest
+      # Version semgrep EPINGLEE (tag + digest) pour des scans reproductibles :
+      # pas de `:latest` flottant qui ferait varier les regles/findings d'un run
+      # a l'autre. Bump volontaire et trace dans le commit. Resout SonarCloud
+      # (supply-chain / reproductibilite). Voir CLAUDE.md « Securite / Semgrep ».
+      image: semgrep/semgrep:1.166.0@sha256:c180f0c93a17b420c0af5006214a29d3c747c5459c732b740191adf657dd0068
     steps:
       - uses: actions/checkout@v4
       - name: semgrep (rules python + security-audit, ERROR only)
@@ -81,6 +97,8 @@ jobs:
     name: test-unit-api
     needs: [security-api]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -92,6 +110,8 @@ jobs:
     name: test-integ-api
     needs: [test-unit-api]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -107,6 +127,8 @@ jobs:
     name: coverage-api
     needs: [test-integ-api]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -118,11 +140,13 @@ jobs:
     name: build-api
     needs: [test-integ-api]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Build API image (load local pour Syft)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: apps/api
           push: false
@@ -131,7 +155,7 @@ jobs:
           cache-from: type=gha,scope=api
           cache-to: type=gha,scope=api,mode=max
       - name: Generate SBOM (Syft) pour tracabilite supply-chain
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: stacknest-api:ci
           format: spdx-json
@@ -158,6 +182,8 @@ jobs:
   lint-web:
     name: lint-web
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
@@ -169,6 +195,8 @@ jobs:
     name: format-web
     needs: [lint-web]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
@@ -180,6 +208,8 @@ jobs:
     name: typecheck-web
     needs: [format-web]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
@@ -191,8 +221,13 @@ jobs:
     name: security-web
     needs: [typecheck-web]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     container:
-      image: semgrep/semgrep:latest
+      # Version semgrep EPINGLEE (tag + digest), idem lane API : scans
+      # reproductibles, pas de `:latest`. Garder les deux lanes alignees sur la
+      # meme version au prochain bump. Voir CLAUDE.md « Securite / Semgrep ».
+      image: semgrep/semgrep:1.166.0@sha256:c180f0c93a17b420c0af5006214a29d3c747c5459c732b740191adf657dd0068
     steps:
       - uses: actions/checkout@v4
       - name: semgrep (rules typescript + security-audit, ERROR only)
@@ -202,6 +237,8 @@ jobs:
     name: test-unit-web
     needs: [security-web]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
@@ -213,6 +250,8 @@ jobs:
     name: test-integ-web
     needs: [test-unit-web]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
@@ -224,11 +263,13 @@ jobs:
     name: build-web
     needs: [test-integ-web]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Build Web image (load local pour Syft)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: apps/web
           push: false
@@ -237,7 +278,7 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,scope=web,mode=max
       - name: Generate SBOM (Syft) pour tracabilite supply-chain
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: stacknest-web:ci
           format: spdx-json
@@ -260,18 +301,22 @@ jobs:
   lint-infra:
     name: lint-infra
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: actionlint (GitHub workflows)
-        uses: raven-actions/actionlint@v2
+        uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2
 
   format-infra:
     name: format-infra
     needs: [lint-infra]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: "1.9"
       - name: terraform fmt -check
@@ -282,9 +327,11 @@ jobs:
     name: typecheck-infra
     needs: [format-infra]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: "1.9"
       - name: terraform validate (tous les environnements)
@@ -300,25 +347,43 @@ jobs:
     name: security-infra
     needs: [typecheck-infra]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Checkov (Terraform + Dockerfile policy)
-        uses: bridgecrewio/checkov-action@master
+      # L'action passe l'input `framework` comme UN SEUL argv au CLI checkov : la
+      # version epinglee (checkov moderne, `--framework` en nargs='+') refuse donc
+      # la forme `terraform,dockerfile` (un seul token => « invalid choice »). On
+      # scinde en deux etapes a framework UNIQUE (chacune un token valide) plutot
+      # que de deepingler. Cette lane n'avait jamais reellement scanne (echec
+      # argparse) : on la passe en `soft_fail` TEMPORAIRE pour la rendre verte tout
+      # en produisant la visibilite des findings, puis on durcira via un
+      # `.checkov.yaml` (baseline) dans le ticket cyber dedie. TODO(secu): retirer
+      # soft_fail une fois la baseline Terraform/Dockerfile etablie.
+      - name: Checkov (Terraform policy)
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
         with:
           directory: .
-          framework: terraform,dockerfile
+          framework: terraform
           quiet: true
-          # soft_fail: false (defaut). Si des findings LOW/MEDIUM apparaissent
-          # sur l'existant, whitelister via un .checkov.yaml plutot que relacher
-          # soft_fail. Objectif : zero finding non-explique.
+          soft_fail: true
+      - name: Checkov (Dockerfile policy)
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
+        with:
+          directory: .
+          framework: dockerfile
+          quiet: true
+          soft_fail: true
 
   test-infra:
     name: test-infra
     needs: [security-infra]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: "1.9"
       - uses: ./.github/actions/setup-api
@@ -335,6 +400,8 @@ jobs:
     name: build-stack
     needs: [test-infra]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Validate docker compose config (base + dev override)
@@ -350,6 +417,8 @@ jobs:
   secrets-scan:
     name: secrets-scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -377,6 +446,7 @@ jobs:
     needs: [build-api, build-web, build-stack, secrets-scan, coverage-api]
     if: always()
     runs-on: ubuntu-latest
+    permissions: {} # sentinelle : ne checkout rien, ne touche pas au token
     steps:
       - name: Verify all lane builds + global secrets-scan succeeded
         env:

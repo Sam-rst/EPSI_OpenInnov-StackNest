@@ -37,6 +37,9 @@ function slugify(name: string): string {
   const slug = name
     .toLowerCase()
     .normalize('NFD')
+    // Classe de caracteres simple (diacritiques combinants U+0300–U+036F), sans
+    // aucun quantificateur : impossible a faire backtracker -> pas de ReDoS. Le
+    // hotspot SonarCloud S5852 est un faux positif (a marquer « safe » cote UI). NOSONAR
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')

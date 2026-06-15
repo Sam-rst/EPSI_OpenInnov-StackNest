@@ -195,6 +195,32 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 - Backend: pytest + testcontainers. Auto-marker pytest (via `conftest.py` racine) qui applique `@pytest.mark.{unit,integ,e2e}` selon le suffixe du fichier (`*.unit.py` / `*.integ.py` / `*.e2e.py`). Commandes : `uv run pytest -m unit` (boucle TDD rapide), `-m integ`, `-m e2e`, ou `uv run pytest app/{feature}/` pour un slice vertical.
 - Frontend: vitest + MSW + Playwright.
 
+## Sécurité — SAST & supply-chain (versions épinglées)
+
+Pour des scans **reproductibles**, les outils de sécurité et les actions
+GitHub tierces sont **épinglés** (pas de `latest`/`@master` flottant). Tout
+bump est volontaire et tracé dans un commit dédié.
+
+- **Semgrep** : image Docker épinglée **`semgrep/semgrep:1.166.0`** (tag + digest
+  `sha256:c180f0c93a17b420c0af5006214a29d3c747c5459c732b740191adf657dd0068`),
+  utilisée par les lanes `security-api` / `security-web` de `ci.yml`. Garder
+  les deux lanes alignées sur la même version au prochain bump.
+- **Rulesets semgrep** : registres distants versionnés par Semgrep —
+  `p/python` (lane API), `p/typescript` (lane web) et `p/security-audit`
+  (les deux). Scan en `--severity=ERROR --error` (échec dur sur finding ERROR).
+  Tests exclus via `.semgrepignore` (fixtures = secrets factices).
+  Reproduire en local : `docker run --rm -v "$PWD:/src" semgrep/semgrep:1.166.0
+  semgrep scan --config=p/python --config=p/security-audit --error
+  --severity=ERROR apps/api` (idem `p/typescript` + `apps/web`).
+- **Trivy** : `aquasecurity/trivy-action` épinglé au SHA de `v0.36.0` (ex-`@master`).
+- **Checkov** : `bridgecrewio/checkov-action` épinglé au SHA de `v12.1347.0` (ex-`@master`).
+- **Actions GitHub tierces** (`docker/*`, `anchore/*`, `hashicorp/*`,
+  `raven-actions/*`, `SonarSource/*`) : épinglées au **SHA complet** avec un
+  commentaire `# vX` (résout SonarCloud S7637, supply-chain).
+- **Permissions GITHUB_TOKEN** : baseline `permissions: {}` (deny-all) au niveau
+  workflow ; chaque job redéclare le scope minimal (`contents: read`). Résout
+  SonarCloud S8264/S8233.
+
 ## Trunk-Based Development (TBD)
 
 - **main** (trunk) : always deployable, everything goes through PRs

@@ -23,9 +23,12 @@ concurrency:
   group: ci-nightly
   cancel-in-progress: false # un nightly en cours ne s'annule pas
 
-permissions:
-  contents: read
-  issues: write # requis pour eventuels posts de resume en issue
+# Baseline « deny-all » au niveau workflow (hardening GitHub recommande) :
+# aucune permission accordee globalement. Chaque job redeclare le scope minimal
+# (`contents: read` pour checkout ; `review-reports-check` ajoute
+# `pull-requests: read` pour `gh pr list`). Resout SonarCloud S8264/S8233.
+# Aucun job ne poste d'issue : l'ancien `issues: write` etait inutile.
+permissions: {}
 
 jobs:
   # ═══════════════════════════════════════════════════════════
@@ -35,6 +38,8 @@ jobs:
   mutation-api:
     name: mutation-api
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     continue-on-error: true # tolerant tant qu'on affine le seuil 60%
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +51,8 @@ jobs:
   mutation-web:
     name: mutation-web
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     continue-on-error: true # tolerant tant que Stryker est pas valide
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +64,8 @@ jobs:
   e2e-api:
     name: e2e-api
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     continue-on-error: true # tolerant tant qu'il n'y a pas de tests .e2e.py
     steps:
       - uses: actions/checkout@v4
@@ -68,6 +77,8 @@ jobs:
   e2e-web:
     name: e2e-web
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     continue-on-error: true # tolerant tant que Playwright n'a pas de tests reels
     steps:
       - uses: actions/checkout@v4
@@ -86,6 +97,8 @@ jobs:
   pip-audit:
     name: pip-audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -101,6 +114,8 @@ jobs:
   npm-audit:
     name: npm-audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
@@ -111,11 +126,13 @@ jobs:
   trivy-api:
     name: trivy-api
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Build API image (load local)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: apps/api
           push: false
@@ -123,7 +140,7 @@ jobs:
           tags: stacknest-api:nightly
           cache-from: type=gha,scope=api
       - name: Trivy scan API image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: stacknest-api:nightly
           severity: CRITICAL,HIGH
@@ -133,11 +150,13 @@ jobs:
   trivy-web:
     name: trivy-web
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Build Web image (load local)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: apps/web
           push: false
@@ -145,7 +164,7 @@ jobs:
           tags: stacknest-web:nightly
           cache-from: type=gha,scope=web
       - name: Trivy scan Web image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: stacknest-web:nightly
           severity: CRITICAL,HIGH
@@ -161,6 +180,8 @@ jobs:
   sonar:
     name: sonar
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     continue-on-error: true # tolerant : SonarCloud peut rate-limit ou casser independemment
     steps:
       - uses: actions/checkout@v4
@@ -180,7 +201,7 @@ jobs:
         run: npm run test:coverage
 
       - name: SonarCloud scan
-        uses: SonarSource/sonarqube-scan-action@v4
+        uses: SonarSource/sonarqube-scan-action@689fb39b34b9aa95ebc5f8f119343ddd51542402 # v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
@@ -264,6 +285,7 @@ jobs:
       - review-reports-check
     if: always()
     runs-on: ubuntu-latest
+    permissions: {} # ecrit seulement $GITHUB_STEP_SUMMARY, ne checkout rien
     steps:
       - name: Build step summary
         env:

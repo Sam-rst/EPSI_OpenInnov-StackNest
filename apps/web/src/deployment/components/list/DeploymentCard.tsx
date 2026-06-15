@@ -23,7 +23,14 @@ export function DeploymentCard({ deployment, selection }: DeploymentCardProps) {
   return (
     <div className="relative">
       {selection && (
+        // Conteneur de POSITIONNEMENT non interactif : son seul `onClick` empeche
+        // le clic (souris) sur la case de remonter au <Link> parent et de
+        // declencher la navigation. L'accessibilite clavier est entierement
+        // portee par <SelectionCheckbox> (vrai input focusable) : ce div n'a donc
+        // pas besoin de gestionnaire clavier. `role="presentation"` l'explicite et
+        // leve le faux positif SonarCloud S1082 (element non interactif).
         <div
+          role="presentation"
           className="absolute top-3 left-3 z-10"
           onClick={(event) => {
             event.stopPropagation()
