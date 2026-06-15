@@ -1,0 +1,31 @@
+%% StackNest — Architecture (plan de contrôle vs hôte d'exécution)
+%% Source Mermaid à importer dans Excalidraw : excalidraw.com → menu « + » → « Mermaid to Excalidraw » → coller ce contenu.
+flowchart TB
+  USER["Utilisateur (navigateur)"]
+
+  subgraph CP["Plan de controle — jamais de workload utilisateur"]
+    direction TB
+    UI["ui : Nginx + React SPA"]
+    API["api : FastAPI"]
+    WK["worker : arq"]
+    DB[("db : PostgreSQL 16")]
+    RD[("redis 7 : file arq + pub/sub SSE")]
+  end
+
+  subgraph EH["Hote d execution Docker — DOCKER_HOST separe"]
+    direction TB
+    CO["Conteneurs utilisateurs"]
+    ST["Stacks docker compose"]
+  end
+
+  LLM["LLM pluggable : Ollama / OpenAI / Anthropic"]
+
+  USER -->|HTTPS| UI
+  UI -->|proxy /api| API
+  API --> DB
+  API -->|enqueue job| RD
+  RD -.->|SSE pub/sub| API
+  WK -->|consume| RD
+  WK -->|Docker SDK / compose CLI| CO
+  WK --> ST
+  API -.->|port LLMProvider| LLM
