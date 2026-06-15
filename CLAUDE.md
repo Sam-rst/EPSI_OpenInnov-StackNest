@@ -206,7 +206,10 @@ Code → Green tests → Lint (0 errors, 0 warnings) → Docs → Commit
 
 ### PR conventions
 
-- **Titre** : `STN-XX — [Domaine] Description courte` (FR, <70 caracteres)
+- **Titre** : `<type>(STN-XX): description courte` (FR, <70 caracteres) — Conventional
+  Commit (cf. section « Versioning & Conventional Commits »). Ex.
+  `feat(STN-42): catalogue — filtre par tag`. Remplace l'ancien format
+  `STN — [Domaine] …` (l'info de domaine peut rester dans la description).
 - **Body** : sections obligatoires — `Résumé`, `Changements principaux`, `Validation (déjà exécutée)` (table des checks locaux), `Critères d'acceptation` (checklist copiée du ticket), `Plan de test (reviewer)`
 - **Plan de test actionnable** : chaque étape DOIT contenir les commandes exactes à copier-coller (pas juste une description). Inclure : prérequis, récupération de la branche, checks locaux, étapes de validation UI avec URL, tests E2E/mutation si applicable, build Docker si applicable, nettoyage. But : le reviewer ne doit pas avoir à deviner comment tester.
 - Utiliser `gh pr create --base main` (gh.exe dans `/c/Program Files/GitHub CLI/`, préfixer PATH si bash). Ne jamais ajouter `Co-Authored-By`.
@@ -234,20 +237,80 @@ Les 💡 Suggestions résiduelles et items de dette non-bloquants restent tracé
 | **preview** | QA / acceptance | Manual — tag rc (after pentest) |
 | **prod** | Production / jury demo | Manual — tag release |
 
-### Versioning (SemVer)
+### Versioning & Conventional Commits (SemVer)
 
-- `v0.X.0-rc.N` : release candidate (test → preview)
-- `v0.X.0` : release (prod)
-- `v0.X.1` : hotfix
-- **Version courante : `0.6.0`** — centralisee dans `version.json` à la racine
-  (`{ version, name, description }`), reflétée dans `apps/api/pyproject.toml` et
-  `apps/web/package.json`.
+**La version se dérive de l'historique des commits** (style *semantic-release*), pas à
+la main. On adopte un **type Conventional Commit** sur le titre de chaque PR /
+**squash-merge**, en gardant le **français** et la **référence STN-XX**.
+
+#### Format de titre de PR / squash-merge
+
+```
+<type>(STN-XX): description courte en français
+```
+
+- **Remplace / standardise** l'ancien format `STN — [Domaine] …` pour les **futurs**
+  commits. L'historique passé reste tel quel (le script sait le classer en repli).
+- Types : `feat` · `fix` · `docs` · `chore` · `refactor` · `test` · `ci` · `build` ·
+  `perf` · `style`. On peut conserver l'info de domaine dans la description
+  (ex. `feat(STN-42): catalogue — filtre par tag`).
+- Breaking change : suffixe `!` (`feat!(STN-XX): …`) ou ligne `BREAKING CHANGE:` dans
+  le corps.
+
+Exemples :
+
+```
+feat(STN-42): déploiement — action « pause » réelle (docker pause)
+fix(STN-58): chat — ordre des messages d'un fil (clock_timestamp)
+docs(STN-99): dossier de rendu oral jury
+chore(STN-105): pose la version 0.78.0
+refactor(STN-12): extrait le mapper Template du repository
+```
+
+#### Mapping SemVer (pré-1.0, `0.y.z`)
+
+| Type de commit | Bump |
+|---|---|
+| `feat` | **minor** (`0.y.0`, remet le patch à 0) |
+| `fix` | **patch** (`0.y.z+1`) |
+| `docs` / `chore` / `refactor` / `test` / `ci` / `build` / `style` / `perf` | **pas de bump** |
+| `feat!` / `BREAKING CHANGE` | **major** — *à partir de la 1.0 seulement* (pré-1.0, traité comme un `feat`) |
+
+**Version courante : `0.78.0`** (78 *feat*, 17 *fix* sur 122 commits historiques).
+Centralisée dans `version.json` à la racine (`{ version, name, description }`), reflétée
+dans `apps/api/pyproject.toml` (+ `uv.lock`) et `apps/web/package.json`.
+
+#### Dériver la prochaine version
+
+```bash
+bash scripts/next-version.sh            # affiche la prochaine version (stdout, ex. 0.79.0)
+bash scripts/next-version.sh --verbose  # + recap feat/fix/autres sur stderr
+```
+
+Le script lit les commits **depuis le dernier tag annoté `vX.Y.Z`**
+(`git describe --tags --abbrev=0` puis `git log <tag>..HEAD`), classe chaque sujet
+(type Conventional Commit explicite, sinon repli par mots-clés pour l'ancien format
+`STN — [Domaine] …`), applique le mapping ci-dessus et affiche la version. Sans tag, il
+calcule depuis le 1er commit. Sortie « nue » sur stdout, capturable :
+`VERSION=$(bash scripts/next-version.sh)`.
+
+#### Process de release
+
+1. **Dériver** : `VERSION=$(bash scripts/next-version.sh)`.
+2. **Propager** la version dans les 3 sources : `version.json`,
+   `apps/api/pyproject.toml` (+ `uv lock`), `apps/web/package.json`.
+3. **Tag annoté** : `git tag -a v$VERSION -m "Release v$VERSION"` puis `git push --tags`.
+   Pour une RC : `v0.X.0-rc.N` (test → preview) ; release : `v0.X.0` (prod) ;
+   hotfix : `v0.X.1`.
+
+#### Propagation au runtime
+
 - **Chaine de propagation** : la CI lit `version.json` → injecte `APP_VERSION`
   (+ `GIT_COMMIT`, `DEPLOYED_AT`) comme build args Docker (cf. `docker-compose.yml`
   + `apps/api/Dockerfile` `ARG APP_VERSION`) → `ENV` runtime → lu par
   `pydantic-settings` (`Settings.app_version`).
 - **`GET /version`** (slice `core`, sert `version + commit + env + deployed_at`)
-  lit ces env vars. Sans injection (dev local), les defaults reprennent `0.6.0`.
+  lit ces env vars. Sans injection (dev local), les defaults reprennent `0.78.0`.
 
 ## Worktrees multi-agents (dev parallèle)
 

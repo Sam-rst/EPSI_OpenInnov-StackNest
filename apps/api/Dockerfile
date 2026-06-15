@@ -59,7 +59,7 @@ USER app
 EXPOSE 8000
 
 # Build args injectes par la CI depuis version.json (CA4 partie 2)
-ARG APP_VERSION=0.6.0
+ARG APP_VERSION=0.78.0
 ARG GIT_COMMIT=unknown
 ARG DEPLOYED_AT=1970-01-01T00:00:00Z
 ENV APP_VERSION=$APP_VERSION \

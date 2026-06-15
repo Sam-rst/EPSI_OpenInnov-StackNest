@@ -1,6 +1,6 @@
 [project]
 name = "stacknest-api"
-version = "0.6.0"
+version = "0.78.0"
 description = "StackNest Backend API (FastAPI + Clean Architecture)"
 readme = "README.md"
 requires-python = ">=3.13"

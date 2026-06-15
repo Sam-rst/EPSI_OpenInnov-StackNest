@@ -46,7 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "(VM, bases de donnees, environnements) de maniere autonome via "
             "une UI web ou un chatbot IA, orchestre par Terraform et Docker."
         ),
-        version="0.6.0",
+        version="0.78.0",
         docs_url="/docs" if docs_enabled else None,
         redoc_url="/redoc" if docs_enabled else None,
         openapi_url="/openapi.json" if docs_enabled else None,
@@ -132,7 +132,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         Ces valeurs sont injectees au build par la CI (ARG Docker) puis lues
         depuis l'environnement via `pydantic-settings`. Sans injection, les
-        defaults reprennent `version.json` (`0.6.0` / `unknown` / `dev`).
+        defaults reprennent `version.json` (`0.78.0` / `unknown` / `dev`).
         """
         return VersionResponse(
             version=settings.app_version,

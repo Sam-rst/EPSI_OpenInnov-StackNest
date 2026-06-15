@@ -134,7 +134,10 @@ Cible de couverture : **80 % global**, **90 % sur la logique métier**.
 - **Tests colocalisés** dans `__tests__/{unit,integration}/` à côté du code ; E2E à part.
 - **Commits en français**, référençant le ticket **`STN-XX`** (jamais `EOS-XX`, jamais `Co-Authored-By`).
 - **Branches courtes** `feature/STN-XX-description` créées depuis `main`, merge via **PR vers `main`**
-  (Trunk-Based Development). Titre de PR : `STN-XX — [Domaine] Description` (FR).
+  (Trunk-Based Development). Titre de PR au format **Conventional Commit** :
+  `<type>(STN-XX): description` (FR), ex. `feat(STN-42): catalogue — filtre par tag`.
+- **Versioning dérivé des commits** : `feat` → minor, `fix` → patch (cf. CLAUDE.md). La prochaine
+  version se calcule avec `bash scripts/next-version.sh`. Version courante : **`0.78.0`**.
 - **Quality gates bloquants** (CI casse au moindre écart) : lint (`ruff` / `eslint --max-warnings 0`),
   format (`ruff format` / `prettier --check`, CRLF interdit), types (`mypy` / `tsc`), tests, doc.
   Pré-commit Husky + lint-staged lance lint/format automatiquement.

@@ -1437,7 +1437,7 @@ asyncio = [
 
 [[package]]
 name = "stacknest-api"
-version = "0.6.0"
+version = "0.78.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiosmtplib" },
