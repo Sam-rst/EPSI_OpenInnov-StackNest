@@ -19,6 +19,13 @@ volumes:
 services:
   db:
     image: postgres:16-alpine
+    # Securite : `stacknest` (user/password/db) est un identifiant de DEV local.
+    # Le Postgres tourne dans un conteneur ephemere sur le reseau interne, jamais
+    # expose hors de la stack. En preview/prod, POSTGRES_PASSWORD / DATABASE_URL
+    # sont injectes par la CD via SOPS — aucun secret reel n'est code en dur ici.
+    # Les findings SonarCloud S6698 sur les defaults `stacknest:stacknest`
+    # ci-dessous (db / api / worker) sont donc safe-by-design (a marquer
+    # « reviewed » cote UI SonarCloud).
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-stacknest}
       POSTGRES_USER: ${POSTGRES_USER:-stacknest}
