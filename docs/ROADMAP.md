@@ -3,9 +3,10 @@
 > Roadmap **versionnée** consolidant le bilan du rapport technique
 > ([`docs/rendu/rapport-technique.md`](rendu/rapport-technique.md), §4 et §11) et la vision business
 > ([`docs/rendu/business-strategie.md`](rendu/business-strategie.md)). Les versions suivent le
-> **SemVer** du projet (`v0.X.0-rc.N` → `v0.X.0` → `v0.X.1`).
+> **SemVer dérivé des commits** du projet (`feat` → minor, `fix` → patch ; cf. CLAUDE.md,
+> section « Versioning & Conventional Commits »).
 >
-> ⚠️ Les jalons post-v0.6.0 sont **prévisionnels** (priorisation par sprint planning) et le double
+> ⚠️ Les jalons post-v0.78.0 sont **prévisionnels** (priorisation par sprint planning) et le double
 > modèle économique (hébergé + self-host open-core) reste une **hypothèse stratégique** à valider,
 > pas un engagement produit.
 
@@ -15,17 +16,24 @@
 
 | Version | Horizon | Thème | Statut |
 |---|---|---|---|
-| **v0.6.0** | Actuel | MVP livré (jury) | ✅ Livré |
-| **v0.7.0 / v0.8.0** | Court terme | Cycle de vie fin des stacks, vraie pause, sortie de bêta, MFA | 🔜 Planifié |
-| **v0.9.0** | Moyen terme | Provisioning Terraform/Proxmox, scaling, LLM « juge » | 🧭 Cible |
-| **v1.0.0** | GA (post-jury) | Offre stabilisée, multi-tenant cloud, observabilité complète | 🎯 Vision |
+| **v0.78.0** | Actuel | MVP livré (jury) | ✅ Livré |
+| **v0.79.0** | Court terme | Cycle de vie fin des stacks, vraie pause, sortie de bêta | 🔜 Planifié |
+| **v0.80.0** | Court terme | MFA TOTP, action IA `compose_stack` pré-remplie | 🔜 Planifié |
+| **v0.81.0** | Moyen terme | Provisioning Terraform/Proxmox, scaling, LLM « juge » | 🧭 Cible |
+| **v1.0.0** | GA (post-jury) | Offre stabilisée, multi-tenant cloud, observabilité complète, MFA généralisée | 🎯 Vision |
+
+> La version se **dérive automatiquement** de l'historique : `bash scripts/next-version.sh`
+> (depuis le dernier tag annoté `vX.Y.Z`). Chaque `feat` mergé fait avancer le **minor**,
+> chaque `fix` le **patch**. Les numéros ci-dessous sont donc indicatifs — c'est le **flux de
+> commits** qui fixe la prochaine version réelle.
 
 ---
 
-## v0.6.0 — MVP livré (actuel)
+## v0.78.0 — MVP livré (actuel)
 
 État réel du code à la date de l'oral jury. Chaîne complète de provisioning sous **TDD strict**
-(1 184 tests backend, 903 cas frontend) et CI multi-lanes.
+(1 184 tests backend, 903 cas frontend) et CI multi-lanes. Cette version est le **point de départ
+du versioning par commits** : 78 *feat* et 17 *fix* dans l'historique → `0.78.0`.
 
 - **Auth** : inscription, vérification email, login JWT (access + refresh), logout, `/me`, mot de
   passe oublié + reset, RBAC admin/user, CLI `create-admin`.
@@ -43,21 +51,26 @@
 
 ---
 
-## v0.7.0 / v0.8.0 — Court terme
+## v0.79.0 / v0.80.0 — Court terme
 
 Renforcer et **stabiliser** l'existant : passer les stacks de la bêta au statut « stable » et
-affiner le contrôle du cycle de vie.
+affiner le contrôle du cycle de vie. Chaque item livré est un `feat` → fait avancer le minor.
+
+### v0.79.0 — Cycle de vie & stabilisation des stacks
 
 - **Cycle de vie par service dans les stacks** : stop / start **isolé** d'un service d'une stack
   (sans toucher aux autres) et **édition** d'une stack déjà déployée.
 - **Vraie pause** (`docker pause`) au lieu d'un stop/start, pour suspendre sans recréer le conteneur.
 - **Stabilisation / sortie de bêta** du composeur de stack (retrait des bannières « bêta »).
+
+### v0.80.0 — Durcissement & chat
+
 - **MFA TOTP** sur l'authentification (durcissement compte).
 - Action IA `compose_stack` **pré-remplissant le builder** (le modèle est déjà câblé pour le proposer).
 
 ---
 
-## v0.9.0 — Moyen terme
+## v0.81.0 — Moyen terme
 
 Débloquer les capacités d'infrastructure et passer à l'échelle.
 
@@ -73,7 +86,8 @@ Débloquer les capacités d'infrastructure et passer à l'échelle.
 
 ## v1.0.0 — GA (post-jury)
 
-Industrialisation de l'offre, en cohérence avec le modèle économique du volet business.
+Industrialisation de l'offre, en cohérence avec le modèle économique du volet business. À partir de
+la 1.0, un `feat!` / `BREAKING CHANGE` ferait basculer le **major** (cf. mapping SemVer dans CLAUDE.md).
 
 - **Offre stabilisée** : tiers Free / Pro / Team / Entreprise + self-hosted open-core (hypothèse de
   pricing du dossier business à valider par étude de marché).
