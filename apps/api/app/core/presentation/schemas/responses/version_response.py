@@ -8,7 +8,8 @@ class VersionResponse(BaseModel):
 
     Les valeurs sont injectees au build par la CI (ARG Docker) puis lues au
     runtime depuis les variables d'environnement via `pydantic-settings`.
-    Sans injection, les defaults renvoient des valeurs de dev (`0.0.0-dev`).
+    Sans injection, les defaults reprennent la version centralisee de
+    `version.json` (`0.6.0`).
     """
 
     version: str = Field(
