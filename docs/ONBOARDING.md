@@ -1,16 +1,50 @@
-# Onboarding — Nouveau développeur StackNest
+<div align="center">
 
-> Guide pas-à-pas pour rendre un nouveau membre **productif rapidement** sur StackNest.
-> La **source de vérité des conventions** est [`CLAUDE.md`](../CLAUDE.md) (à la racine) — ce guide
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/assets/logo.svg">
+  <img src="brand/assets/logo.svg" alt="StackNest" width="220">
+</picture>
+
+# 🚪 Onboarding — Nouveau développeur
+
+*Guide pas-à-pas pour rendre un nouveau membre **productif rapidement** sur StackNest.*
+
+<br/>
+
+[![temps](https://img.shields.io/badge/temps-~30%20min-0d9297?style=flat-square)](#sommaire)
+[![niveau](https://img.shields.io/badge/niveau-débutant%20OK-22c55e?style=flat-square)](#sommaire)
+[![conventions](https://img.shields.io/badge/conventions-CLAUDE.md-032233?style=flat-square)](../CLAUDE.md)
+[![stack](https://img.shields.io/badge/stack-FastAPI%20·%20React-fea21f?style=flat-square)](#stacknest-en-une-phrase)
+
+</div>
+
+---
+
+> 💡 La **source de vérité des conventions** est [`CLAUDE.md`](../CLAUDE.md) (à la racine) — ce guide
 > en donne le chemin d'entrée concret, sans tout dupliquer.
+
+### StackNest en une phrase
 
 StackNest est une **Internal Developer Platform** (IDP) : provisionner des ressources IT en autonomie
 via une UI web ou un chat IA. Backend **FastAPI** (Python 3.13), frontend **React + Vite + TS**,
 **PostgreSQL 16**, **Redis** (file `arq` + SSE), provisioning **Docker SDK + compose CLI**.
 
+### Sommaire
+
+| # | Étape | |
+|---|---|---|
+| 1 | [Prérequis](#1--prérequis) | Outils à installer |
+| 2 | [Cloner et monter la stack](#2--cloner-et-monter-la-stack) | `git clone` + Docker Compose |
+| 3 | [Lancer back & front en natif](#3--lancer-back--front-en-natif-debug-fin) | Debug fin sans Docker |
+| 4 | [Lancer les tests](#4--lancer-les-tests) | TDD strict, en continu |
+| 5 | [Conventions](#5--conventions-résumé) | Résumé des règles projet |
+| 6 | [Worktrees multi-agents](#6--workflow-worktrees-multi-agents-dev-parallèle) | Dev parallèle isolé |
+| 7 | [Où trouver quoi](#7--où-trouver-quoi) | Carte du dépôt |
+| 8 | [Les skills projet](#8--les-skills-projet-claude-code) | Outils Claude Code |
+
 ---
 
-## 1. Prérequis
+## 1. ⚙️ Prérequis
 
 | Outil | Usage | Installation |
 |---|---|---|
@@ -21,7 +55,7 @@ via une UI web ou un chat IA. Backend **FastAPI** (Python 3.13), frontend **Reac
 
 ---
 
-## 2. Cloner et monter la stack
+## 2. 📦 Cloner et monter la stack
 
 ```bash
 git clone https://github.com/Sam-rst/EPSI_OpenInnov-StackNest.git
@@ -31,7 +65,7 @@ npm install              # Husky (hooks de pré-commit : lint/format auto)
 cp .env.example .env     # variables d'environnement (le .env reste gitignore)
 ```
 
-> **Note :** les fichiers `docker-compose*.yml` et `.env.example` sont **à la racine** du dépôt
+> ⚠️ Les fichiers `docker-compose*.yml` et `.env.example` sont **à la racine** du dépôt
 > (pas sous `infra/docker/`).
 
 ### Variante développement (hot reload back + front)
@@ -45,13 +79,13 @@ l'API démarre. Ensuite :
 
 | Service | URL |
 |---|---|
-| UI (Vite HMR) | http://localhost:8080 |
-| Swagger (dev uniquement) | http://localhost:8080/api/docs |
-| MailHog (inbox des mails capturés) | http://localhost:8025 |
-| PostgreSQL (outils devs) | `localhost:5432` (stacknest / stacknest) |
-| Redis | `localhost:6379` |
+| 🌐 UI (Vite HMR) | http://localhost:8080 |
+| 📖 Swagger (dev uniquement) | http://localhost:8080/api/docs |
+| 📧 MailHog (inbox des mails capturés) | http://localhost:8025 |
+| 🐘 PostgreSQL (outils devs) | `localhost:5432` (stacknest / stacknest) |
+| 🧰 Redis | `localhost:6379` |
 
-Modifier un fichier sous `apps/api/app/` → uvicorn se reload ; sous `apps/web/src/` → Vite HMR.
+> 💡 Modifier un fichier sous `apps/api/app/` → uvicorn se reload ; sous `apps/web/src/` → Vite HMR.
 
 ### Variante iso-prod (preview)
 
@@ -77,7 +111,7 @@ défaut le chat IA pointe sur Ollama ; on peut basculer sur OpenAI/Anthropic via
 
 ---
 
-## 3. Lancer back & front en natif (debug fin)
+## 3. 🛠️ Lancer back & front en natif (debug fin)
 
 Utile pour développer un seul service sans Docker.
 
@@ -95,9 +129,9 @@ npm run dev
 
 ---
 
-## 4. Lancer les tests
+## 4. 🧪 Lancer les tests
 
-TDD strict oblige : on lance les tests **en continu**.
+> 💡 TDD strict oblige : on lance les tests **en continu**.
 
 ```bash
 # Backend (pytest + testcontainers + factory-boy)
@@ -121,7 +155,9 @@ Cible de couverture : **80 % global**, **90 % sur la logique métier**.
 
 ---
 
-## 5. Conventions (résumé — détail dans [`CLAUDE.md`](../CLAUDE.md))
+## 5. 📐 Conventions (résumé)
+
+> 💡 Résumé condensé — le détail complet vit dans [`CLAUDE.md`](../CLAUDE.md).
 
 - **TDD strict Red → Green → Blue** : écrire les tests qui échouent (RED), implémentation minimale
   (GREEN), refactor Software Craftsmanship (BLUE). Un commit par phase. Voir le skill `/tdd`.
@@ -145,7 +181,7 @@ Cible de couverture : **80 % global**, **90 % sur la logique métier**.
 
 ---
 
-## 6. Workflow worktrees multi-agents (dev parallèle)
+## 6. 🌳 Workflow worktrees multi-agents (dev parallèle)
 
 Plusieurs devs/agents peuvent travailler en parallèle sur le même dépôt, chacun dans un **git
 worktree isolé** avec **sa propre stack Docker** (nom de projet Compose unique + ports décalés par
@@ -158,11 +194,11 @@ scripts/worktree.sh ports feature/STN-XX-slug  # affiche les 7 ports
 scripts/worktree.sh rm feature/STN-XX-slug     # supprime + libère le slot
 ```
 
-Détail et règles : skill `/worktree` et `docs/superpowers/specs/2026-06-04-worktree-convention.md`.
+> 💡 Détail et règles : skill `/worktree` et `docs/superpowers/specs/2026-06-04-worktree-convention.md`.
 
 ---
 
-## 7. Où trouver quoi
+## 7. 🗂️ Où trouver quoi
 
 | Je cherche… | C'est ici |
 |---|---|
@@ -174,11 +210,11 @@ Détail et règles : skill `/worktree` et `docs/superpowers/specs/2026-06-04-wor
 | Le dossier de rendu jury | `docs/rendu/` (rapport, CDC, guide démo, business) |
 | La roadmap versionnée | `docs/ROADMAP.md` |
 | Les conventions complètes | `CLAUDE.md` (racine) |
-| Le board Jira | [samrst-studies.atlassian.net (EOS)](https://samrst-studies.atlassian.net/jira/software/projects/EOS/boards/34) |
+| Le board Jira | [samrst-studies.atlassian.net (STN)](https://samrst-studies.atlassian.net/jira/software/projects/STN/boards/34) |
 
 ---
 
-## 8. Les skills projet (Claude Code)
+## 8. 🤖 Les skills projet (Claude Code)
 
 Committés dans `.claude/skills/`, ils voyagent avec le dépôt. Les plus utiles au quotidien :
 
@@ -195,5 +231,5 @@ Committés dans `.claude/skills/`, ils voyagent avec le dépôt. Les plus utiles
 | **`/worktree`** | Travailler en parallèle dans une stack Docker isolée |
 | **`/pentest`**, **`/deploy`**, **`/debug`** | Audit sécu / déploiement / debug systématique |
 
-> Pour une prise en main guidée et adaptée à ton rôle (M1 DEV / M1 CYBER / B1), invoque le skill
+> 💡 Pour une prise en main guidée et adaptée à ton rôle (M1 DEV / M1 CYBER / B1), invoque le skill
 > **`/onboarding`** directement dans Claude Code.

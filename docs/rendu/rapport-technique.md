@@ -31,6 +31,11 @@ Le projet est développé en **TDD strict** (Red → Green → Blue), avec **1 1
 (pytest) et **903 cas de test frontend** (Vitest), une CI GitHub Actions à lanes multiples, et une
 **Clean Architecture vertical-slicing** appliquée côté back **et** front.
 
+> **📊 Chiffres clés (v0.78.0)** — `45` templates au catalogue (`31` déployables / `14` bloquées) ·
+> `~1 184` tests backend + `~903` frontend · couverture **~95 %** (gate CI ≥ 80 %) · `11` migrations
+> Alembic · `12` slices verticales (back + front) · `3` adaptateurs LLM · CI à `~15` lanes +
+> nocturne · versioning **SemVer dérivé des commits** (conventional commits).
+
 ---
 
 ## 2. Contexte & problématique
@@ -142,15 +147,25 @@ L'offre **hébergée** porte le revenu récurrent (et la question RGPD/données 
 | **Listes** | Actions en masse (bulk) sur déploiements et stacks |
 | **Infra / Qualité** | Docker Compose (base + dev + preview), CI multi-lanes, worktrees multi-agents |
 
-### Roadmap (post-jury)
+### Roadmap (versionnée — alignée sur le board Jira STN)
 
-- **v1.5 chat** : action IA `compose_stack` pré-remplissant le builder (déjà câblée au modèle).
-- **v2 stacks** : cycle de vie **par service** (stop/start d'un service isolé), édition d'une stack
-  déployée, répliques (scaling horizontal).
-- **Déploiement** : vraie **pause** (`docker pause`), provider **Terraform/Proxmox** pour les VMs
-  (les cartes Terraform sont déjà au catalogue, bloquées au MVP).
-- **Auth** : MFA TOTP.
-- **Sécurité** : 2ᵉ LLM « juge » relisant l'action avant la carte de confirmation.
+La roadmap est **tracée dans Jira** et priorisée par version **SemVer** (cf. § Gestion de projet).
+L'action chat `compose_stack` et le composeur de stack, longtemps en tête de roadmap, sont
+désormais **livrés** (v0.78.0).
+
+| Version | Item | Ticket(s) |
+|---|---|---|
+| **v0.79.0** | Cycle de vie **par service** d'une stack (stop/start/restart isolé) | STN-172 |
+| **v0.79.0** | Vraie **pause/reprise** d'un déploiement (`docker pause` / `unpause`) | STN-173 |
+| **v0.79.0** | Durcissement sécurité : baseline `.checkov.yaml` + 7 vulnérabilités SonarCloud (E → A) | STN-178 |
+| **v0.79.0** | Quotas par utilisateur · export CSV de l'historique | STN-110 · STN-111 |
+| **v0.80.0** | **MFA TOTP** (double authentification) | STN-175 |
+| **v0.80.0** | **2ᵉ LLM « juge »** anti-hallucination (défense en profondeur) | STN-176 |
+| **v0.80.0** | Protection anti **prompt-injection** du chat | STN-132 |
+| **v1.0.0** | Déploiements **Terraform/Proxmox** : débloquer les 10 cartes provider du catalogue | STN-174 · épic STN-3 |
+
+> Les cartes Terraform sont déjà **présentes mais bloquées** au catalogue : l'UI montre la cible, le
+> domaine refuse le déploiement tant que le provider n'est pas livré (v1.0.0).
 
 ---
 
@@ -237,7 +252,7 @@ hooks React Query, compound components, états Skeleton/Empty/Error. **1 fichier
 | **Provisioning** | **Docker SDK** (docker-py) derrière une interface `Provisioner` ; **compose CLI** pour les stacks ; **Terraform** pour l'infra des 4 environnements | Docker SDK = contrôle fin du cycle de vie d'un conteneur ; interface pluggable pour Terraform/Proxmox plus tard ; compose CLI pour le multi-services |
 | **LLM** | Port `LLMProvider` **agnostique** + 3 adaptateurs : **Ollama** (défaut local), **OpenAI**, **Anthropic** + `FakeLLMProvider` (tests) | Zéro coût / on-premise (RGPD) par défaut ; aucun verrouillage fournisseur ; aucun appel réseau LLM en CI |
 | **Observabilité** | structlog (JSON), Sentry (back + front) | Logs structurés parsables, exceptions temps réel |
-| **Pré-commit / CI** | Husky + lint-staged, GitHub Actions | Lint/format auto avant commit ; gate CI strict |
+| **CI / supply-chain** | GitHub Actions (lanes api/web/infra), **Semgrep épinglé** (tag + digest), actions tierces **épinglées au SHA**, `permissions:` en moindre privilège, gitleaks · Checkov · Trivy · SonarCloud | Scans **reproductibles**, surface du `GITHUB_TOKEN` minimale, chaîne d'appro durcie ; gate CI strict agrégé par `ci-ok`. Hooks pre-commit en cours d'intégration (STN-155) |
 
 ---
 
@@ -335,7 +350,12 @@ stacks : **sélection multiple** + **barre d'actions en masse** (stop / start / 
 - **Gates de déployabilité** : impossible de déployer une ressource Terraform ou un runtime bloqué —
   vérifié côté domaine, pas seulement masqué dans l'UI.
 - **Isolation** : plan de contrôle ≠ hôte d'exécution ; routes scopées par `owner_id`.
-- **CI sécurité** : lanes `security-api` / `security-web` / `security-infra` + `secrets-scan`.
+- **CI sécurité & supply-chain** : lanes `security-api` / `security-web` (**Semgrep épinglé** par
+  tag + digest → scans reproductibles), `security-infra` (Checkov), `secrets-scan` (**gitleaks** sur
+  tout l'historique) ; Trivy en nocturne. Actions GitHub tierces **épinglées au SHA complet**,
+  `permissions:` en **moindre privilège** (baseline deny-all au niveau workflow, scope minimal par
+  job). Analyse continue **SonarCloud** : findings triés (vrais correctifs vs faux-positifs
+  documentés et justifiés), hotspots/vulnérabilités suivis en tickets dédiés.
 
 ### RGPD
 
@@ -377,34 +397,159 @@ minimale), BLUE (refactor Software Craftsmanship). 3 niveaux de tests **colocali
 - **Types** : `mypy` (back), `tsc` (front).
 - **CI GitHub Actions** (`ci.yml`) : lanes par périmètre (api / web / infra) —
   `lint`, `format`, `typecheck`, `security`, `test-unit`, `test-integ`, `build` — plus
-  `build-stack`, `secrets-scan` et un job final `ci-ok` qui agrège le tout.
+  `coverage-api` (**gate de couverture ≥ 80 %** sur la suite complète), `build-stack`,
+  `secrets-scan` et un job final `ci-ok` qui agrège le tout (sentinelle de mergeabilité).
 - **CI nocturne** (`ci-nightly.yml`) pour les analyses plus lourdes.
 - **CD** : **toujours manuelle** (`workflow_dispatch`).
 
 ---
 
-## 10. Méthodologie
+## 10. Gestion de projet & méthodologie
 
-- **Trunk-Based Development** : `main` toujours déployable, branches `feature/STN-XX-*` courtes
-  (< 2 jours), merge via PR après CI verte. Commits en **français**, référence `STN-XX`.
+### 10.1 Organisation de l'équipe
+
+| Pôle | Membres | Responsabilités |
+|---|---|---|
+| **Dev** | Samuel Ressiot (tech lead), Yassine Zouitni | Architecture, features, revue de code, merges |
+| **Cyber** | Antony Lozano, Remi Reze, Thomas Bremard | Sécurisation, infra/serveur, audit, conformité RGPD |
+| **Design / QA** | Julien Volmerange, Mahe Pernot | Charte, maquettes, recette fonctionnelle, documentation |
+
+### 10.2 Méthode — Kanban + Jira
+
+Pilotage en **Kanban** (flux continu), pas en sprints à dates : la granularité sprint s'est révélée
+trop lourde pour l'équipe. Le board **Jira STN** matérialise le flux `Nouveau → … → Terminé`. Chaque
+ticket respecte un **DoR** (Definition of Ready : 6 sections — contexte, critères d'acceptation
+Given/When/Then, parcours, périmètre, impact technique, risques) avant d'être pris, et un **DoD**
+(Definition of Done : code + tests verts + lint/format/types + doc + review) avant clôture.
+
+> Le backlog a été **réconcilié avec la réalité du code** (juin 2026) : le livré a été clôturé sur la
+> version **v0.78.0**, les chantiers restants re-versionnés (v0.79 → v1.0) et les tickets obsolètes
+> (approches supersédées) annulés. Le board reflète désormais fidèlement l'avancement.
+
+### 10.3 Versioning — SemVer dérivé des commits
+
+La version se **dérive de l'historique des commits** (style *semantic-release*) : chaque PR /
+squash-merge porte un **type Conventional Commit** en français avec la référence `STN-XX`
+(`feat(STN-42): …`, `fix(STN-58): …`). `feat` → bump *minor*, `fix` → *patch*, le reste ne bumpe
+pas. Un script (`scripts/next-version.sh`) calcule la prochaine version depuis le dernier tag. État
+courant : **v0.78.0**.
+
+### 10.4 Trunk-Based Development & revue
+
+- **TBD** : `main` toujours déployable, branches `feature/STN-XX-*` courtes (< 2 jours), merge via PR
+  après **CI verte**.
 - **Cycle de review** : toute review produit un **rapport d'étonnement**
   (`docs/reviews/AAAA-MM-JJ-STN-XX-rapport.md`). Une PR n'est mergeable qu'une fois tous les items
   ⚠️ *Important* / 🚫 *Blocking* traités ; re-review itérative jusqu'au verdict `✅ mergeable`.
-- **Développement multi-agents en worktrees** : `scripts/worktree.sh` isole chaque agent/dev dans un
-  git worktree avec **sa propre stack Docker** (`COMPOSE_PROJECT_NAME` unique + ports décalés par
-  slot), sans collision — c'est ce qui a permis de paralléliser le développement des slices.
+
+### 10.5 Développement multi-agents en worktrees (originalité méthodo)
+
+`scripts/worktree.sh` isole chaque agent/dev dans un **git worktree** avec **sa propre stack Docker**
+(`COMPOSE_PROJECT_NAME` unique + ports décalés par slot), sans collision. C'est ce qui a permis de
+**paralléliser** le développement de plusieurs slices verticales simultanément (back + front) tout en
+sérialisant proprement les points de friction (têtes de migration Alembic, câblage du routeur front).
+
+### 10.6 Outillage
+
+Jira (backlog/board) · GitHub + GitHub Actions (CI/CD) · SonarCloud (qualité continue) ·
+Sentry (erreurs back + front) · Docker / Docker Compose (envs reproductibles).
+
+### 10.7 Planning sur 2 ans
+
+Jalonné dans le cahier des charges (`docs/rendu/cahier-des-charges.md`, § Planning) : MVP jury →
+durcissement sécurité & Terraform → offre hébergée (freemium) → industrialisation (K8s, multi-tenant).
 
 ---
 
-## 11. Bilan & roadmap
+## 11. Bilan
 
 Le MVP atteint son objectif : transformer StackNest d'une vitrine en un **guichet de provisioning
 réel**, avec deux portes (UI + chat) et deux granularités (service unique + stack multi-services),
-le tout sous TDD strict et une CI exigeante.
+le tout sous TDD strict et une CI exigeante. La **roadmap versionnée** (§ 4) trace la suite jusqu'à
+la **v1.0** (cycle de vie par service, vraie pause, MFA, 2ᵉ LLM « juge », déploiements
+Terraform/Proxmox), pilotée dans Jira.
 
-**Prochaines étapes prioritaires (v2)** :
+---
 
-1. **Cycle de vie par service** dans les stacks (stop/start d'un service isolé, édition).
-2. **Vraie pause** (`docker pause`) plutôt qu'un stop/start.
-3. **Déploiements Terraform** (débloquer les 10 cartes infra) — provider Docker puis Proxmox/VM.
-4. **MFA TOTP** et **2ᵉ LLM « juge »** pour durcir encore l'anti-hallucination.
+## 12. Indicateurs & métriques projet
+
+| Indicateur | Valeur |
+|---|---|
+| **Version** | v0.78.0 (SemVer dérivé des commits) |
+| **Catalogue** | 45 templates — 31 déployables (Docker) / 14 bloqués (10 Terraform + 4 runtimes) |
+| **Tests backend** | ~1 184 (pytest : unit / integ / e2e, testcontainers) |
+| **Tests frontend** | ~903 (Vitest + Testing Library + MSW) + E2E Playwright |
+| **Couverture** | ~95 % (gate CI ≥ 80 %, cible 90 % sur la logique métier) |
+| **Migrations** | 11 (Alembic, upgrade + downgrade) |
+| **Slices verticales** | 12 (back + front : auth, catalog, deployment, stack, chat, dashboard…) |
+| **Adaptateurs LLM** | 3 (Ollama / OpenAI / Anthropic) + Fake (tests) |
+| **CI** | ~15 lanes (api / web / infra) + nocturne ; gate `ci-ok` + `coverage-api` |
+| **Sécurité** | Semgrep · Checkov · gitleaks · Trivy · SonarCloud ; secrets jamais persistés |
+| **Environnements** | 4 (dev / test / preview / prod) |
+
+---
+
+## 13. Rétrospective & leçons apprises
+
+**Ce qui a bien fonctionné**
+
+- **TDD strict** : la discipline Red → Green → Blue a tenu sur toute la durée ; refactors sereins grâce au filet de tests.
+- **Mockups → prod** : prototyper l'UI dans `web-mockup` puis la redévelopper proprement en TDD dans `web` a accéléré sans créer de dette.
+- **Dev multi-agents en worktrees** : parallélisation réelle de slices verticales sans collision (stacks Docker isolées).
+- **Clean Archi + vertical slicing** : ajout de features (stacks, chat) sans casser l'existant, frontières nettes.
+- **Anti-hallucination par couches déterministes** : le chat agit sans jamais déployer hors catalogue.
+
+**Difficultés & ajustements**
+
+- **Synchronisation du backlog** : le board Jira avait dérivé du code (livraisons en gros PR) → réconcilié a posteriori (v0.78.0). À l'avenir : traçabilité par `feat(STN-XX)` systématique + intégration GitHub ↔ Jira.
+- **Périmètre des stacks** : le composeur multi-services s'est révélé plus ambitieux que prévu — livré, mais signalé **bêta** dans l'UI.
+- **CI** : quelques merges en `--admin` (faute d'un 2ᵉ reviewer) avaient laissé passer du rouge ; CI **réparée et durcie** (lanes, gate de couverture, pin SHA, permissions least-privilege).
+
+> **Si c'était à refaire** : adopter le versioning conventional-commits + l'intégration Jira **dès le départ**, et figer le périmètre « bêta » plus tôt.
+
+---
+
+## 14. Glossaire
+
+| Terme | Définition |
+|---|---|
+| **IDP** (*Internal Developer Platform*) | Plateforme interne en libre-service pour provisionner des ressources sans passer par les Ops |
+| **IaC** (*Infrastructure as Code*) | Description déclarative de l'infra (ici Terraform pour les environnements) |
+| **Provisioning** | Création / démarrage effectif d'une ressource (conteneur, stack) |
+| **SSE** (*Server-Sent Events*) | Flux HTTP unidirectionnel serveur → client (progression live, streaming chat) |
+| **RBAC** (*Role-Based Access Control*) | Contrôle d'accès par rôle (ici admin / user) |
+| **JWT** | Jeton d'authentification signé (access + refresh) |
+| **LLM** | Grand modèle de langage (assistant IA) |
+| **TDD** | *Test-Driven Development* (test d'abord : Red → Green → Blue) |
+| **TBD** | *Trunk-Based Development* (`main` toujours déployable, branches courtes) |
+| **Vertical slicing** | Découpage du code par feature (et non par couche technique) |
+| **DoR / DoD** | *Definition of Ready / Done* (critères d'entrée / sortie d'un ticket) |
+| **Self-hosted** | Hébergé sur sa propre infra (vs PaaS cloud facturé au service) |
+| **Gate de déployabilité** | Règle domaine rendant une ressource visible mais non déployable |
+
+---
+
+## 15. Annexes
+
+### 15.1 Liens
+
+| Ressource | Lien |
+|---|---|
+| **Dépôt** | `github.com/Sam-rst/EPSI_OpenInnov-StackNest` |
+| **Board Jira** (projet STN) | `samrst-studies.atlassian.net` |
+| **Roadmap versionnée** | `docs/ROADMAP.md` |
+| **Cahier des charges** | `docs/rendu/cahier-des-charges.md` |
+| **Business & stratégie** | `docs/rendu/business-strategie.md` |
+| **Guide de démo (jury)** | `docs/rendu/guide-demo.md` |
+| **Charte graphique & marque** | `docs/brand/` |
+
+### 15.2 Environnements
+
+| Env | Usage | Déclencheur de déploiement |
+|---|---|---|
+| **dev** | Développement (hot reload) | Manuel — `main` (dernier commit) |
+| **test** | Pentest sécurité | Manuel — tag `rc` (version gelée) |
+| **preview** | Recette / QA (iso-prod local) | Manuel — tag `rc` (après pentest) |
+| **prod** | Production / démo jury | Manuel — tag `release` |
+
+> CD **toujours manuelle** (`workflow_dispatch`), sur runner self-hosted. Les emplacements de captures d'écran sont balisés `[CAPTURE: …]` dans ce rapport et détaillés dans le guide de démo.

@@ -1,6 +1,26 @@
-# StackNest — Roadmap
+<div align="center">
 
-> Roadmap **versionnée** consolidant le bilan du rapport technique
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/assets/logo.svg">
+  <img src="brand/assets/logo.svg" alt="StackNest" width="220">
+</picture>
+
+# 🗺️ Roadmap
+
+*Roadmap versionnée — du MVP livré (jury) à la vision GA, au rythme du SemVer dérivé des commits.*
+
+<br/>
+
+[![version](https://img.shields.io/badge/actuel-v0.78.0-0d9297?style=flat-square)](#-v0780--mvp-livré-actuel)
+[![prochaine](https://img.shields.io/badge/prochaine-v0.79.0-fea21f?style=flat-square)](#-v0790--v0800--court-terme)
+[![vision](https://img.shields.io/badge/vision-v1.0.0%20GA-032233?style=flat-square)](#-v100--ga-post-jury)
+[![versioning](https://img.shields.io/badge/SemVer-dérivé%20des%20commits-22c55e?style=flat-square)](../CLAUDE.md)
+
+</div>
+
+---
+
+> 💡 Roadmap **versionnée** consolidant le bilan du rapport technique
 > ([`docs/rendu/rapport-technique.md`](rendu/rapport-technique.md), §4 et §11) et la vision business
 > ([`docs/rendu/business-strategie.md`](rendu/business-strategie.md)). Les versions suivent le
 > **SemVer dérivé des commits** du projet (`feat` → minor, `fix` → patch ; cf. CLAUDE.md,
@@ -12,7 +32,7 @@
 
 ---
 
-## Vue d'ensemble
+## 🧭 Vue d'ensemble
 
 | Version | Horizon | Thème | Statut |
 |---|---|---|---|
@@ -22,36 +42,32 @@
 | **v0.81.0** | Moyen terme | Provisioning Terraform/Proxmox, scaling, LLM « juge » | 🧭 Cible |
 | **v1.0.0** | GA (post-jury) | Offre stabilisée, multi-tenant cloud, observabilité complète, MFA généralisée | 🎯 Vision |
 
-> La version se **dérive automatiquement** de l'historique : `bash scripts/next-version.sh`
+> 💡 La version se **dérive automatiquement** de l'historique : `bash scripts/next-version.sh`
 > (depuis le dernier tag annoté `vX.Y.Z`). Chaque `feat` mergé fait avancer le **minor**,
 > chaque `fix` le **patch**. Les numéros ci-dessous sont donc indicatifs — c'est le **flux de
 > commits** qui fixe la prochaine version réelle.
 
 ---
 
-## v0.78.0 — MVP livré (actuel)
+## ✅ v0.78.0 — MVP livré (actuel)
 
 État réel du code à la date de l'oral jury. Chaîne complète de provisioning sous **TDD strict**
 (1 184 tests backend, 903 cas frontend) et CI multi-lanes. Cette version est le **point de départ
 du versioning par commits** : 78 *feat* et 17 *fix* dans l'historique → `0.78.0`.
 
-- **Auth** : inscription, vérification email, login JWT (access + refresh), logout, `/me`, mot de
-  passe oublié + reset, RBAC admin/user, CLI `create-admin`.
-- **Catalogue** : 45 templates (versions + LTS/EOL), filtres, détail, **gates de déployabilité**
-  (31 ressources Docker déployables, 14 cartes bloquées : 10 Terraform + 4 runtimes), CRUD admin.
-- **Déploiement Docker live** : provisioning via Docker SDK, suivi **SSE** temps réel, cycle de vie
-  complet (create / stop / start / regenerate / destroy), secret généré côté worker et affiché une fois.
-- **Composeur de stack Docker Compose** *(bêta)* : assemblage de N services + liens `{to.*}`,
-  déploiement comme un projet `docker compose`, détail à 2 niveaux (stack + service).
-- **Chat IA** : assistant guidé + confirmation, actions `deploy` **et** `compose_stack`
-  (+ stop/start/regenerate), streaming SSE, fils multiples, 3 adaptateurs LLM (Ollama/OpenAI/Anthropic),
-  défense anti-hallucination (boîte à outils fermée + validation déterministe).
-- **Dashboard** (KPIs + sections) et **actions en masse** (bulk) sur déploiements et stacks.
-- **Infra/qualité** : Docker Compose (base + dev + preview), CI GitHub Actions, worktrees multi-agents.
+| Domaine | Livré |
+|---|---|
+| 🔐 **Auth** | Inscription, vérification email, login JWT (access + refresh), logout, `/me`, mot de passe oublié + reset, RBAC admin/user, CLI `create-admin`. |
+| 📦 **Catalogue** | 45 templates (versions + LTS/EOL), filtres, détail, **gates de déployabilité** (31 ressources Docker déployables, 14 cartes bloquées : 10 Terraform + 4 runtimes), CRUD admin. |
+| 🚀 **Déploiement Docker live** | Provisioning via Docker SDK, suivi **SSE** temps réel, cycle de vie complet (create / stop / start / regenerate / destroy), secret généré côté worker et affiché une fois. |
+| 🧩 **Composeur de stack Compose** *(bêta)* | Assemblage de N services + liens `{to.*}`, déploiement comme un projet `docker compose`, détail à 2 niveaux (stack + service). |
+| 🤖 **Chat IA** | Assistant guidé + confirmation, actions `deploy` **et** `compose_stack` (+ stop/start/regenerate), streaming SSE, fils multiples, 3 adaptateurs LLM (Ollama/OpenAI/Anthropic), défense anti-hallucination (boîte à outils fermée + validation déterministe). |
+| 📊 **Dashboard** | KPIs + sections, et **actions en masse** (bulk) sur déploiements et stacks. |
+| 🏗️ **Infra / qualité** | Docker Compose (base + dev + preview), CI GitHub Actions, worktrees multi-agents. |
 
 ---
 
-## v0.79.0 / v0.80.0 — Court terme
+## 🔜 v0.79.0 / v0.80.0 — Court terme
 
 Renforcer et **stabiliser** l'existant : passer les stacks de la bêta au statut « stable » et
 affiner le contrôle du cycle de vie. Chaque item livré est un `feat` → fait avancer le minor.
@@ -70,7 +86,7 @@ affiner le contrôle du cycle de vie. Chaque item livré est un `feat` → fait 
 
 ---
 
-## v0.81.0 — Moyen terme
+## 🧭 v0.81.0 — Moyen terme
 
 Débloquer les capacités d'infrastructure et passer à l'échelle.
 
@@ -84,7 +100,7 @@ Débloquer les capacités d'infrastructure et passer à l'échelle.
 
 ---
 
-## v1.0.0 — GA (post-jury)
+## 🎯 v1.0.0 — GA (post-jury)
 
 Industrialisation de l'offre, en cohérence avec le modèle économique du volet business. À partir de
 la 1.0, un `feat!` / `BREAKING CHANGE` ferait basculer le **major** (cf. mapping SemVer dans CLAUDE.md).
@@ -99,7 +115,7 @@ la 1.0, un `feat!` / `BREAKING CHANGE` ferait basculer le **major** (cf. mapping
 
 ---
 
-## Vision 2 ans (jalons macro)
+## 🔭 Vision 2 ans (jalons macro)
 
 1. **Adoption bottom-up (étudiant → entreprise)** : ancrage académique EPSI, free tier étudiant à 0 €
    et self-hostabilité pour maximiser la diffusion ; les étudiants formés deviennent ambassadeurs
@@ -112,5 +128,7 @@ la 1.0, un `feat!` / `BREAKING CHANGE` ferait basculer le **major** (cf. mapping
    d'exécution variés (VM, Kubernetes) tout en conservant la règle structurante **plan de contrôle ≠
    hôte d'exécution**.
 
-> Détails marché, pricing et personas : [`docs/rendu/business-strategie.md`](rendu/business-strategie.md).
+---
+
+> 📑 Détails marché, pricing et personas : [`docs/rendu/business-strategie.md`](rendu/business-strategie.md).
 > Bilan technique et prochaines étapes : [`docs/rendu/rapport-technique.md`](rendu/rapport-technique.md).
