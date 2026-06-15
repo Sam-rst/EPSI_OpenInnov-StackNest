@@ -116,9 +116,16 @@ format         = "ruff format ."
 typecheck      = "mypy ."
 
 # --- Tests ---
+# NB : `test:unit` et `test:integ` passent `--no-cov` car ils ne couvrent qu'un
+# sous-ensemble de la suite ; mesurer la couverture de tout `app` sur un run
+# partiel echouerait toujours le seuil 80% (cf. fix pipeline CI). Le vrai gate de
+# couverture est porte par `test:cov` (suite complete unit+integ), branche dans
+# le job CI dedie `coverage-api`.
 test           = "pytest"                  # tout + coverage + seuil 80%
 "test:unit"    = "pytest -m unit --no-cov" # boucle TDD rapide
-"test:integ"   = "pytest -m integ"
+"test:integ"   = "pytest -m integ --no-cov"
+# Gate couverture : suite complete unit+integ avec seuil 80% (job CI coverage-api).
+"test:cov"     = "pytest -m 'unit or integ' --cov=app --cov-fail-under=80"
 "test:coverage"= "pytest --cov-report=html"
 e2e            = "pytest -m e2e"
 # Mutation testing : natif Linux/Mac/CI. Sur Windows, utiliser la commande Docker
