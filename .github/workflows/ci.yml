@@ -99,6 +99,21 @@ jobs:
         working-directory: apps/api
         run: uv run poe test:integ
 
+  # Gate de couverture : ni test:unit ni test:integ ne l'enforce (ils tournent
+  # avec --no-cov car un run partiel ne peut pas atteindre 80% sur tout `app`).
+  # Ce job lance la suite complete unit+integ avec --cov-fail-under=80 (poe
+  # test:cov) ; c'est lui qui porte le seuil 80%. Required via ci-ok.
+  coverage-api:
+    name: coverage-api
+    needs: [test-integ-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: pytest unit+integ + seuil couverture 80%
+        working-directory: apps/api
+        run: uv run poe test:cov
+
   build-api:
     name: build-api
     needs: [test-integ-api]
@@ -356,8 +371,10 @@ jobs:
     name: ci-ok
     # Les security-{api,web,infra} sont dans les lanes (chainees avant
     # les tests), donc couvertes transitively par les builds. Pas besoin
-    # de les lister explicitement ici.
-    needs: [build-api, build-web, build-stack, secrets-scan]
+    # de les lister explicitement ici. coverage-api (gate 80%) tourne en
+    # parallele de build-api (meme parent test-integ-api) : on le liste
+    # explicitement car il n'est pas sur le chemin d'un build.
+    needs: [build-api, build-web, build-stack, secrets-scan, coverage-api]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -367,13 +384,14 @@ jobs:
           RESULT_WEB: ${{ needs.build-web.result }}
           RESULT_STACK: ${{ needs.build-stack.result }}
           RESULT_SECRETS: ${{ needs.secrets-scan.result }}
+          RESULT_COVERAGE: ${{ needs.coverage-api.result }}
         run: |
           echo "lane builds | api=$RESULT_API | web=$RESULT_WEB | stack=$RESULT_STACK"
-          echo "global      | secrets-scan=$RESULT_SECRETS"
-          for r in "$RESULT_API" "$RESULT_WEB" "$RESULT_STACK" "$RESULT_SECRETS"; do
+          echo "global      | secrets-scan=$RESULT_SECRETS | coverage-api=$RESULT_COVERAGE"
+          for r in "$RESULT_API" "$RESULT_WEB" "$RESULT_STACK" "$RESULT_SECRETS" "$RESULT_COVERAGE"; do
             if [[ "$r" != "success" ]]; then
               echo "::error::At least one required job failed (result=$r)"
               exit 1
             fi
           done
-          echo "✅ All CI lanes green (security-* et builds inclus)"
+          echo "✅ All CI lanes green (security-*, builds, coverage-api inclus)"
