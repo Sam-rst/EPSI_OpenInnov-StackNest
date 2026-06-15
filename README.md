@@ -2,7 +2,7 @@
 
 > **Build Fast. Deploy Smart.**
 
-![version](https://img.shields.io/badge/version-v0.6.0-0d9297) ![statut](https://img.shields.io/badge/statut-MVP-fea21f) ![stack](https://img.shields.io/badge/FastAPI%20%2B%20React-032233)
+![version](https://img.shields.io/badge/version-v0.78.0-0d9297) ![statut](https://img.shields.io/badge/statut-MVP-fea21f) ![stack](https://img.shields.io/badge/FastAPI%20%2B%20React-032233)
 
 **StackNest — Internal Developer Platform : provisionner des ressources IT en autonomie via UI ou chat IA.**
 
@@ -10,7 +10,7 @@ StackNest est une *Internal Developer Platform* (IDP) qui permet à une équipe 
 
 ---
 
-## Fonctionnalités clés (MVP v0.6.0)
+## Fonctionnalités clés (MVP v0.78.0)
 
 - **Catalogue** de 45 templates réels (versions + indicateurs LTS/EOL) avec **gates de déployabilité** : 31 ressources Docker provisionnables, 14 cartes visibles mais bloquées (10 Terraform + 4 runtimes langage).
 - **Déploiement Docker live** d'une ressource via le **Docker SDK** (docker-py), avec suivi temps réel en **SSE** et **cycle de vie complet** (créer / arrêter / démarrer / régénérer le secret / détruire).
@@ -161,7 +161,7 @@ npm test                      # ou test:unit / test:integ / e2e
 
 ## Statut
 
-**MVP v0.6.0** — chaîne complète livrée (catalogue, déploiement Docker live, composeur de stack, chat IA, dashboard, actions en masse), sous **TDD strict** et CI exigeante. Les **stacks multi-services** sont fonctionnelles mais en **bêta** ; le provisioning **Terraform/Proxmox** est en roadmap (cf. [`docs/ROADMAP.md`](docs/ROADMAP.md)).
+**MVP v0.78.0** — chaîne complète livrée (catalogue, déploiement Docker live, composeur de stack, chat IA, dashboard, actions en masse), sous **TDD strict** et CI exigeante. Les **stacks multi-services** sont fonctionnelles mais en **bêta** ; le provisioning **Terraform/Proxmox** est en roadmap (cf. [`docs/ROADMAP.md`](docs/ROADMAP.md)).
 
 ## Licence
 

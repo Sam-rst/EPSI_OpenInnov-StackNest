@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    app_version: str = "0.6.0"
+    app_version: str = "0.78.0"
     git_commit: str = "unknown"
     app_env: str = "dev"
     deployed_at: str = "1970-01-01T00:00:00Z"
