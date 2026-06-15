@@ -68,5 +68,8 @@ lcov.info
 # Docker
 *.tar
 
+# Secrets scanning (rapports locaux gitleaks — ne jamais committer)
+gitleaks-report.json
+
 # Claude Code
 .claude/settings.local.json

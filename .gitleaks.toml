@@ -1,0 +1,37 @@
+# Gitleaks — configuration StackNest
+# ---------------------------------------------------------------------------
+# `extend.useDefault = true` : on garde TOUTES les regles de detection du jeu
+# par defaut de gitleaks (cles AWS/GCP, tokens GitHub/Slack, cles privees, etc.).
+# On n'ajoute ici qu'une **allowlist ciblee** pour les faux positifs connus —
+# jamais une allowlist large qui desactiverait la detection.
+#
+# CI : `gitleaks detect --source=. --verbose --redact --no-banner` (fetch-depth:0,
+# scanne tout l'historique git). Voir .github/workflows/ci.yml (job secrets-scan).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Faux positifs : fixtures de tests et fichiers d'exemple (aucun secret reel)."
+
+# 1) Fichiers de test/fixtures et exemples.
+#    Les valeurs sensibles y sont des FAUX secrets (ex. "valeur-tres-sensible-1234",
+#    "super-secret") servant a tester le masquage. Aucun identifiant reel n'y vit.
+#    Scope volontairement etroit : repertoires de tests colocalises (__tests__/),
+#    fichiers de tests (suffixes *.unit.* / *.integ.* / *.e2e.*), et *.env.example.
+paths = [
+    '''(^|/)__tests__/''',
+    '''(^|/)tests/''',
+    '''\.(unit|integ|e2e)\.(py|ts|tsx)$''',
+    '''\.env\.example$''',
+]
+
+# 2) Filet supplementaire : les valeurs exactes des fixtures du test de MASQUAGE
+#    des params secrets (apps/api/.../test_deployment_response.unit.py). Le secret
+#    flagge — "valeur-tres-sensible-1234" / "super-secret" — n'est PAS un
+#    identifiant reel : c'est l'entree d'un test qui verifie qu'un param SECRET
+#    n'est jamais reexpose. Trace explicitement le finding historique.
+regexes = [
+    '''valeur-tres-sensible-1234''',
+    '''super-secret''',
+]
