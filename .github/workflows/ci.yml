@@ -1,21 +1,35 @@
 name: CI
 
-# Workflow rapide (~2-3 min cible) declenche sur chaque push / PR.
-# Les taches lentes (e2e, mutation testing, deep security) vivent dans
-# ci-nightly.yml et s'executent a 20h via schedule.
+# Workflow rapide declenche sur chaque push / PR. Les taches lentes (e2e,
+# mutation testing, deep security) vivent dans ci-nightly.yml (schedule 20h).
 #
-# Topologie : 3 lanes parallèles et indépendantes (api / web / infra).
-# Chaque lane chaine ses etapes en sequentiel via `needs:` — si lint-api
-# casse, format-api / typecheck-api / test-*-api / build-api ne tournent
-# pas. Les lanes ne s'attendent pas entre elles (pas de gate global par
-# stage) : l'api avance meme si web echoue au lint.
+# Topologie : 1 job par stack × concern, ORDONNES en WORKFLOW via `needs` :
 #
-# Sentinelle finale `ci-ok` attend les 3 builds. C'est le seul required
+#   qualite → build → tests → securite → metrics
+#
+# Fail-fast : si le lint casse on ne build pas ; si ca ne build pas on ne teste
+# pas ; etc. Chaque job appelle les COMPOSITES poe (back) / npm (front) — jamais
+# d'outil en direct. Setup unique (setup-api / setup-web) puis steps granulaires.
+# Nommage STACK-FIRST coherent : `<stack>-<concern>` (api-*, web-*, infra-*).
+#
+# SAST semgrep : plus de jobs `semgrep-api`/`semgrep-web` orphelins (ils
+# lancaient l'image Docker en direct, sans appeler de script de stack). semgrep
+# est un outil Python POLYGLOTTE : il est desormais ENGLOBE dans la securite de
+# chaque stack via les composites RACINE `api-security` / `web-security`
+# (= securite de stack `:code` + `uvx semgrep` `:sast`, scope p/python ou
+# p/typescript). Voir pyproject.toml racine et CLAUDE.md « Securite / Semgrep ».
+#
+# Les 3 stacks (api / web / infra) tournent en PARALLELE entre elles ; a
+# l'interieur d'une stack, l'ordre ci-dessus est SERIEL (chaine de `needs`).
+# Jobs transverses INDEPENDANTS (parallele) : secrets-scan (gitleaks, historique
+# git complet) et outils-test (tooling Python racine). Les *-metrics sont
+# informationnels (continue-on-error) et hors sentinelle.
+#
+# Sentinelle finale `ci-ok` attend les jobs BLOQUANTS. C'est le seul required
 # check a configurer cote branch protection.
 #
-# Le setup repete (checkout + setup-uv + uv sync pour la lane api,
-# checkout + setup-node + npm ci pour la lane web) est factorise dans
-# des composite actions sous .github/actions/setup-{api,web}/action.yml.
+# Le setup repete (checkout + setup-uv + uv sync pour api, checkout + setup-node
+# + npm ci pour web) est factorise dans .github/actions/setup-{api,web}.
 
 on:
   push:
@@ -35,110 +49,28 @@ permissions: {}
 
 jobs:
   # ═══════════════════════════════════════════════════════════
-  # Lane API — apps/api (Python 3.13, uv, FastAPI)
+  # Stack API — apps/api (Python 3.13, uv, FastAPI)
+  # Workflow seriel : qualite → build → tests → securite → metrics.
   # ═══════════════════════════════════════════════════════════
 
-  lint-api:
-    name: lint-api
+  api-qualite:
+    name: api-qualite
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
-      - name: ruff check
-        working-directory: apps/api
-        run: uv run poe lint
+      - name: lint
+        run: uv run --directory apps/api poe lint
+      - name: format:check
+        run: uv run --directory apps/api poe format:check
+      - name: typecheck
+        run: uv run --directory apps/api poe typecheck
 
-  format-api:
-    name: format-api
-    needs: [lint-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-api
-      - name: ruff format --check
-        working-directory: apps/api
-        run: uv run poe format:check
-
-  typecheck-api:
-    name: typecheck-api
-    needs: [format-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-api
-      - name: mypy strict
-        working-directory: apps/api
-        run: uv run poe typecheck
-
-  security-api:
-    name: security-api
-    needs: [typecheck-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    container:
-      # Version semgrep EPINGLEE (tag + digest) pour des scans reproductibles :
-      # pas de `:latest` flottant qui ferait varier les regles/findings d'un run
-      # a l'autre. Bump volontaire et trace dans le commit. Resout SonarCloud
-      # (supply-chain / reproductibilite). Voir CLAUDE.md « Securite / Semgrep ».
-      image: semgrep/semgrep:1.166.0@sha256:c180f0c93a17b420c0af5006214a29d3c747c5459c732b740191adf657dd0068
-    steps:
-      - uses: actions/checkout@v4
-      - name: semgrep (rules python + security-audit, ERROR only)
-        run: semgrep scan --config=p/python --config=p/security-audit --error --severity=ERROR apps/api
-
-  test-unit-api:
-    name: test-unit-api
-    needs: [security-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-api
-      - name: pytest -m unit
-        working-directory: apps/api
-        run: uv run poe test:unit
-
-  test-integ-api:
-    name: test-integ-api
-    needs: [test-unit-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-api
-      - name: pytest -m integ
-        working-directory: apps/api
-        run: uv run poe test:integ
-
-  # Gate de couverture : ni test:unit ni test:integ ne l'enforce (ils tournent
-  # avec --no-cov car un run partiel ne peut pas atteindre 80% sur tout `app`).
-  # Ce job lance la suite complete unit+integ avec --cov-fail-under=80 (poe
-  # test:cov) ; c'est lui qui porte le seuil 80%. Required via ci-ok.
-  coverage-api:
-    name: coverage-api
-    needs: [test-integ-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-api
-      - name: pytest unit+integ + seuil couverture 80%
-        working-directory: apps/api
-        run: uv run poe test:cov
-
-  build-api:
-    name: build-api
-    needs: [test-integ-api]
+  api-build:
+    name: api-build
+    needs: [api-qualite]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -168,100 +100,74 @@ jobs:
           path: sbom-api.spdx.json
           retention-days: 30
 
+  api-test:
+    name: api-test
+    needs: [api-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      # test:cov lance la suite complete unit+integ avec le seuil
+      # --cov-fail-under=80 (testcontainers/Docker disponibles sur le runner).
+      - name: test:cov
+        run: uv run --directory apps/api poe test:cov
+
+  api-securite:
+    name: api-securite
+    needs: [api-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      # Composite RACINE englobant : securite de la stack (`:code` =
+      # ruff/bandit + pip-audit) PUIS semgrep SAST (`:sast` = uvx semgrep
+      # p/python + p/security-audit). uv/uvx fournis par setup-api.
+      - name: api-security (bandit + pip-audit + semgrep p/python)
+        run: uv run poe api-security
+
+  # Job informationnel (complexite / Maintainability Index) — JAMAIS bloquant.
+  api-metrics:
+    name: api-metrics
+    needs: [api-securite]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: metrics
+        run: uv run --directory apps/api poe metrics
+
   # ═══════════════════════════════════════════════════════════
-  # Lane WEB — apps/web (Node 22, Vite, React)
+  # Stack WEB — apps/web (Node 22, Vite, React)
+  # Workflow seriel : qualite → build → tests → securite → metrics.
+  # NB : la stack cible exclusivement `apps/web`. `apps/web-mockup/`
+  # (reference design, STN-157) est volontairement HORS quality gate.
   # ═══════════════════════════════════════════════════════════
-  # NB : la lane cible exclusivement `apps/web` (working-directory /
-  # context). `apps/web-mockup/` (référence design issue de la branche
-  # `mockups`, STN-157) est volontairement HORS quality gate : pas de
-  # workspaces root, aucun job ne le référence. C'est une archive de
-  # design vivante, non production. Chaque feature qu'elle illustre est
-  # redéveloppée en TDD strict dans `apps/web`. Voir
-  # docs/superpowers/specs/2026-06-04-integration-mockup-reference.md.
 
-  lint-web:
-    name: lint-web
+  web-qualite:
+    name: web-qualite
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
-      - name: eslint
-        working-directory: apps/web
-        run: npm run lint
+      - name: lint
+        run: npm --prefix apps/web run lint
+      - name: format:check
+        run: npm --prefix apps/web run format:check
+      - name: typecheck
+        run: npm --prefix apps/web run typecheck
 
-  format-web:
-    name: format-web
-    needs: [lint-web]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-web
-      - name: prettier --check
-        working-directory: apps/web
-        run: npm run format:check
-
-  typecheck-web:
-    name: typecheck-web
-    needs: [format-web]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-web
-      - name: tsc --noEmit
-        working-directory: apps/web
-        run: npm run typecheck
-
-  security-web:
-    name: security-web
-    needs: [typecheck-web]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    container:
-      # Version semgrep EPINGLEE (tag + digest), idem lane API : scans
-      # reproductibles, pas de `:latest`. Garder les deux lanes alignees sur la
-      # meme version au prochain bump. Voir CLAUDE.md « Securite / Semgrep ».
-      image: semgrep/semgrep:1.166.0@sha256:c180f0c93a17b420c0af5006214a29d3c747c5459c732b740191adf657dd0068
-    steps:
-      - uses: actions/checkout@v4
-      - name: semgrep (rules typescript + security-audit, ERROR only)
-        run: semgrep scan --config=p/typescript --config=p/security-audit --error --severity=ERROR apps/web
-
-  test-unit-web:
-    name: test-unit-web
-    needs: [security-web]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-web
-      - name: vitest unit
-        working-directory: apps/web
-        run: npm run test:unit
-
-  test-integ-web:
-    name: test-integ-web
-    needs: [test-unit-web]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-web
-      - name: vitest integ
-        working-directory: apps/web
-        run: npm run test:integ
-
-  build-web:
-    name: build-web
-    needs: [test-integ-web]
+  web-build:
+    name: web-build
+    needs: [web-qualite]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -291,15 +197,63 @@ jobs:
           path: sbom-web.spdx.json
           retention-days: 30
 
+  web-test:
+    name: web-test
+    needs: [web-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: test
+        run: npm --prefix apps/web run test
+
+  web-securite:
+    name: web-securite
+    needs: [web-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      # Composite RACINE englobant : securite de la stack (`:code` =
+      # eslint-plugin-security + npm audit) PUIS semgrep SAST (`:sast` = uvx
+      # semgrep p/typescript + p/security-audit). setup-web fournit node/npm
+      # pour `:code` ; setup-uv fournit uv/uvx pour semgrep `:sast`.
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: web-security (eslint-security + npm audit + semgrep p/typescript)
+        run: uv run poe web-security
+
+  # Job informationnel (metriques) — JAMAIS bloquant.
+  web-metrics:
+    name: web-metrics
+    needs: [web-securite]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: metrics
+        run: npm --prefix apps/web run metrics
+
   # ═══════════════════════════════════════════════════════════
   # Lane INFRA — infra/ (Terraform, Docker Compose, GitHub Actions)
+  # Workflow seriel : qualite → build → tests → securite.
+  # Pas de composite action factorisable : chaque concern-job utilise un
+  # sous-ensemble d'outils different (actionlint + terraform pour qualite,
+  # docker CLI pour build, terraform+uv pour test, checkov pour securite).
+  # Pas de *-metrics infra (pas d'outil de metrique dediee a l'IaC).
   # ═══════════════════════════════════════════════════════════
-  # Pas de composite action factorisable : chaque job infra utilise un
-  # sous-ensemble d'outils different (actionlint seul, terraform seul,
-  # terraform+uv pour test-infra, docker CLI pour build-stack).
 
-  lint-infra:
-    name: lint-infra
+  infra-qualite:
+    name: infra-qualite
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -307,33 +261,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: actionlint (GitHub workflows)
         uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2
-
-  format-infra:
-    name: format-infra
-    needs: [lint-infra]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: "1.9"
       - name: terraform fmt -check
         working-directory: infra/terraform
         run: terraform fmt -check -recursive
-
-  typecheck-infra:
-    name: typecheck-infra
-    needs: [format-infra]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
-        with:
-          terraform_version: "1.9"
       - name: terraform validate (tous les environnements)
         run: |
           set -euo pipefail
@@ -343,37 +276,22 @@ jobs:
             echo "::endgroup::"
           done
 
-  security-infra:
-    name: security-infra
-    needs: [typecheck-infra]
+  infra-build:
+    name: infra-build
+    needs: [infra-qualite]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      # L'action passe l'input `framework` comme UN SEUL argv au CLI checkov : la
-      # version epinglee (checkov moderne, `--framework` en nargs='+') refuse la
-      # forme `terraform,dockerfile`. On scinde donc en deux etapes a framework
-      # UNIQUE (chacune un token valide).
-      # Gate RESTAURE BLOQUANT (STN-179) : `soft_fail` retire apres avoir prouve
-      # 0 violation (Checkov local : Terraform 0 failed ; Dockerfile 179 passed /
-      # 0 failed). « Clean as You Code » : tout nouveau finding Checkov bloque la PR.
-      - name: Checkov (Terraform policy)
-        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
-        with:
-          directory: .
-          framework: terraform
-          quiet: true
-      - name: Checkov (Dockerfile policy)
-        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
-        with:
-          directory: .
-          framework: dockerfile
-          quiet: true
+      - name: Validate docker compose config (base + dev override)
+        run: |
+          docker compose -f docker-compose.yml config > /dev/null
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config > /dev/null
 
-  test-infra:
-    name: test-infra
-    needs: [security-infra]
+  infra-test:
+    name: infra-test
+    needs: [infra-build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -392,24 +310,38 @@ jobs:
             echo "::endgroup::"
           done
 
-  build-stack:
-    name: build-stack
-    needs: [test-infra]
+  infra-securite:
+    name: infra-securite
+    needs: [infra-test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Validate docker compose config (base + dev override)
-        run: |
-          docker compose -f docker-compose.yml config > /dev/null
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml config > /dev/null
+      # L'action passe l'input `framework` comme UN SEUL argv au CLI checkov : la
+      # version epinglee (checkov moderne, `--framework` en nargs='+') refuse la
+      # forme `terraform,dockerfile`. On scinde donc en deux etapes a framework
+      # UNIQUE (chacune un token valide).
+      # Gate BLOQUANT (STN-179) : `soft_fail` retire apres avoir prouve 0
+      # violation. « Clean as You Code » : tout nouveau finding Checkov bloque.
+      - name: Checkov (Terraform policy)
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
+        with:
+          directory: .
+          framework: terraform
+          quiet: true
+      - name: Checkov (Dockerfile policy)
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
+        with:
+          directory: .
+          framework: dockerfile
+          quiet: true
 
   # ═══════════════════════════════════════════════════════════
-  # Security globale — job independant, pas dans une lane car scan
-  # transverse (historique git complet, tous les fichiers).
+  # Jobs transverses INDEPENDANTS (paralleles, hors workflow de stack).
   # ═══════════════════════════════════════════════════════════
 
+  # Securite globale : scan transverse (historique git complet, tous fichiers).
   secrets-scan:
     name: secrets-scan
     runs-on: ubuntu-latest
@@ -428,36 +360,82 @@ jobs:
       - name: gitleaks detect (secrets dans le code + historique)
         run: gitleaks detect --source=. --verbose --redact --no-banner
 
+  # Outils racine — scripts/ (tooling Python du depot : worktree, next-version,
+  # validateur commit-msg…). Projet poe RACINE (pyproject.toml racine), PAS
+  # apps/api : on lance `uv run poe test` SANS `--directory`.
+  outils-test:
+    name: outils-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: test (pytest scripts)
+        run: uv run poe test
+
   # ═══════════════════════════════════════════════════════════
-  # Sentinelle finale — seul required check pour branch protection
+  # Sentinelle finale — seul required check pour branch protection.
   # ═══════════════════════════════════════════════════════════
 
   ci-ok:
     name: ci-ok
-    # Les security-{api,web,infra} sont dans les lanes (chainees avant
-    # les tests), donc couvertes transitively par les builds. Pas besoin
-    # de les lister explicitement ici. coverage-api (gate 80%) tourne en
-    # parallele de build-api (meme parent test-integ-api) : on le liste
-    # explicitement car il n'est pas sur le chemin d'un build.
-    needs: [build-api, build-web, build-stack, secrets-scan, coverage-api]
+    # Liste explicite des 14 jobs BLOQUANTS : par stack (api/web/infra) les 4
+    # concerns qualite/build/test/securite (semgrep est englobe dans *-securite),
+    # plus les 2 transverses outils-test + secrets-scan. Les *-metrics sont
+    # informationnels (continue-on-error) et volontairement ABSENTS.
+    needs:
+      - api-qualite
+      - api-build
+      - api-test
+      - api-securite
+      - web-qualite
+      - web-build
+      - web-test
+      - web-securite
+      - infra-qualite
+      - infra-build
+      - infra-test
+      - infra-securite
+      - outils-test
+      - secrets-scan
     if: always()
     runs-on: ubuntu-latest
     permissions: {} # sentinelle : ne checkout rien, ne touche pas au token
     steps:
-      - name: Verify all lane builds + global secrets-scan succeeded
+      - name: Verify all required jobs succeeded
         env:
-          RESULT_API: ${{ needs.build-api.result }}
-          RESULT_WEB: ${{ needs.build-web.result }}
-          RESULT_STACK: ${{ needs.build-stack.result }}
+          RESULT_API_QUALITE: ${{ needs.api-qualite.result }}
+          RESULT_API_BUILD: ${{ needs.api-build.result }}
+          RESULT_API_TEST: ${{ needs.api-test.result }}
+          RESULT_API_SECURITE: ${{ needs.api-securite.result }}
+          RESULT_WEB_QUALITE: ${{ needs.web-qualite.result }}
+          RESULT_WEB_BUILD: ${{ needs.web-build.result }}
+          RESULT_WEB_TEST: ${{ needs.web-test.result }}
+          RESULT_WEB_SECURITE: ${{ needs.web-securite.result }}
+          RESULT_INFRA_QUALITE: ${{ needs.infra-qualite.result }}
+          RESULT_INFRA_BUILD: ${{ needs.infra-build.result }}
+          RESULT_INFRA_TEST: ${{ needs.infra-test.result }}
+          RESULT_INFRA_SECURITE: ${{ needs.infra-securite.result }}
+          RESULT_OUTILS_TEST: ${{ needs.outils-test.result }}
           RESULT_SECRETS: ${{ needs.secrets-scan.result }}
-          RESULT_COVERAGE: ${{ needs.coverage-api.result }}
         run: |
-          echo "lane builds | api=$RESULT_API | web=$RESULT_WEB | stack=$RESULT_STACK"
-          echo "global      | secrets-scan=$RESULT_SECRETS | coverage-api=$RESULT_COVERAGE"
-          for r in "$RESULT_API" "$RESULT_WEB" "$RESULT_STACK" "$RESULT_SECRETS" "$RESULT_COVERAGE"; do
+          echo "qualite  | api=$RESULT_API_QUALITE | web=$RESULT_WEB_QUALITE | infra=$RESULT_INFRA_QUALITE"
+          echo "build    | api=$RESULT_API_BUILD | web=$RESULT_WEB_BUILD | infra=$RESULT_INFRA_BUILD"
+          echo "test     | api=$RESULT_API_TEST | web=$RESULT_WEB_TEST | infra=$RESULT_INFRA_TEST | outils=$RESULT_OUTILS_TEST"
+          echo "securite | api=$RESULT_API_SECURITE | web=$RESULT_WEB_SECURITE | infra=$RESULT_INFRA_SECURITE (semgrep englobe dans api/web)"
+          echo "global   | secrets-scan=$RESULT_SECRETS"
+          for r in \
+            "$RESULT_API_QUALITE" "$RESULT_API_BUILD" "$RESULT_API_TEST" "$RESULT_API_SECURITE" \
+            "$RESULT_WEB_QUALITE" "$RESULT_WEB_BUILD" "$RESULT_WEB_TEST" "$RESULT_WEB_SECURITE" \
+            "$RESULT_INFRA_QUALITE" "$RESULT_INFRA_BUILD" "$RESULT_INFRA_TEST" "$RESULT_INFRA_SECURITE" \
+            "$RESULT_OUTILS_TEST" "$RESULT_SECRETS"; do
             if [[ "$r" != "success" ]]; then
               echo "::error::At least one required job failed (result=$r)"
               exit 1
             fi
           done
-          echo "✅ All CI lanes green (security-*, builds, coverage-api inclus)"
+          echo "✅ All required CI jobs green (qualite → build → test → securite par stack + outils + secrets)"
