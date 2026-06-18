@@ -23,6 +23,7 @@ requires-python = ">=3.13"
 dev = [
     "poethepoet>=0.44.0",
     "pre-commit>=4.0.0",
+    "pytest>=9.0.3",
 ]
 
 [tool.uv]
@@ -49,4 +50,11 @@ security     = ["api-security",   "web-security"]
 metrics      = ["api-metrics",    "web-metrics"]
 "pre-commit" = ["api-pre-commit", "web-pre-commit"]
 "pre-push"   = ["api-pre-push",   "web-pre-push"]
-ci           = ["quality", "security"]
+# Tests des OUTILS racine (scripts/ — ex. validateur de message commit-msg).
+# Les tests applicatifs vivent dans chaque stack (api `test:cov`, web `test`).
+test         = "pytest scripts"
+ci           = ["quality", "security", "test"]
+
+[tool.pytest.ini_options]
+testpaths = ["scripts"]
+python_files = ["test_*.py"]
