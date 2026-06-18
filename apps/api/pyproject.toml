@@ -29,10 +29,12 @@ dependencies = [
 dev = [
     "mutmut>=3.5.0",
     "mypy>=1.20.1",
+    "pip-audit>=2.7.3",
     "poethepoet>=0.44.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.1.0",
+    "radon>=6.0.1",
     "ruff>=0.15.11",
     "testcontainers>=4.14.2",
     "types-docker>=7.1.0.20260518",
@@ -135,6 +137,24 @@ e2e            = "pytest -m e2e"
 # --- Build ---
 build          = "docker build -t stacknest-api:local ."
 
-# --- Composites ---
-check          = ["lint", "format:check", "typecheck", "test"]  # gate CI complet
-fix            = ["lint:fix", "format"]                          # auto-fix tout
+# --- Metrics (informationnel — jamais bloquant, jamais en hook) ---
+complexity      = "radon cc app -s -a --total-average"  # complexite cyclomatique (McCabe)
+maintainability = "radon mi app -s"                      # Maintainability Index
+metrics         = ["complexity", "maintainability"]
+
+# --- Security ---
+# flake8-bandit (S) sur le code de PROD. Hors tests/fakes (fixtures = faux positifs)
+# et hors S101 (assert) + S105/106/107 (heuristiques "mot de passe" tres FP : la
+# detection de secrets reels est le job de gitleaks en CI, pas du lint).
+"security:lint" = "ruff check --select S --ignore S101,S105,S106,S107 --extend-exclude *.unit.py,*.integ.py,*.e2e.py,conftest.py,fakes.py app"
+"security:deps" = "pip-audit"                            # CVE des dependances (reseau)
+security        = ["security:lint", "security:deps"]
+
+# --- Composites par CONCERN ---
+quality         = ["lint", "format:check", "typecheck"]          # qualite statique (check-only)
+check           = ["quality", "security", "test:cov"]            # gate local complet ~ CI
+fix             = ["lint:fix", "format"]                          # auto-fix — ON-DEMAND, JAMAIS en hook
+
+# --- Composites par STAGE git (appeles tels quels par les hooks, check-only) ---
+"pre-commit"    = ["lint", "format:check"]                       # rapide, aucune mutation de fichier
+"pre-push"      = ["typecheck", "test:unit", "security"]         # avant remote : types + tests + securite
