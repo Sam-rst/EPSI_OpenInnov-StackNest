@@ -121,6 +121,7 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
       # Composite RACINE englobant : securite de la stack (`:code` =
       # ruff/bandit + pip-audit) PUIS semgrep SAST (`:sast` = uvx semgrep
@@ -215,6 +216,7 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
       # Composite RACINE englobant : securite de la stack (`:code` =
       # eslint-plugin-security + npm audit) PUIS semgrep SAST (`:sast` = uvx
