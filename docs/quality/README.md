@@ -45,13 +45,25 @@ uv run pre-commit install --install-hooks   # pose pre-commit + pre-push + commi
 
 > **Vérification, pas correction** : les hooks *constatent* le respect des règles ; ils ne mutent jamais les fichiers stagés. Le dev lance `…run fix` lui-même au besoin. Bypass d'urgence : `git commit/push --no-verify` (toléré, tracé).
 
-## 🤖 CI (`ci.yml`) — un job par stack × concern
+## 🤖 CI (`ci.yml`) — 1 job par stack × concern, **ordonnés en workflow**
 
-Même vocabulaire qu'en local (« ce qui tourne en local = ce qui tourne en CI »). **Un job par stack par concern**, chacun avec **setup unique + steps granulaires** :
+Même vocabulaire qu'en local (« ce qui tourne en local = ce qui tourne en CI »). Chaque job appelle un **composite** (jamais d'outil brut), setup unique + steps granulaires. Les concerns d'une stack sont **chaînés via `needs`** (fail-fast) :
 
-`api-qualite` · `web-qualite` · `api-securite` · `web-securite` · `api-metrics` *(informatif)* · `web-metrics` *(informatif)* · `api-test`/`coverage-api` · `web-test` — agrégés par `ci-ok`.
+```
+qualité → build → tests → sécurité → métriques
+```
 
-Les scans **infra/transverses** restent des lanes dédiées (images Docker / actions) : `security-infra` (Checkov), `secrets-scan` (gitleaks), et en **nightly** : Trivy, mutation (`mutmut`/Stryker), `pip-audit`/`npm audit`, SonarCloud.
+| Stack | Chaîne sérielle | metrics (non bloquant) |
+|---|---|---|
+| **api** | `api-qualite` → `api-build` → `api-test` → `api-securite` | `api-metrics` |
+| **web** | `web-qualite` → `web-build` → `web-test` → `web-securite` | `web-metrics` |
+| **infra** | `infra-qualite` → `infra-build` → `infra-test` → `infra-securite` | — |
+
+Les 3 stacks tournent **en parallèle** entre elles. **`api-securite` / `web-securite`** appellent les composites **racine englobants** `api-security` / `web-security` = sécu de stack (`:code`) **+ semgrep** (`:sast`, `uvx`) — il n'y a **plus** de jobs `semgrep-api`/`semgrep-web` séparés.
+
+Jobs **transverses indépendants** : `secrets-scan` (gitleaks, historique git) · `outils-test` (tooling Python racine). Sentinelle **`ci-ok`** = AND des **14** jobs bloquants (metrics exclus) → seul *required check*.
+
+**Nightly** (`ci-nightly.yml`) : Trivy, mutation (`mutmut`/Stryker), e2e, SonarCloud.
 
 ## 📐 Métriques (le « quoi » qu'on mesure)
 

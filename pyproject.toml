@@ -32,17 +32,31 @@ package = false
 [tool.poe.tasks]
 # ---- délégués back (apps/api · poe) — un job par stack, invocable & visible ----
 "api-quality"    = "uv run --directory apps/api poe quality"
-"api-security"   = "uv run --directory apps/api poe security"
 "api-metrics"    = "uv run --directory apps/api poe metrics"
 "api-pre-commit" = "uv run --directory apps/api poe pre-commit"
 "api-pre-push"   = "uv run --directory apps/api poe pre-push"
 
 # ---- délégués front (apps/web · npm) ----
 "web-quality"    = "npm --prefix apps/web run quality"
-"web-security"   = "npm --prefix apps/web run security"
 "web-metrics"    = "npm --prefix apps/web run metrics"
 "web-pre-commit" = "npm --prefix apps/web run pre-commit"
 "web-pre-push"   = "npm --prefix apps/web run pre-push"
+
+# ---- SÉCURITÉ par stack — composite ENGLOBANT : sécu de la stack (:code) +
+#      semgrep SAST (:sast). semgrep est UN outil Python *polyglotte* (un seul
+#      binaire scanne back ET front via des rulesets différents) : on le gère à
+#      la RACINE via `uvx` (env éphémère épinglé — aucune pollution des venvs de
+#      stack, aucun lock à modifier), scopé par stack (p/python sur apps/api,
+#      p/typescript sur apps/web) + p/security-audit partout, en `--error
+#      --severity=ERROR` (échec dur sur finding ERROR). Volontairement HORS hooks
+#      (le pre-push de stack garde sa sécu sans semgrep → OK Windows) ; semgrep
+#      tourne en CI (Linux) et, en local Windows, via Docker — cf. CLAUDE.md.
+"api-security:code" = "uv run --directory apps/api poe security"
+"api-security:sast" = "uvx --from semgrep==1.166.0 semgrep scan --config=p/python --config=p/security-audit --error --severity=ERROR apps/api"
+"api-security"      = ["api-security:code", "api-security:sast"]
+"web-security:code" = "npm --prefix apps/web run security"
+"web-security:sast" = "uvx --from semgrep==1.166.0 semgrep scan --config=p/typescript --config=p/security-audit --error --severity=ERROR apps/web"
+"web-security"      = ["web-security:code", "web-security:sast"]
 
 # ---- composites cross-stack (la carte lisible) ----
 quality      = ["api-quality",    "web-quality"]

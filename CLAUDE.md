@@ -201,17 +201,22 @@ Pour des scans **reproductibles**, les outils de sécurité et les actions
 GitHub tierces sont **épinglés** (pas de `latest`/`@master` flottant). Tout
 bump est volontaire et tracé dans un commit dédié.
 
-- **Semgrep** : image Docker épinglée **`semgrep/semgrep:1.166.0`** (tag + digest
-  `sha256:c180f0c93a17b420c0af5006214a29d3c747c5459c732b740191adf657dd0068`),
-  utilisée par les lanes `security-api` / `security-web` de `ci.yml`. Garder
-  les deux lanes alignées sur la même version au prochain bump.
+- **Semgrep** : outil Python **polyglotte** épinglé **`semgrep==1.166.0`**, exécuté
+  via `uvx --from semgrep==1.166.0` (env éphémère, pas de pollution des venvs de
+  stack). Il n'y a **plus** de jobs `semgrep-api`/`semgrep-web` séparés : semgrep
+  est **englobé** dans la sécurité de chaque stack via les composites **racine**
+  `api-security` / `web-security` (`pyproject.toml` racine, partie `:sast`), eux-
+  mêmes appelés par les jobs CI `api-securite` / `web-securite`. Garder le pin
+  aligné back/front au prochain bump (un seul endroit : `pyproject.toml` racine).
 - **Rulesets semgrep** : registres distants versionnés par Semgrep —
-  `p/python` (lane API), `p/typescript` (lane web) et `p/security-audit`
-  (les deux). Scan en `--severity=ERROR --error` (échec dur sur finding ERROR).
-  Tests exclus via `.semgrepignore` (fixtures = secrets factices).
-  Reproduire en local : `docker run --rm -v "$PWD:/src" semgrep/semgrep:1.166.0
-  semgrep scan --config=p/python --config=p/security-audit --error
-  --severity=ERROR apps/api` (idem `p/typescript` + `apps/web`).
+  `p/python` (scope `apps/api`), `p/typescript` (scope `apps/web`) et
+  `p/security-audit` (les deux). Scan en `--severity=ERROR --error` (échec dur sur
+  finding ERROR). Tests exclus via `.semgrepignore` (fixtures = secrets factices).
+  Reproduire en local : `uv run poe api-security` (resp. `web-security`), ou —
+  **fallback Windows** (semgrep ne tourne pas nativement sous win32, comme mutmut) —
+  via Docker : `docker run --rm -v "$PWD:/src" semgrep/semgrep:1.166.0 semgrep
+  scan --config=p/python --config=p/security-audit --error --severity=ERROR
+  apps/api` (idem `p/typescript` + `apps/web`).
 - **Trivy** : `aquasecurity/trivy-action` épinglé au SHA de `v0.36.0` (ex-`@master`).
 - **Checkov** : `bridgecrewio/checkov-action` épinglé au SHA de `v12.1347.0` (ex-`@master`).
 - **Actions GitHub tierces** (`docker/*`, `anchore/*`, `hashicorp/*`,
