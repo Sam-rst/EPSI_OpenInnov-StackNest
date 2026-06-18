@@ -1,0 +1,52 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Orchestrateur QUALITÉ racine (monorepo polyglotte).
+#
+# Ce fichier ne contient AUCUNE logique d'outil : il se contente de DÉLÉGUER aux
+# composites de chaque stack — back `apps/api` (poe) et front `apps/web` (npm) —
+# via les flags natifs de cwd (`uv run --directory …`, `npm --prefix …`), sans
+# jamais `cd`. C'est la **carte unique et traçable** des jobs qualité, appelée
+# aussi bien par les hooks git (`.pre-commit-config.yaml`) que par la CI.
+#
+#   uv run poe quality     # qualité statique back + front
+#   uv run poe security    # sécurité back + front
+#   uv run poe metrics     # métriques back + front (informationnel)
+#   uv run poe pre-commit  # ce que le hook pre-commit enchaîne
+#   uv run poe pre-push    # ce que le hook pre-push enchaîne
+# ─────────────────────────────────────────────────────────────────────────────
+[project]
+name = "stacknest"
+version = "0.78.0"
+description = "StackNest — orchestrateur qualité racine (délègue aux stacks api/web)"
+requires-python = ">=3.13"
+
+[dependency-groups]
+dev = [
+    "poethepoet>=0.44.0",
+    "pre-commit>=4.0.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.poe.tasks]
+# ---- délégués back (apps/api · poe) — un job par stack, invocable & visible ----
+"api-quality"    = "uv run --directory apps/api poe quality"
+"api-security"   = "uv run --directory apps/api poe security"
+"api-metrics"    = "uv run --directory apps/api poe metrics"
+"api-pre-commit" = "uv run --directory apps/api poe pre-commit"
+"api-pre-push"   = "uv run --directory apps/api poe pre-push"
+
+# ---- délégués front (apps/web · npm) ----
+"web-quality"    = "npm --prefix apps/web run quality"
+"web-security"   = "npm --prefix apps/web run security"
+"web-metrics"    = "npm --prefix apps/web run metrics"
+"web-pre-commit" = "npm --prefix apps/web run pre-commit"
+"web-pre-push"   = "npm --prefix apps/web run pre-push"
+
+# ---- composites cross-stack (la carte lisible) ----
+quality      = ["api-quality",    "web-quality"]
+security     = ["api-security",   "web-security"]
+metrics      = ["api-metrics",    "web-metrics"]
+"pre-commit" = ["api-pre-commit", "web-pre-commit"]
+"pre-push"   = ["api-pre-push",   "web-pre-push"]
+ci           = ["quality", "security"]

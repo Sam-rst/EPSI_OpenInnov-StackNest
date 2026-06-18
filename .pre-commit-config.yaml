@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Hooks git (shift-left) — funnel à 3 étages. Les hooks n'appellent QUE les
+# composites de chaque stack (aucune logique d'outil ici) ; ils VÉRIFIENT, ne
+# corrigent jamais (pas de --fix : un hook ne mute pas les fichiers stagés).
+#
+# Installation (une fois) :
+#   uv run pre-commit install --install-hooks
+#   (installe pre-commit + pre-push + commit-msg via default_install_hook_types)
+#
+# Budget par étage :
+#   commit-msg  ~instant   — valide le format Conventional Commit (+ STN-XX)
+#   pre-commit  < ~5 s      — lint + format:check, stack modifiée seulement
+#   pre-push    < ~60 s     — typecheck + test:unit + security, avant le remote
+# Le reste (metrics, mutation, integ/e2e, coverage) → on-demand + CI.
+# ─────────────────────────────────────────────────────────────────────────────
+default_install_hook_types: [pre-commit, pre-push, commit-msg]
+default_stages: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+      # ── commit-msg : Conventional Commit FR (+ référence STN-XX encouragée) ──
+      - id: commit-msg-conventional
+        name: "commit-msg · Conventional Commit (+ STN-XX)"
+        language: system
+        stages: [commit-msg]
+        entry: uv run python scripts/hooks/check_commit_msg.py
+        always_run: true
+
+      # ── pre-commit : VÉRIFICATION rapide, par stack modifiée (jamais de fix) ──
+      - id: api-pre-commit
+        name: "api · pre-commit (lint + format:check)"
+        language: system
+        files: ^apps/api/
+        pass_filenames: false
+        entry: uv run --directory apps/api poe pre-commit
+        stages: [pre-commit]
+      - id: web-pre-commit
+        name: "web · pre-commit (lint + format:check)"
+        language: system
+        files: ^apps/web/
+        pass_filenames: false
+        entry: npm --prefix apps/web run pre-commit
+        stages: [pre-commit]
+
+      # ── pre-push : types + tests unitaires + sécurité, par stack modifiée ──
+      - id: api-pre-push
+        name: "api · pre-push (typecheck + test:unit + security)"
+        language: system
+        files: ^apps/api/
+        pass_filenames: false
+        entry: uv run --directory apps/api poe pre-push
+        stages: [pre-push]
+      - id: web-pre-push
+        name: "web · pre-push (typecheck + test:unit + security)"
+        language: system
+        files: ^apps/web/
+        pass_filenames: false
+        entry: npm --prefix apps/web run pre-push
+        stages: [pre-push]
