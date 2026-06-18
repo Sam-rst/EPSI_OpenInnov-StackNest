@@ -4,17 +4,19 @@ name: CI
 # Les taches lentes (e2e, mutation testing, deep security) vivent dans
 # ci-nightly.yml et s'executent a 20h via schedule.
 #
-# Topologie : 3 lanes parallèles et indépendantes (api / web / infra).
-# Chaque lane chaine ses etapes en sequentiel via `needs:` — si lint-api
-# casse, format-api / typecheck-api / test-*-api / build-api ne tournent
-# pas. Les lanes ne s'attendent pas entre elles (pas de gate global par
-# stage) : l'api avance meme si web echoue au lint.
+# Topologie : 1 job par stack × concern (qualite / securite / test /
+# metrics), chaque job appelant les COMPOSITES poe (back) / npm (front)
+# — jamais d'outil en direct. Setup unique (setup-api / setup-web) puis
+# steps granulaires. Les concern-jobs d'une meme stack tournent en
+# PARALLELE (plus de chainage sequentiel `needs:` entre concerns) ; seuls
+# les builds attendent leur job de test (build-api ← api-test, build-web ←
+# web-test). La lane infra garde son chainage propre.
 #
-# Sentinelle finale `ci-ok` attend les 3 builds. C'est le seul required
-# check a configurer cote branch protection.
+# Sentinelle finale `ci-ok` attend les jobs bloquants. C'est le seul
+# required check a configurer cote branch protection.
 #
-# Le setup repete (checkout + setup-uv + uv sync pour la lane api,
-# checkout + setup-node + npm ci pour la lane web) est factorise dans
+# Le setup repete (checkout + setup-uv + uv sync pour la stack api,
+# checkout + setup-node + npm ci pour la stack web) est factorise dans
 # des composite actions sous .github/actions/setup-{api,web}/action.yml.
 
 on:
@@ -35,110 +37,86 @@ permissions: {}
 
 jobs:
   # ═══════════════════════════════════════════════════════════
-  # Lane API — apps/api (Python 3.13, uv, FastAPI)
+  # Stack API — apps/api (Python 3.13, uv, FastAPI)
+  # Jobs par concern : qualite / securite / test / metrics.
+  # Setup-api UNE fois par job, puis steps granulaires via poe.
   # ═══════════════════════════════════════════════════════════
 
-  lint-api:
-    name: lint-api
+  api-qualite:
+    name: api-qualite
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
-      - name: ruff check
-        working-directory: apps/api
-        run: uv run poe lint
+      - name: lint
+        run: uv run --directory apps/api poe lint
+      - name: format:check
+        run: uv run --directory apps/api poe format:check
+      - name: typecheck
+        run: uv run --directory apps/api poe typecheck
 
-  format-api:
-    name: format-api
-    needs: [lint-api]
+  api-securite:
+    name: api-securite
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
-      - name: ruff format --check
-        working-directory: apps/api
-        run: uv run poe format:check
+      - name: security:lint
+        run: uv run --directory apps/api poe security:lint
+      - name: security:deps
+        run: uv run --directory apps/api poe security:deps
 
-  typecheck-api:
-    name: typecheck-api
-    needs: [format-api]
+  api-test:
+    name: api-test
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
-      - name: mypy strict
-        working-directory: apps/api
-        run: uv run poe typecheck
+      # test:cov lance la suite complete unit+integ avec le seuil
+      # --cov-fail-under=80 (testcontainers/Docker disponibles sur le
+      # runner ubuntu-latest, comme pour les anciens test-unit/integ).
+      - name: test:cov
+        run: uv run --directory apps/api poe test:cov
 
-  security-api:
-    name: security-api
-    needs: [typecheck-api]
+  # Job informationnel (complexite / metriques) — JAMAIS bloquant.
+  api-metrics:
+    name: api-metrics
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: metrics
+        run: uv run --directory apps/api poe metrics
+
+  # SAST semgrep API — image EPINGLEE (tag + digest) pour des scans
+  # reproductibles : pas de `:latest` flottant qui ferait varier les
+  # regles/findings d'un run a l'autre. Bump volontaire et trace dans le
+  # commit. Resout SonarCloud (supply-chain / reproductibilite). Voir
+  # CLAUDE.md « Securite / Semgrep ».
+  semgrep-api:
+    name: semgrep-api
     runs-on: ubuntu-latest
     permissions:
       contents: read
     container:
-      # Version semgrep EPINGLEE (tag + digest) pour des scans reproductibles :
-      # pas de `:latest` flottant qui ferait varier les regles/findings d'un run
-      # a l'autre. Bump volontaire et trace dans le commit. Resout SonarCloud
-      # (supply-chain / reproductibilite). Voir CLAUDE.md « Securite / Semgrep ».
       image: semgrep/semgrep:1.166.0@sha256:c180f0c93a17b420c0af5006214a29d3c747c5459c732b740191adf657dd0068
     steps:
       - uses: actions/checkout@v4
       - name: semgrep (rules python + security-audit, ERROR only)
         run: semgrep scan --config=p/python --config=p/security-audit --error --severity=ERROR apps/api
 
-  test-unit-api:
-    name: test-unit-api
-    needs: [security-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-api
-      - name: pytest -m unit
-        working-directory: apps/api
-        run: uv run poe test:unit
-
-  test-integ-api:
-    name: test-integ-api
-    needs: [test-unit-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-api
-      - name: pytest -m integ
-        working-directory: apps/api
-        run: uv run poe test:integ
-
-  # Gate de couverture : ni test:unit ni test:integ ne l'enforce (ils tournent
-  # avec --no-cov car un run partiel ne peut pas atteindre 80% sur tout `app`).
-  # Ce job lance la suite complete unit+integ avec --cov-fail-under=80 (poe
-  # test:cov) ; c'est lui qui porte le seuil 80%. Required via ci-ok.
-  coverage-api:
-    name: coverage-api
-    needs: [test-integ-api]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-api
-      - name: pytest unit+integ + seuil couverture 80%
-        working-directory: apps/api
-        run: uv run poe test:cov
-
   build-api:
     name: build-api
-    needs: [test-integ-api]
+    needs: [api-test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -169,9 +147,11 @@ jobs:
           retention-days: 30
 
   # ═══════════════════════════════════════════════════════════
-  # Lane WEB — apps/web (Node 22, Vite, React)
+  # Stack WEB — apps/web (Node 22, Vite, React)
+  # Jobs par concern : qualite / securite / test / metrics.
+  # Setup-web UNE fois par job, puis steps granulaires via npm.
   # ═══════════════════════════════════════════════════════════
-  # NB : la lane cible exclusivement `apps/web` (working-directory /
+  # NB : la stack cible exclusivement `apps/web` (working-directory /
   # context). `apps/web-mockup/` (référence design issue de la branche
   # `mockups`, STN-157) est volontairement HORS quality gate : pas de
   # workspaces root, aucun job ne le référence. C'est une archive de
@@ -179,89 +159,76 @@ jobs:
   # redéveloppée en TDD strict dans `apps/web`. Voir
   # docs/superpowers/specs/2026-06-04-integration-mockup-reference.md.
 
-  lint-web:
-    name: lint-web
+  web-qualite:
+    name: web-qualite
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
-      - name: eslint
-        working-directory: apps/web
-        run: npm run lint
+      - name: lint
+        run: npm --prefix apps/web run lint
+      - name: format:check
+        run: npm --prefix apps/web run format:check
+      - name: typecheck
+        run: npm --prefix apps/web run typecheck
 
-  format-web:
-    name: format-web
-    needs: [lint-web]
+  web-securite:
+    name: web-securite
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
-      - name: prettier --check
-        working-directory: apps/web
-        run: npm run format:check
+      - name: security:lint
+        run: npm --prefix apps/web run security:lint
+      - name: security:deps
+        run: npm --prefix apps/web run security:deps
 
-  typecheck-web:
-    name: typecheck-web
-    needs: [format-web]
+  web-test:
+    name: web-test
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
-      - name: tsc --noEmit
-        working-directory: apps/web
-        run: npm run typecheck
+      - name: test
+        run: npm --prefix apps/web run test
 
-  security-web:
-    name: security-web
-    needs: [typecheck-web]
+  # Job informationnel (metriques) — JAMAIS bloquant.
+  web-metrics:
+    name: web-metrics
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+      - name: metrics
+        run: npm --prefix apps/web run metrics
+
+  # SAST semgrep WEB — image EPINGLEE (tag + digest), idem stack API :
+  # scans reproductibles, pas de `:latest`. Garder les deux jobs alignes
+  # sur la meme version au prochain bump. Voir CLAUDE.md « Securite / Semgrep ».
+  semgrep-web:
+    name: semgrep-web
     runs-on: ubuntu-latest
     permissions:
       contents: read
     container:
-      # Version semgrep EPINGLEE (tag + digest), idem lane API : scans
-      # reproductibles, pas de `:latest`. Garder les deux lanes alignees sur la
-      # meme version au prochain bump. Voir CLAUDE.md « Securite / Semgrep ».
       image: semgrep/semgrep:1.166.0@sha256:c180f0c93a17b420c0af5006214a29d3c747c5459c732b740191adf657dd0068
     steps:
       - uses: actions/checkout@v4
       - name: semgrep (rules typescript + security-audit, ERROR only)
         run: semgrep scan --config=p/typescript --config=p/security-audit --error --severity=ERROR apps/web
 
-  test-unit-web:
-    name: test-unit-web
-    needs: [security-web]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-web
-      - name: vitest unit
-        working-directory: apps/web
-        run: npm run test:unit
-
-  test-integ-web:
-    name: test-integ-web
-    needs: [test-unit-web]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-web
-      - name: vitest integ
-        working-directory: apps/web
-        run: npm run test:integ
-
   build-web:
     name: build-web
-    needs: [test-integ-web]
+    needs: [web-test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -434,30 +401,57 @@ jobs:
 
   ci-ok:
     name: ci-ok
-    # Les security-{api,web,infra} sont dans les lanes (chainees avant
-    # les tests), donc couvertes transitively par les builds. Pas besoin
-    # de les lister explicitement ici. coverage-api (gate 80%) tourne en
-    # parallele de build-api (meme parent test-integ-api) : on le liste
-    # explicitement car il n'est pas sur le chemin d'un build.
-    needs: [build-api, build-web, build-stack, secrets-scan, coverage-api]
+    # Liste explicite des jobs BLOQUANTS (1 par stack × concern + builds +
+    # semgrep + infra + secrets). Les *-metrics sont informationnels
+    # (continue-on-error) et volontairement ABSENTS de cette liste.
+    needs:
+      - api-qualite
+      - web-qualite
+      - api-securite
+      - web-securite
+      - api-test
+      - web-test
+      - semgrep-api
+      - semgrep-web
+      - build-api
+      - build-web
+      - build-stack
+      - secrets-scan
     if: always()
     runs-on: ubuntu-latest
     permissions: {} # sentinelle : ne checkout rien, ne touche pas au token
     steps:
-      - name: Verify all lane builds + global secrets-scan succeeded
+      - name: Verify all required jobs succeeded
         env:
-          RESULT_API: ${{ needs.build-api.result }}
-          RESULT_WEB: ${{ needs.build-web.result }}
-          RESULT_STACK: ${{ needs.build-stack.result }}
+          RESULT_API_QUALITE: ${{ needs.api-qualite.result }}
+          RESULT_WEB_QUALITE: ${{ needs.web-qualite.result }}
+          RESULT_API_SECURITE: ${{ needs.api-securite.result }}
+          RESULT_WEB_SECURITE: ${{ needs.web-securite.result }}
+          RESULT_API_TEST: ${{ needs.api-test.result }}
+          RESULT_WEB_TEST: ${{ needs.web-test.result }}
+          RESULT_SEMGREP_API: ${{ needs.semgrep-api.result }}
+          RESULT_SEMGREP_WEB: ${{ needs.semgrep-web.result }}
+          RESULT_BUILD_API: ${{ needs.build-api.result }}
+          RESULT_BUILD_WEB: ${{ needs.build-web.result }}
+          RESULT_BUILD_STACK: ${{ needs.build-stack.result }}
           RESULT_SECRETS: ${{ needs.secrets-scan.result }}
-          RESULT_COVERAGE: ${{ needs.coverage-api.result }}
         run: |
-          echo "lane builds | api=$RESULT_API | web=$RESULT_WEB | stack=$RESULT_STACK"
-          echo "global      | secrets-scan=$RESULT_SECRETS | coverage-api=$RESULT_COVERAGE"
-          for r in "$RESULT_API" "$RESULT_WEB" "$RESULT_STACK" "$RESULT_SECRETS" "$RESULT_COVERAGE"; do
+          echo "qualite  | api=$RESULT_API_QUALITE | web=$RESULT_WEB_QUALITE"
+          echo "securite | api=$RESULT_API_SECURITE | web=$RESULT_WEB_SECURITE"
+          echo "test     | api=$RESULT_API_TEST | web=$RESULT_WEB_TEST"
+          echo "semgrep  | api=$RESULT_SEMGREP_API | web=$RESULT_SEMGREP_WEB"
+          echo "build    | api=$RESULT_BUILD_API | web=$RESULT_BUILD_WEB | stack=$RESULT_BUILD_STACK"
+          echo "global   | secrets-scan=$RESULT_SECRETS"
+          for r in \
+            "$RESULT_API_QUALITE" "$RESULT_WEB_QUALITE" \
+            "$RESULT_API_SECURITE" "$RESULT_WEB_SECURITE" \
+            "$RESULT_API_TEST" "$RESULT_WEB_TEST" \
+            "$RESULT_SEMGREP_API" "$RESULT_SEMGREP_WEB" \
+            "$RESULT_BUILD_API" "$RESULT_BUILD_WEB" "$RESULT_BUILD_STACK" \
+            "$RESULT_SECRETS"; do
             if [[ "$r" != "success" ]]; then
               echo "::error::At least one required job failed (result=$r)"
               exit 1
             fi
           done
-          echo "✅ All CI lanes green (security-*, builds, coverage-api inclus)"
+          echo "✅ All required CI jobs green (qualite, securite, test, semgrep, builds, secrets)"
