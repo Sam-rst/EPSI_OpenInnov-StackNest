@@ -7,10 +7,11 @@ name: CI
 # Topologie : 1 job par stack × concern (qualite / securite / test /
 # metrics), chaque job appelant les COMPOSITES poe (back) / npm (front)
 # — jamais d'outil en direct. Setup unique (setup-api / setup-web) puis
-# steps granulaires. Les concern-jobs d'une meme stack tournent en
+# steps granulaires. Nommage STACK-FIRST coherent : `<stack>-<concern>`
+# (api-*, web-*, infra-*). Les concern-jobs d'une meme stack tournent en
 # PARALLELE (plus de chainage sequentiel `needs:` entre concerns) ; seuls
-# les builds attendent leur job de test (build-api ← api-test, build-web ←
-# web-test). La lane infra garde son chainage propre.
+# les builds attendent leur job de test (api-build ← api-test, web-build ←
+# web-test, infra-build ← infra-test).
 #
 # Sentinelle finale `ci-ok` attend les jobs bloquants. C'est le seul
 # required check a configurer cote branch protection.
@@ -114,8 +115,8 @@ jobs:
       - name: semgrep (rules python + security-audit, ERROR only)
         run: semgrep scan --config=p/python --config=p/security-audit --error --severity=ERROR apps/api
 
-  build-api:
-    name: build-api
+  api-build:
+    name: api-build
     needs: [api-test]
     runs-on: ubuntu-latest
     permissions:
@@ -226,8 +227,8 @@ jobs:
       - name: semgrep (rules typescript + security-audit, ERROR only)
         run: semgrep scan --config=p/typescript --config=p/security-audit --error --severity=ERROR apps/web
 
-  build-web:
-    name: build-web
+  web-build:
+    name: web-build
     needs: [web-test]
     runs-on: ubuntu-latest
     permissions:
@@ -260,13 +261,17 @@ jobs:
 
   # ═══════════════════════════════════════════════════════════
   # Lane INFRA — infra/ (Terraform, Docker Compose, GitHub Actions)
+  # Jobs par concern : qualite / securite / test (+ build).
+  # Pas de composite action factorisable : chaque concern-job utilise un
+  # sous-ensemble d'outils different (actionlint + terraform pour qualite,
+  # checkov pour securite, terraform+uv pour test, docker CLI pour build).
+  # Comme api-* / web-* : les concern-jobs tournent en PARALLELE (plus de
+  # chainage sequentiel `needs:` entre concerns) ; seul infra-build attend
+  # infra-test.
   # ═══════════════════════════════════════════════════════════
-  # Pas de composite action factorisable : chaque job infra utilise un
-  # sous-ensemble d'outils different (actionlint seul, terraform seul,
-  # terraform+uv pour test-infra, docker CLI pour build-stack).
 
-  lint-infra:
-    name: lint-infra
+  infra-qualite:
+    name: infra-qualite
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -274,33 +279,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: actionlint (GitHub workflows)
         uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2
-
-  format-infra:
-    name: format-infra
-    needs: [lint-infra]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: "1.9"
       - name: terraform fmt -check
         working-directory: infra/terraform
         run: terraform fmt -check -recursive
-
-  typecheck-infra:
-    name: typecheck-infra
-    needs: [format-infra]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
-        with:
-          terraform_version: "1.9"
       - name: terraform validate (tous les environnements)
         run: |
           set -euo pipefail
@@ -310,9 +294,8 @@ jobs:
             echo "::endgroup::"
           done
 
-  security-infra:
-    name: security-infra
-    needs: [typecheck-infra]
+  infra-securite:
+    name: infra-securite
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -338,9 +321,8 @@ jobs:
           framework: dockerfile
           quiet: true
 
-  test-infra:
-    name: test-infra
-    needs: [security-infra]
+  infra-test:
+    name: infra-test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -359,9 +341,9 @@ jobs:
             echo "::endgroup::"
           done
 
-  build-stack:
-    name: build-stack
-    needs: [test-infra]
+  infra-build:
+    name: infra-build
+    needs: [infra-test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -396,26 +378,54 @@ jobs:
         run: gitleaks detect --source=. --verbose --redact --no-banner
 
   # ═══════════════════════════════════════════════════════════
+  # Outils racine — scripts/ (tooling Python du depot : worktree,
+  # next-version, etc.). Projet poe racine (pyproject.toml a la racine),
+  # PAS apps/api : on lance donc `uv run poe test` SANS `--directory`.
+  # uv installe via la meme action epinglee que setup-api/action.yml
+  # (astral-sh/setup-uv@v7, cache active sur le lockfile racine).
+  # ═══════════════════════════════════════════════════════════
+
+  outils-test:
+    name: outils-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: test (pytest scripts)
+        run: uv run poe test
+
+  # ═══════════════════════════════════════════════════════════
   # Sentinelle finale — seul required check pour branch protection
   # ═══════════════════════════════════════════════════════════
 
   ci-ok:
     name: ci-ok
-    # Liste explicite des jobs BLOQUANTS (1 par stack × concern + builds +
-    # semgrep + infra + secrets). Les *-metrics sont informationnels
-    # (continue-on-error) et volontairement ABSENTS de cette liste.
+    # Liste explicite des 16 jobs BLOQUANTS (1 par stack × concern + builds +
+    # semgrep + outils + secrets). Nommage STACK-FIRST coherent : api-*, web-*,
+    # infra-* (sauf semgrep-api/semgrep-web, conserves tels quels). Les
+    # *-metrics sont informationnels (continue-on-error) et volontairement
+    # ABSENTS de cette liste.
     needs:
       - api-qualite
-      - web-qualite
       - api-securite
-      - web-securite
       - api-test
-      - web-test
+      - api-build
       - semgrep-api
+      - web-qualite
+      - web-securite
+      - web-test
+      - web-build
       - semgrep-web
-      - build-api
-      - build-web
-      - build-stack
+      - infra-qualite
+      - infra-securite
+      - infra-test
+      - infra-build
+      - outils-test
       - secrets-scan
     if: always()
     runs-on: ubuntu-latest
@@ -424,34 +434,39 @@ jobs:
       - name: Verify all required jobs succeeded
         env:
           RESULT_API_QUALITE: ${{ needs.api-qualite.result }}
-          RESULT_WEB_QUALITE: ${{ needs.web-qualite.result }}
           RESULT_API_SECURITE: ${{ needs.api-securite.result }}
-          RESULT_WEB_SECURITE: ${{ needs.web-securite.result }}
           RESULT_API_TEST: ${{ needs.api-test.result }}
-          RESULT_WEB_TEST: ${{ needs.web-test.result }}
+          RESULT_API_BUILD: ${{ needs.api-build.result }}
           RESULT_SEMGREP_API: ${{ needs.semgrep-api.result }}
+          RESULT_WEB_QUALITE: ${{ needs.web-qualite.result }}
+          RESULT_WEB_SECURITE: ${{ needs.web-securite.result }}
+          RESULT_WEB_TEST: ${{ needs.web-test.result }}
+          RESULT_WEB_BUILD: ${{ needs.web-build.result }}
           RESULT_SEMGREP_WEB: ${{ needs.semgrep-web.result }}
-          RESULT_BUILD_API: ${{ needs.build-api.result }}
-          RESULT_BUILD_WEB: ${{ needs.build-web.result }}
-          RESULT_BUILD_STACK: ${{ needs.build-stack.result }}
+          RESULT_INFRA_QUALITE: ${{ needs.infra-qualite.result }}
+          RESULT_INFRA_SECURITE: ${{ needs.infra-securite.result }}
+          RESULT_INFRA_TEST: ${{ needs.infra-test.result }}
+          RESULT_INFRA_BUILD: ${{ needs.infra-build.result }}
+          RESULT_OUTILS_TEST: ${{ needs.outils-test.result }}
           RESULT_SECRETS: ${{ needs.secrets-scan.result }}
         run: |
-          echo "qualite  | api=$RESULT_API_QUALITE | web=$RESULT_WEB_QUALITE"
-          echo "securite | api=$RESULT_API_SECURITE | web=$RESULT_WEB_SECURITE"
-          echo "test     | api=$RESULT_API_TEST | web=$RESULT_WEB_TEST"
+          echo "qualite  | api=$RESULT_API_QUALITE | web=$RESULT_WEB_QUALITE | infra=$RESULT_INFRA_QUALITE"
+          echo "securite | api=$RESULT_API_SECURITE | web=$RESULT_WEB_SECURITE | infra=$RESULT_INFRA_SECURITE"
+          echo "test     | api=$RESULT_API_TEST | web=$RESULT_WEB_TEST | infra=$RESULT_INFRA_TEST | outils=$RESULT_OUTILS_TEST"
+          echo "build    | api=$RESULT_API_BUILD | web=$RESULT_WEB_BUILD | infra=$RESULT_INFRA_BUILD"
           echo "semgrep  | api=$RESULT_SEMGREP_API | web=$RESULT_SEMGREP_WEB"
-          echo "build    | api=$RESULT_BUILD_API | web=$RESULT_BUILD_WEB | stack=$RESULT_BUILD_STACK"
           echo "global   | secrets-scan=$RESULT_SECRETS"
           for r in \
-            "$RESULT_API_QUALITE" "$RESULT_WEB_QUALITE" \
-            "$RESULT_API_SECURITE" "$RESULT_WEB_SECURITE" \
-            "$RESULT_API_TEST" "$RESULT_WEB_TEST" \
-            "$RESULT_SEMGREP_API" "$RESULT_SEMGREP_WEB" \
-            "$RESULT_BUILD_API" "$RESULT_BUILD_WEB" "$RESULT_BUILD_STACK" \
-            "$RESULT_SECRETS"; do
+            "$RESULT_API_QUALITE" "$RESULT_API_SECURITE" "$RESULT_API_TEST" \
+            "$RESULT_API_BUILD" "$RESULT_SEMGREP_API" \
+            "$RESULT_WEB_QUALITE" "$RESULT_WEB_SECURITE" "$RESULT_WEB_TEST" \
+            "$RESULT_WEB_BUILD" "$RESULT_SEMGREP_WEB" \
+            "$RESULT_INFRA_QUALITE" "$RESULT_INFRA_SECURITE" "$RESULT_INFRA_TEST" \
+            "$RESULT_INFRA_BUILD" \
+            "$RESULT_OUTILS_TEST" "$RESULT_SECRETS"; do
             if [[ "$r" != "success" ]]; then
               echo "::error::At least one required job failed (result=$r)"
               exit 1
             fi
           done
-          echo "✅ All required CI jobs green (qualite, securite, test, semgrep, builds, secrets)"
+          echo "✅ All required CI jobs green (qualite, securite, test, builds, semgrep, outils, secrets)"
