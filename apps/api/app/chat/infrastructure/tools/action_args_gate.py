@@ -283,23 +283,40 @@ class ActionArgsGate:
 
     @staticmethod
     def _validate_params(template: Template, raw_params: Any) -> dict[str, Any]:
+        # Orchestration lisible : chaque etape de validation est deleguee a un
+        # helper nomme (extract method). Comportement identique a la version
+        # precedente, mais complexite cyclomatique ramenee sous le seuil McCabe.
         if not isinstance(raw_params, dict):
             raise InvalidToolArgsException("Les parametres doivent etre un objet.")
-        allowed = {param.key for param in template.params}
-        unknown = set(raw_params) - allowed
+        unknown = ActionArgsGate._unknown_params(template, raw_params)
         if unknown:
             raise InvalidToolArgsException(f"Parametres inconnus : {sorted(unknown)}.")
-        # Les parametres `secret` (ex. mot de passe) sont generes au provisioning par
-        # le worker : on ne les exige jamais de l'utilisateur et on ne les propage
-        # pas dans la proposition (jamais saisis, affiches, ni persistes cote chat).
-        secret_keys = {param.key for param in template.params if param.type is ParamType.SECRET}
-        missing = {
+        missing = ActionArgsGate._missing_required_params(template, raw_params)
+        if missing:
+            raise InvalidToolArgsException(f"Parametres requis manquants : {sorted(missing)}.")
+        return ActionArgsGate._strip_secrets(template, raw_params)
+
+    @staticmethod
+    def _unknown_params(template: Template, raw_params: dict[str, Any]) -> set[str]:
+        """Cles fournies qui ne correspondent a aucun parametre declare du template."""
+        allowed = {param.key for param in template.params}
+        return set(raw_params) - allowed
+
+    @staticmethod
+    def _missing_required_params(template: Template, raw_params: dict[str, Any]) -> set[str]:
+        """Parametres requis (hors secrets) absents de l'entree utilisateur."""
+        return {
             param.key
             for param in template.params
             if param.required and param.type is not ParamType.SECRET and param.key not in raw_params
         }
-        if missing:
-            raise InvalidToolArgsException(f"Parametres requis manquants : {sorted(missing)}.")
+
+    @staticmethod
+    def _strip_secrets(template: Template, raw_params: dict[str, Any]) -> dict[str, Any]:
+        """Retire les parametres `secret` (ex. mot de passe) : ils sont generes au
+        provisioning par le worker, jamais exiges de l'utilisateur ni propages dans
+        la proposition (jamais saisis, affiches, ni persistes cote chat)."""
+        secret_keys = {param.key for param in template.params if param.type is ParamType.SECRET}
         return {key: value for key, value in raw_params.items() if key not in secret_keys}
 
     @staticmethod

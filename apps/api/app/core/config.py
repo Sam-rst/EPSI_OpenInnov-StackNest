@@ -22,15 +22,13 @@ class Settings(BaseSettings):
     deployed_at: str = "1970-01-01T00:00:00Z"
     sentry_dsn: str = ""
 
-    # URL SQLAlchemy async (driver asyncpg). Le default pointe sur un Postgres
-    # local (hors Docker) pour permettre un `uv run` sans .env ; en conteneur,
-    # docker-compose injecte l'hote `db`. Source de verite : .env / env vars.
-    # NB securite : le couple `stacknest:stacknest` est un identifiant de DEV
-    # local (Postgres ephemere en conteneur, jamais expose). Aucun secret reel
-    # n'est code en dur ; en preview/prod la CD injecte DATABASE_URL via SOPS.
-    # SonarCloud S6698 (« change/remove this password ») est donc safe-by-design
-    # (dev default), a marquer « reviewed » cote UI. NOSONAR
-    database_url: str = "postgresql+asyncpg://stacknest:stacknest@localhost:5432/stacknest"
+    # URL SQLAlchemy async (driver asyncpg). Le default local n'embarque AUCUN
+    # mot de passe en source (regle « ne jamais coder un credential en dur »,
+    # cf. ISO 25010 / SonarCloud S6698) : le couple complet est fourni par `.env`
+    # en dev (cf. `.env.example`) ou injecte par la CD via SOPS en preview/prod ;
+    # en conteneur, docker-compose fournit `DATABASE_URL`. Le nom d'utilisateur
+    # seul n'est pas un secret.
+    database_url: str = "postgresql+asyncpg://stacknest@localhost:5432/stacknest"
 
     # URL du client Redis (queue de jobs + pub/sub SSE + rate-limit auth). Le
     # default pointe sur un Redis local hors Docker ; en conteneur docker-compose

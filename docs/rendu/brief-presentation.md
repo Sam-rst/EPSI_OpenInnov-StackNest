@@ -64,7 +64,7 @@ protection autour du logo, pas de recolorisation hors palette. Recommandation : 
 ### Slide 0 — Couverture (hors plan, ouverture)
 - **StackNest** + logo + baseline *« Build Fast. Deploy Smart. »*.
 - Sous-titre : *Internal Developer Platform — provisionnez en autonomie.*
-- Contexte : Oral jury EPSI Open Innovation · équipe de 7 (Dev / Cyber / Design-QA).
+- Contexte : Oral jury EPSI Open Innovation · équipe de 7 (Dev / Cyber / Design-QA) · **MVP v0.78.0**.
 - Fond bleu nuit, logo mono blanc/cyan, accent jaune sur la baseline.
 
 ---
@@ -140,8 +140,11 @@ protection autour du logo, pas de recolorisation hors palette. Recommandation : 
 - « Merci — questions ? »
 
 > Si réduction à **6 slides** : fusionner 1a+1b (problématique en 1 slide) et garder 1 slide par bloc.
-> Les contenus **qualité/méthodo, sécurité détaillée et roadmap** (TDD, ~1 184 tests back / 903 front,
-> CI multi-lanes, worktrees) restent disponibles en **slides d'appui / annexe** pour le Q&R.
+> Les contenus suivants restent en **slides d'appui / annexe** (à dégainer en Q&R) :
+> - **Qualité & méthodo** : TDD strict, ~1 184 tests back / ~903 front, **~95 % couverture**, CI multi-lanes + supply-chain durcie (Semgrep épinglé, pin SHA, permissions least-privilege).
+> - **Gestion de projet** : **Kanban** + board Jira, **versioning SemVer dérivé des conventional commits**, Trunk-Based Dev + revue (rapport d'étonnement), **dev multi-agents en worktrees**.
+> - **Roadmap versionnée** : v0.79 (cycle de vie par service, vraie pause, quotas) · v0.80 (MFA, 2ᵉ LLM « juge ») · v1.0 (Terraform/Proxmox).
+> - **Métriques** : v0.78.0, 45 templates (31/14), 11 migrations, 4 environnements.
 
 ## 7. Recommandations visuelles
 
